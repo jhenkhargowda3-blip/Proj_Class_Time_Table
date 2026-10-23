@@ -50,9 +50,20 @@
           </div>
         </div>
 
-        <div style="background: var(--bg-surface-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 0.6rem 1.25rem; text-align: center;">
-          <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Timetable Status</div>
-          <div style="font-size: 1.05rem; font-weight: 700; color: var(--color-success);">Active &amp; Verified</div>
+        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+          <div style="background: var(--bg-surface-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 0.6rem 1rem; text-align: center;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Timetable Status</div>
+            <div style="font-size: 1.05rem; font-weight: 700; color: var(--color-success);">Active &amp; Verified</div>
+          </div>
+          <button class="btn-primary" id="btn-student-export-pdf" style="font-size: 0.85rem; padding: 0.5rem 0.85rem;" title="Download print-ready PDF schedule">
+            📄 Export PDF
+          </button>
+          <button class="btn-secondary" id="btn-student-print-schedule" style="font-size: 0.85rem; padding: 0.5rem 0.85rem;" title="Print weekly schedule">
+            🖨️ Print
+          </button>
+          <button class="btn-secondary" id="btn-student-export-ics" style="font-size: 0.85rem; padding: 0.5rem 0.85rem;" title="Export schedule to calendar (.ics)">
+            📅 Export ICS
+          </button>
         </div>
       </div>
     </div>

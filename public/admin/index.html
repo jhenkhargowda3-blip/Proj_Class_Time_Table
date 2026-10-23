@@ -174,6 +174,9 @@
             <button class="btn-secondary" style="text-align: left; justify-content: flex-start;" onclick="window.switchTab('master-data')">
               🏫 <strong>Master Data:</strong> Manage departments, subjects, sections, and room capacities
             </button>
+            <button class="btn-secondary" style="text-align: left; justify-content: flex-start;" id="btn-overview-backup-json">
+              💾 <strong>Backup System:</strong> Download full database configuration JSON snapshot
+            </button>
           </div>
         </div>
 
@@ -203,6 +206,8 @@
             <button class="btn-secondary" id="btn-studio-activate">Activate Version</button>
             <button class="btn-secondary" id="btn-studio-duplicate">Duplicate</button>
             <button class="btn-secondary" id="btn-studio-export">Export CSV</button>
+            <button class="btn-secondary" id="btn-studio-export-pdf">Export PDF</button>
+            <button class="btn-secondary" id="btn-studio-export-ics">Export ICS</button>
           </div>
         </div>
 
@@ -249,6 +254,7 @@
             <button class="btn-secondary" id="btn-add-section" onclick="window.openSectionModal()">+ Add Section</button>
             <button class="btn-secondary" id="btn-add-holiday" onclick="window.openHolidayModal()">+ Add Holiday</button>
             <button class="btn-secondary" id="btn-add-department" onclick="window.openDepartmentModal()">+ Add Department</button>
+            <button class="btn-secondary" id="btn-admin-backup-json" title="Download snapshot of entire database configuration (JSON)">💾 Backup System (JSON)</button>
           </div>
         </div>
 
@@ -265,6 +271,17 @@
         <!-- Master Data Content Panels -->
         <!-- 1. Faculty -->
         <div id="master-subpanel-faculty" class="master-subpanel">
+          <!-- Faculty Search Bar -->
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; background: var(--bg-surface-subtle); padding: 0.75rem 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+            <div style="flex: 1; min-width: 260px; position: relative;">
+              <input type="text" id="faculty-search-input" class="form-input" placeholder="🔍 Search faculty by name, department, email, or phone..." style="width: 100%; font-size: 0.85rem;">
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <span id="faculty-search-count" style="font-size: 0.82rem; color: var(--text-secondary); font-weight: 600;"></span>
+              <button type="button" class="btn-secondary" id="btn-faculty-search-clear" style="font-size: 0.75rem; padding: 0.35rem 0.65rem; display: none;">Clear Search</button>
+            </div>
+          </div>
+
           <div style="overflow-x: auto;">
             <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
               <thead>

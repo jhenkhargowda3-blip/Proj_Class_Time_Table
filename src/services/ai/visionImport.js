@@ -271,102 +271,112 @@ Rules:
 
     // 1. Try Gemini Vision
     if (gemini) {
-      try {
-        const response = await gemini.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType: mimeType || 'image/png',
-                data: base64Data
+      let geminiSuccess = false;
+      for (let attempt = 1; attempt <= 2 && !geminiSuccess; attempt++) {
+        try {
+          const response = await gemini.models.generateContent({
+            model: 'gemini-3.8-flash',
+            contents: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: mimeType || 'image/png',
+                  data: base64Data
+                }
               }
+            ],
+            config: {
+              responseMimeType: 'application/json'
             }
-          ],
-          config: {
-            responseMimeType: 'application/json'
+          });
+
+          const cleanJson = response.text?.trim() || '{}';
+          const parsed = JSON.parse(cleanJson);
+          const validated = TimetableGridSchema.parse(parsed);
+          const matched = fuzzyMatchEntities(validated.cells, options.sectionId);
+
+          return {
+            success: true,
+            mode: 'gemini_vision',
+            modelUsed: 'gemini-3.8-flash',
+            sectionName: validated.sectionName,
+            ...matched
+          };
+        } catch (err) {
+          if (attempt === 1 && (err?.status === 503 || err?.message?.includes('503') || err?.message?.includes('high demand'))) {
+            await new Promise((resolve) => setTimeout(resolve, 800));
+            continue;
           }
-        });
-
-        const cleanJson = response.text?.trim() || '{}';
-        const parsed = JSON.parse(cleanJson);
-        const validated = TimetableGridSchema.parse(parsed);
-        const matched = fuzzyMatchEntities(validated.cells, options.sectionId);
-
-        return {
-          success: true,
-          mode: 'gemini_vision',
-          modelUsed: 'gemini-3.8-flash',
-          sectionName: validated.sectionName,
-          ...matched
-        };
-      } catch (err) {
-        console.warn('[VisionImport] Gemini Vision call failed, attempting Grok fallback:', err.message);
+          console.log('[VisionImport] Gemini Vision call failed, checking fallback:', err.message);
+          break;
+        }
       }
     }
 
     // 2. Try Grok Vision
     if (isGrokActive) {
-      const messages = [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: prompt },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:${mimeType};base64,${base64Data}`
-              }
-            }
-          ]
-        }
-      ];
-
-      let rawResponse = await callGrok({
-        apiKey: config.grok.visionApiKey,
-        model: config.grok.visionModel,
-        messages,
-        temperature: 0.1
-      });
-
-      // Clean any markdown formatting
-      let cleanJson = rawResponse.trim();
-      if (cleanJson.startsWith('```json')) cleanJson = cleanJson.slice(7);
-      if (cleanJson.startsWith('```')) cleanJson = cleanJson.slice(3);
-      if (cleanJson.endsWith('```')) cleanJson = cleanJson.slice(0, -3);
-      cleanJson = cleanJson.trim();
-
-      let parsed;
       try {
-        parsed = JSON.parse(cleanJson);
-      } catch {
-        // Retry once if invalid JSON
-        console.warn('[VisionImport] Initial JSON parse failed. Retrying with strict instruction...');
-        messages.push({ role: 'assistant', content: rawResponse });
-        messages.push({ role: 'user', content: 'Output the pure JSON object only, without any commentary or extra characters.' });
-        const retryResponse = await callGrok({
+        const messages = [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:${mimeType};base64,${base64Data}`
+                }
+              }
+            ]
+          }
+        ];
+
+        let rawResponse = await callGrok({
           apiKey: config.grok.visionApiKey,
           model: config.grok.visionModel,
           messages,
           temperature: 0.1
         });
-        let retryClean = retryResponse.trim();
-        if (retryClean.startsWith('```json')) retryClean = retryClean.slice(7);
-        if (retryClean.startsWith('```')) retryClean = retryClean.slice(3);
-        if (retryClean.endsWith('```')) retryClean = retryClean.slice(0, -3);
-        parsed = JSON.parse(retryClean.trim());
+
+        // Clean any markdown formatting
+        let cleanJson = rawResponse.trim();
+        if (cleanJson.startsWith('```json')) cleanJson = cleanJson.slice(7);
+        if (cleanJson.startsWith('```')) cleanJson = cleanJson.slice(3);
+        if (cleanJson.endsWith('```')) cleanJson = cleanJson.slice(0, -3);
+        cleanJson = cleanJson.trim();
+
+        let parsed;
+        try {
+          parsed = JSON.parse(cleanJson);
+        } catch {
+          messages.push({ role: 'assistant', content: rawResponse });
+          messages.push({ role: 'user', content: 'Output the pure JSON object only, without any commentary or extra characters.' });
+          const retryResponse = await callGrok({
+            apiKey: config.grok.visionApiKey,
+            model: config.grok.visionModel,
+            messages,
+            temperature: 0.1
+          });
+          let retryClean = retryResponse.trim();
+          if (retryClean.startsWith('```json')) retryClean = retryClean.slice(7);
+          if (retryClean.startsWith('```')) retryClean = retryClean.slice(3);
+          if (retryClean.endsWith('```')) retryClean = retryClean.slice(0, -3);
+          parsed = JSON.parse(retryClean.trim());
+        }
+
+        const validated = TimetableGridSchema.parse(parsed);
+        const matched = fuzzyMatchEntities(validated.cells, options.sectionId);
+
+        return {
+          success: true,
+          mode: 'grok_vision',
+          modelUsed: config.grok.visionModel,
+          sectionName: validated.sectionName,
+          ...matched
+        };
+      } catch (grokErr) {
+        console.log('[VisionImport] Grok Vision fallback unavailable:', grokErr.message);
       }
-
-      const validated = TimetableGridSchema.parse(parsed);
-      const matched = fuzzyMatchEntities(validated.cells, options.sectionId);
-
-      return {
-        success: true,
-        mode: 'grok_vision',
-        modelUsed: config.grok.visionModel,
-        sectionName: validated.sectionName,
-        ...matched
-      };
     }
 
     // Fall back to sample if no AI provider configured

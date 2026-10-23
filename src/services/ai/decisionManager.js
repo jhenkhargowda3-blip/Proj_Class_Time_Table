@@ -1,7 +1,7 @@
 import config from '../../config/env.js';
 import { getDatabase } from '../../db/connection.js';
 import { callGrok } from './grokClient.js';
-import { getGeminiClient } from './geminiClient.js';
+import { getGeminiClient, generateContentWithTimeout } from './geminiClient.js';
 import { findEligibleSubstitutes, assignSubstitution } from '../substitution.js';
 import { validateTimetable } from '../validator.js';
 import { broadcast } from '../sse.js';
@@ -88,47 +88,53 @@ Return JSON ONLY with this schema:
 
   // 1. Try Gemini
   if (gemini) {
-    try {
-      const response = await gemini.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json'
-        }
-      });
-
-      const parsed = JSON.parse(response.text?.trim() || '{}');
-      if (parsed.rankedOptions && Array.isArray(parsed.rankedOptions)) {
-        const rankedOptions = parsed.rankedOptions.map((ro, idx) => {
-          const cand = eligibleCandidates.find(c => c.facultyId === ro.facultyId) || eligibleCandidates[idx];
-          return {
-            ...cand,
-            aiRank: ro.rank || idx + 1,
-            aiScore: ro.score,
-            aiSummary: ro.aiSummary
-          };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await gemini.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json'
+          }
         });
 
-        return {
-          success: true,
-          hasCandidates: true,
-          mode: 'gemini_decision',
-          modelUsed: 'gemini-3.8-flash',
-          timetableEntryId,
-          dateStr,
-          entry,
-          chosenOptionId: parsed.chosenOptionId || rankedOptions[0]?.facultyId,
-          rankedOptions,
-          justification: parsed.justification || 'Candidate selected based on optimal qualification and workload balancing.',
-          risks: parsed.risks || []
-        };
+        const parsed = JSON.parse(response.text?.trim() || '{}');
+        if (parsed.rankedOptions && Array.isArray(parsed.rankedOptions)) {
+          const rankedOptions = parsed.rankedOptions.map((ro, idx) => {
+            const cand = eligibleCandidates.find(c => c.facultyId === ro.facultyId) || eligibleCandidates[idx];
+            return {
+              ...cand,
+              aiRank: ro.rank || idx + 1,
+              aiScore: ro.score,
+              aiSummary: ro.aiSummary
+            };
+          });
+
+          return {
+            success: true,
+            hasCandidates: true,
+            mode: 'gemini_decision',
+            modelUsed: 'gemini-3.8-flash',
+            timetableEntryId,
+            dateStr,
+            entry,
+            chosenOptionId: parsed.chosenOptionId || rankedOptions[0]?.facultyId,
+            rankedOptions,
+            justification: parsed.justification || 'Candidate selected based on optimal qualification and workload balancing.',
+            risks: parsed.risks || []
+          };
+        }
+      } catch (err) {
+        if (attempt === 0 && (err.status === 503 || err.message?.includes('503') || err.message?.includes('high demand'))) {
+          await new Promise(r => setTimeout(r, 600));
+          continue;
+        }
+        break;
       }
-    } catch (err) {
-      console.warn('[DecisionManager] Gemini Decision call failed, trying Grok fallback:', err.message);
     }
   }
 
-  // 2. Try Grok
+  // 2. Try Grok if configured and active
   if (isGrokActive) {
     try {
       const rawResponse = await callGrok({

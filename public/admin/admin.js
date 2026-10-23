@@ -2,6 +2,7 @@ import { apiRequest } from '/js/api.js';
 import { checkSession, logout } from '/js/auth.js';
 import { showToast } from '/js/toast.js';
 import { initSSE, onEvent } from '/js/sse.js';
+import { printOrExportPdf, exportToIcs, downloadFile } from '/js/exportUtils.js';
 
 let currentTab = 'overview';
 let activeVersionId = null;
@@ -74,6 +75,7 @@ function setupNavigation() {
 
   document.getElementById('logout-btn')?.addEventListener('click', logout);
   setupMasterDataSubtabs();
+  setupMasterDataTools();
 }
 
 export function switchTab(tab) {
@@ -100,6 +102,9 @@ export function switchTab(tab) {
   if (tab === 'absence') loadAbsenceMonitor();
   if (tab === 'ai-center') loadAiCenter();
 }
+
+window.switchTab = switchTab;
+
 
 // 1. Overview Loader
 async function loadOverview() {
@@ -165,6 +170,118 @@ function setupMasterDataSubtabs() {
   });
 }
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function setupMasterDataTools() {
+  // 1. Faculty Search Bar
+  const facultySearchInput = document.getElementById('faculty-search-input');
+  const facultySearchClear = document.getElementById('btn-faculty-search-clear');
+
+  facultySearchInput?.addEventListener('input', () => {
+    applyFacultySearch();
+  });
+
+  facultySearchClear?.addEventListener('click', () => {
+    if (facultySearchInput) {
+      facultySearchInput.value = '';
+      applyFacultySearch();
+      facultySearchInput.focus();
+    }
+  });
+
+  // 2. Backup System (JSON Download)
+  const handleBackupDownload = async () => {
+    try {
+      showToast('Exporting complete database snapshot...', 'info');
+      const backupData = await apiRequest('/api/admin/backup');
+      const jsonStr = JSON.stringify(backupData, null, 2);
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+      downloadFile(`ctas_backup_snapshot_${timestamp}.json`, jsonStr, 'application/json');
+      showToast(`Snapshot downloaded (${backupData.stats?.totalFaculty || 0} faculty, ${backupData.stats?.totalTimetableEntries || 0} timetable entries)`, 'success');
+    } catch (err) {
+      showToast('Failed to download backup snapshot: ' + (err.message || 'Error'), 'error');
+    }
+  };
+
+  document.getElementById('btn-admin-backup-json')?.addEventListener('click', handleBackupDownload);
+  document.getElementById('btn-overview-backup-json')?.addEventListener('click', handleBackupDownload);
+}
+
+function applyFacultySearch() {
+  if (!masterData?.faculty) return;
+  const searchInput = document.getElementById('faculty-search-input');
+  const q = (searchInput?.value || '').trim().toLowerCase();
+
+  if (!q) {
+    renderFacultyTable(masterData.faculty);
+    return;
+  }
+
+  const filtered = masterData.faculty.filter(f => {
+    const name = (f.name || '').toLowerCase();
+    const email = (f.email || '').toLowerCase();
+    const phone = (f.phone || '').toLowerCase();
+    const deptCode = (f.department_code || '').toLowerCase();
+    const deptName = (f.department_name || '').toLowerCase();
+    return name.includes(q) || email.includes(q) || phone.includes(q) || deptCode.includes(q) || deptName.includes(q);
+  });
+
+  renderFacultyTable(filtered);
+}
+
+function renderFacultyTable(facultyList = masterData?.faculty || []) {
+  const facTable = document.getElementById('table-faculty-body');
+  const countLabel = document.getElementById('faculty-search-count');
+  const clearBtn = document.getElementById('btn-faculty-search-clear');
+  const searchInput = document.getElementById('faculty-search-input');
+
+  const total = masterData?.faculty?.length || 0;
+  if (countLabel) {
+    if (searchInput && searchInput.value.trim()) {
+      countLabel.textContent = `Showing ${facultyList.length} of ${total} faculty`;
+      if (clearBtn) clearBtn.style.display = 'inline-block';
+    } else {
+      countLabel.textContent = `Showing all ${total} faculty members`;
+      if (clearBtn) clearBtn.style.display = 'none';
+    }
+  }
+
+  if (!facTable) return;
+
+  if (facultyList.length === 0) {
+    facTable.innerHTML = `
+      <tr style="border-bottom: 1px solid var(--border-subtle);">
+        <td colspan="6" style="padding: 2rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle);">
+          🔍 No faculty members match "<strong>${escapeHtml(searchInput?.value || '')}</strong>".
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  facTable.innerHTML = facultyList.map(f => `
+    <tr style="border-bottom: 1px solid var(--border-subtle);">
+      <td style="padding: 0.6rem 0.75rem; font-weight: 600;">${f.name}</td>
+      <td style="padding: 0.6rem 0.75rem;"><span style="background: var(--bg-surface-subtle); padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 600;">${f.department_code}</span> ${f.department_name}</td>
+      <td style="padding: 0.6rem 0.75rem;">${f.email || '—'}</td>
+      <td style="padding: 0.6rem 0.75rem;">${f.phone || '—'}</td>
+      <td style="padding: 0.6rem 0.75rem;" class="tabular-nums">${f.max_periods_per_day} / day · ${f.max_periods_per_week} / wk</td>
+      <td style="padding: 0.6rem 0.75rem; text-align: right;">
+        <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editFaculty(${f.id})">Edit</button>
+        <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteFaculty(${f.id})">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
 function renderMasterDataTables() {
   if (!masterData) return;
 
@@ -182,23 +299,8 @@ function renderMasterDataTables() {
   const deptCount = document.getElementById('count-departments');
   if (deptCount) deptCount.textContent = masterData.departments?.length || 0;
 
-  // 1. Faculty
-  const facTable = document.getElementById('table-faculty-body');
-  if (facTable) {
-    facTable.innerHTML = masterData.faculty.map(f => `
-      <tr style="border-bottom: 1px solid var(--border-subtle);">
-        <td style="padding: 0.6rem 0.75rem; font-weight: 600;">${f.name}</td>
-        <td style="padding: 0.6rem 0.75rem;"><span style="background: var(--bg-surface-subtle); padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 600;">${f.department_code}</span> ${f.department_name}</td>
-        <td style="padding: 0.6rem 0.75rem;">${f.email || '—'}</td>
-        <td style="padding: 0.6rem 0.75rem;">${f.phone || '—'}</td>
-        <td style="padding: 0.6rem 0.75rem;" class="tabular-nums">${f.max_periods_per_day} / day · ${f.max_periods_per_week} / wk</td>
-        <td style="padding: 0.6rem 0.75rem; text-align: right;">
-          <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editFaculty(${f.id})">Edit</button>
-          <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteFaculty(${f.id})">Delete</button>
-        </td>
-      </tr>
-    `).join('');
-  }
+  // 1. Faculty with search filtering
+  applyFacultySearch();
 
   // 2. Subjects
   const subTable = document.getElementById('table-subjects-body');
@@ -361,6 +463,55 @@ function setupStudioControls() {
   document.getElementById('btn-studio-export')?.addEventListener('click', () => {
     if (!activeVersionId) return;
     window.location.href = `/api/timetable/versions/${activeVersionId}/export.csv`;
+  });
+
+  document.getElementById('btn-studio-export-pdf')?.addEventListener('click', () => {
+    if (!currentVersionData || !masterData) {
+      showToast('No timetable version loaded to export', 'warning');
+      return;
+    }
+    const { workingDays, timeSlots } = masterData;
+    const entries = currentVersionData.entries || [];
+    let filteredEntries = entries;
+    let entityName = 'Master College Grid';
+
+    if (studioMode === 'section') {
+      filteredEntries = entries.filter(e => e.section_id === studioEntityId);
+      const sec = masterData.sections.find(s => s.id === studioEntityId);
+      if (sec) entityName = `Section ${sec.name} (Semester ${sec.semester})`;
+    } else if (studioMode === 'faculty') {
+      filteredEntries = entries.filter(e => e.faculty_id === studioEntityId);
+      const fac = masterData.faculty.find(f => f.id === studioEntityId);
+      if (fac) entityName = `Faculty: ${fac.name} (${fac.department_code || ''})`;
+    } else if (studioMode === 'room') {
+      filteredEntries = entries.filter(e => e.room_id === studioEntityId);
+      const rm = masterData.rooms.find(r => r.id === studioEntityId);
+      if (rm) entityName = `Room ${rm.name} (${rm.type || 'Classroom'})`;
+    }
+
+    printOrExportPdf({
+      title: `Timetable Studio Schedule · ${entityName}`,
+      subtitle: `Version: ${currentVersionData.version?.name || 'Academic Master'} (${currentVersionData.version?.status || 'draft'})`,
+      meta: {
+        'View': `By ${studioMode.charAt(0).toUpperCase() + studioMode.slice(1)}`,
+        'Scheduled Periods': `${filteredEntries.length} classes`,
+        'Integrity': currentVersionData.validation?.isValid ? '✓ 0 Conflicts' : `⚠ ${currentVersionData.validation?.errorCount || 0} Conflicts`
+      },
+      days: workingDays,
+      slots: timeSlots,
+      entries: filteredEntries
+    });
+  });
+
+  document.getElementById('btn-studio-export-ics')?.addEventListener('click', () => {
+    if (!activeVersionId || !currentVersionData) {
+      showToast('No timetable version loaded to export', 'warning');
+      return;
+    }
+    const versionName = currentVersionData.version?.name || `Timetable_v${activeVersionId}`;
+    const cleanName = versionName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    exportToIcs(`timetable_${cleanName}`, versionName, currentVersionData.entries || []);
+    showToast('ICS Calendar file generated and downloaded', 'success');
   });
 }
 

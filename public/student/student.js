@@ -2,10 +2,13 @@ import { apiRequest } from '/js/api.js';
 import { checkSession, logout } from '/js/auth.js';
 import { showToast } from '/js/toast.js';
 import { initSSE, onEvent } from '/js/sse.js';
+import { printOrExportPdf, exportToIcs } from '/js/exportUtils.js';
 
 let currentDateStr = new Date().toISOString().split('T')[0];
 let currentSection = null;
+let currentScheduleData = null;
 let activeTab = 'my-section'; // 'my-section' | 'department'
+
 
 document.addEventListener('DOMContentLoaded', async () => {
   const user = await checkSession('student');
@@ -84,11 +87,77 @@ function setupControls() {
     if (dateInput) dateInput.value = currentDateStr;
     loadSchedule(currentDateStr);
   });
+
+  // Export to PDF / Print Schedule
+  const triggerPdfOrPrint = () => {
+    if (!currentScheduleData || !currentScheduleData.fullWeeklySchedule) {
+      showToast('No schedule data loaded to print', 'warning');
+      return;
+    }
+
+    const days = [
+      { id: 1, day_name: 'Monday', day_index: 1 },
+      { id: 2, day_name: 'Tuesday', day_index: 2 },
+      { id: 3, day_name: 'Wednesday', day_index: 3 },
+      { id: 4, day_name: 'Thursday', day_index: 4 },
+      { id: 5, day_name: 'Friday', day_index: 5 },
+      { id: 6, day_name: 'Saturday', day_index: 6 }
+    ];
+
+    const slotMap = new Map();
+    (currentScheduleData.fullWeeklySchedule || []).forEach(e => {
+      if (!slotMap.has(e.slot_no)) {
+        slotMap.set(e.slot_no, {
+          id: e.slot_id,
+          slot_no: e.slot_no,
+          label: e.slot_label || `Period ${e.slot_no}`,
+          start_time: e.start_time,
+          end_time: e.end_time,
+          is_break: false
+        });
+      }
+    });
+
+    const slots = Array.from(slotMap.values()).sort((a, b) => a.slot_no - b.slot_no);
+    const sec = currentScheduleData.section || {};
+
+    printOrExportPdf({
+      title: `Student Timetable · Section ${sec.name || 'General'}`,
+      subtitle: `${sec.department_name || ''} · Semester ${sec.semester || ''} · Academic Year 2026`,
+      meta: {
+        'Section': sec.name || 'N/A',
+        'Department': sec.department_name || 'N/A',
+        'Total Weekly Periods': `${(currentScheduleData.fullWeeklySchedule || []).length} classes`
+      },
+      days,
+      slots,
+      entries: currentScheduleData.fullWeeklySchedule || []
+    });
+  };
+
+  document.getElementById('btn-student-export-pdf')?.addEventListener('click', triggerPdfOrPrint);
+  document.getElementById('btn-student-print-schedule')?.addEventListener('click', triggerPdfOrPrint);
+
+  // Export ICS
+  document.getElementById('btn-student-export-ics')?.addEventListener('click', () => {
+    if (!currentScheduleData || !currentScheduleData.fullWeeklySchedule) {
+      showToast('No schedule data loaded to export', 'warning');
+      return;
+    }
+    const secName = currentScheduleData.section?.name || 'My_Section';
+    exportToIcs(
+      `section_${secName}_schedule`,
+      `Section ${secName} Academic Schedule`,
+      currentScheduleData.fullWeeklySchedule || []
+    );
+    showToast('ICS Calendar file generated and downloaded', 'success');
+  });
 }
 
 async function loadSchedule(dateStr) {
   try {
     const data = await apiRequest(`/api/student/schedule?date=${dateStr}`);
+    currentScheduleData = data;
     currentSection = data.section;
 
     if (data.section) {

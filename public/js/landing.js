@@ -1,6 +1,7 @@
 import { login } from './auth.js';
 import { apiRequest } from './api.js';
 import { showToast } from './toast.js';
+import { updatePasswordMeterUI } from './passwordStrength.js';
 
 let selectedRole = 'admin';
 
@@ -98,6 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
               usernameInput.value = 'jhenkhar';
               passwordInput.value = 'rocky(Jg)';
             }
+            passwordInput.dispatchEvent(new Event('input'));
           }
         }
       }
@@ -121,6 +123,35 @@ document.addEventListener('DOMContentLoaded', () => {
       confirmNewPasswordInput.setAttribute('type', isPassword ? 'text' : 'password');
       toggleNewPasswordBtn.textContent = isPassword ? 'Hide password' : 'Show password';
     });
+  }
+
+  // 1. Live Password Strength Meter for Login Form
+  if (passwordInput) {
+    const updateLoginMeter = () => {
+      updatePasswordMeterUI(passwordInput.value, {
+        wrapId: 'login-password-meter-wrap',
+        labelId: 'login-password-strength-label',
+        barIds: ['login-meter-bar-1', 'login-meter-bar-2', 'login-meter-bar-3', 'login-meter-bar-4']
+      });
+    };
+    passwordInput.addEventListener('input', updateLoginMeter);
+    passwordInput.addEventListener('change', updateLoginMeter);
+    if (passwordInput.value) updateLoginMeter();
+  }
+
+  // 2. Live Password Strength Meter for Reset Form
+  if (newPasswordInput) {
+    const updateResetMeter = () => {
+      updatePasswordMeterUI(newPasswordInput.value, {
+        wrapId: 'reset-password-meter-wrap',
+        labelId: 'reset-password-strength-label',
+        barIds: ['reset-meter-bar-1', 'reset-meter-bar-2', 'reset-meter-bar-3', 'reset-meter-bar-4'],
+        hintId: 'reset-strength-hint'
+      });
+    };
+    newPasswordInput.addEventListener('input', updateResetMeter);
+    newPasswordInput.addEventListener('change', updateResetMeter);
+    if (newPasswordInput.value) updateResetMeter();
   }
 
   // Auto-detect role based on username input
@@ -161,6 +192,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   if (passwordInput && !passwordInput.value) {
     passwordInput.value = 'sharmajii';
+  }
+  if (passwordInput) {
+    passwordInput.dispatchEvent(new Event('input'));
   }
 
   // Form submit handler

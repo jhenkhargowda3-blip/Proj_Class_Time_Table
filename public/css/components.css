@@ -256,3 +256,38 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Print Styles for formatted schedule printing & PDF export */
+#ctas-print-container {
+  display: none;
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #ctas-print-container,
+  #ctas-print-container * {
+    visibility: visible !important;
+  }
+  #ctas-print-container {
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 1.25cm !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    box-sizing: border-box !important;
+  }
+  @page {
+    size: landscape;
+    margin: 0.8cm;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+

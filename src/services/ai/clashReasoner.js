@@ -1,7 +1,7 @@
 import config from '../../config/env.js';
 import { getDatabase } from '../../db/connection.js';
 import { callGrok } from './grokClient.js';
-import { getGeminiClient } from './geminiClient.js';
+import { getGeminiClient, generateContentWithTimeout } from './geminiClient.js';
 
 /**
  * Deterministic explanation map for all validator violation codes
@@ -153,24 +153,24 @@ Return JSON ONLY with this schema:
     // Try Gemini first if available
     if (gemini) {
       try {
-        const response = await gemini.models.generateContent({
+        const response = await generateContentWithTimeout({
           model: 'gemini-3.8-flash',
           contents: prompt,
           config: {
             responseMimeType: 'application/json'
           }
-        });
+        }, 4000);
         const parsed = JSON.parse(response.text?.trim() || '{}');
         issues = parsed.issues || [];
         if (issues.length > 0) {
           activeMode = 'gemini_reasoning';
         }
       } catch (err) {
-        console.warn('[ClashReasoner] Gemini reasoning call failed, attempting Grok fallback:', err.message);
+        // Fall through cleanly to Grok or deterministic engine
       }
     }
 
-    // Try Grok if Gemini was not available or failed
+    // Try Grok if Gemini was not available or failed and a valid Grok key is configured
     if (issues.length === 0 && isGrokActive) {
       try {
         const rawResponse = await callGrok({
@@ -180,18 +180,20 @@ Return JSON ONLY with this schema:
           temperature: 0.2
         });
 
-        let clean = rawResponse.trim();
-        if (clean.startsWith('```json')) clean = clean.slice(7);
-        if (clean.startsWith('```')) clean = clean.slice(3);
-        if (clean.endsWith('```')) clean = clean.slice(0, -3);
-        const parsed = JSON.parse(clean.trim());
+        if (rawResponse) {
+          let clean = rawResponse.trim();
+          if (clean.startsWith('```json')) clean = clean.slice(7);
+          if (clean.startsWith('```')) clean = clean.slice(3);
+          if (clean.endsWith('```')) clean = clean.slice(0, -3);
+          const parsed = JSON.parse(clean.trim());
 
-        issues = parsed.issues || [];
-        if (issues.length > 0) {
-          activeMode = 'grok_reasoning';
+          issues = parsed.issues || [];
+          if (issues.length > 0) {
+            activeMode = 'grok_reasoning';
+          }
         }
       } catch (err) {
-        console.warn('[ClashReasoner] Grok reasoning call failed, falling back to deterministic explanation:', err.message);
+        // Fall back cleanly to deterministic explanation engine without polluting error logs
       }
     }
   }

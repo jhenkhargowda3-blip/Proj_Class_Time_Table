@@ -111,6 +111,20 @@
                       </button>
                     </div>
                     <input type="password" id="password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
+
+                    <!-- Password Strength Meter (Login Form) -->
+                    <div id="login-password-meter-wrap" style="margin-top: 0.4rem; display: none;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                        <span style="font-size: 0.72rem; color: var(--text-muted);">Security Strength</span>
+                        <span id="login-password-strength-label" style="font-size: 0.72rem; font-weight: 700;">Weak</span>
+                      </div>
+                      <div style="display: flex; gap: 4px; height: 4px; width: 100%; border-radius: 9999px; overflow: hidden; background: var(--bg-surface-subtle); border: 1px solid var(--border-subtle);">
+                        <div id="login-meter-bar-1" style="flex: 1; height: 100%; background: transparent; transition: background 0.2s;"></div>
+                        <div id="login-meter-bar-2" style="flex: 1; height: 100%; background: transparent; transition: background 0.2s;"></div>
+                        <div id="login-meter-bar-3" style="flex: 1; height: 100%; background: transparent; transition: background 0.2s;"></div>
+                        <div id="login-meter-bar-4" style="flex: 1; height: 100%; background: transparent; transition: background 0.2s;"></div>
+                      </div>
+                    </div>
                   </div>
 
                   <div style="display: flex; justify-content: flex-end; margin-top: -0.25rem; margin-bottom: 0.85rem;">
@@ -235,6 +249,23 @@
                       </button>
                     </div>
                     <input type="password" id="new-password" class="form-input" placeholder="At least 6 characters" minlength="6" required autocomplete="new-password">
+
+                    <!-- Password Strength Meter (Reset Form) -->
+                    <div id="reset-password-meter-wrap" style="margin-top: 0.4rem; display: none;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                        <span style="font-size: 0.72rem; color: var(--text-muted);">Security Strength</span>
+                        <span id="reset-password-strength-label" style="font-size: 0.72rem; font-weight: 700;">Weak</span>
+                      </div>
+                      <div style="display: flex; gap: 4px; height: 4px; width: 100%; border-radius: 9999px; overflow: hidden; background: var(--bg-surface-subtle); border: 1px solid var(--border-subtle);">
+                        <div id="reset-meter-bar-1" style="flex: 1; height: 100%; background: transparent; transition: background 0.2s;"></div>
+                        <div id="reset-meter-bar-2" style="flex: 1; height: 100%; background: transparent; transition: background 0.2s;"></div>
+                        <div id="reset-meter-bar-3" style="flex: 1; height: 100%; background: transparent; transition: background 0.2s;"></div>
+                        <div id="reset-meter-bar-4" style="flex: 1; height: 100%; background: transparent; transition: background 0.2s;"></div>
+                      </div>
+                      <div id="reset-strength-hint" style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">
+                        Use 8+ characters with uppercase, numbers &amp; symbols.
+                      </div>
+                    </div>
                   </div>
 
                   <div class="form-group">

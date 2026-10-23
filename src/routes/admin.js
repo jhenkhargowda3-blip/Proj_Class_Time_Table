@@ -432,4 +432,77 @@ router.delete('/assignments/section-subject', (req, res) => {
   res.json({ success: true, message: 'Assignment removed' });
 });
 
+// 10. Database Backup System (JSON Snapshot)
+router.get('/backup', (req, res) => {
+  const db = getDatabase();
+  const timestamp = new Date().toISOString();
+
+  // Extract complete snapshots of all relevant tables
+  const departments = db.prepare('SELECT * FROM departments ORDER BY id ASC').all();
+  const faculty = db.prepare('SELECT * FROM faculty ORDER BY id ASC').all();
+  const subjects = db.prepare('SELECT * FROM subjects ORDER BY id ASC').all();
+  const sections = db.prepare('SELECT * FROM sections ORDER BY id ASC').all();
+  const rooms = db.prepare('SELECT * FROM rooms ORDER BY id ASC').all();
+  const workingDays = db.prepare('SELECT * FROM working_days ORDER BY id ASC').all();
+  const timeSlots = db.prepare('SELECT * FROM time_slots ORDER BY id ASC').all();
+  const holidays = db.prepare('SELECT * FROM holidays ORDER BY id ASC').all();
+  const facultyAvailability = db.prepare('SELECT * FROM faculty_availability').all();
+  const facultySubjects = db.prepare('SELECT * FROM faculty_subjects').all();
+  const sectionSubjects = db.prepare('SELECT * FROM section_subjects').all();
+  const timetableVersions = db.prepare('SELECT * FROM timetable_versions ORDER BY id ASC').all();
+  const timetableEntries = db.prepare('SELECT * FROM timetable_entries ORDER BY id ASC').all();
+  const absences = db.prepare('SELECT * FROM absences ORDER BY id ASC').all();
+  const substitutions = db.prepare('SELECT * FROM substitutions ORDER BY id ASC').all();
+
+  const backupPayload = {
+    app: 'Class Timetable Automation System (CTAS)',
+    format: 'CTAS-DATABASE-SNAPSHOT-v1',
+    exportedAt: timestamp,
+    exportedBy: {
+      userId: req.user.id,
+      username: req.user.username,
+      role: req.user.role
+    },
+    tables: {
+      departments,
+      faculty,
+      subjects,
+      sections,
+      rooms,
+      working_days: workingDays,
+      time_slots: timeSlots,
+      holidays,
+      faculty_availability: facultyAvailability,
+      faculty_subjects: facultySubjects,
+      section_subjects: sectionSubjects,
+      timetable_versions: timetableVersions,
+      timetable_entries: timetableEntries,
+      absences,
+      substitutions
+    },
+    stats: {
+      totalDepartments: departments.length,
+      totalFaculty: faculty.length,
+      totalSubjects: subjects.length,
+      totalSections: sections.length,
+      totalRooms: rooms.length,
+      totalTimetableVersions: timetableVersions.length,
+      totalTimetableEntries: timetableEntries.length
+    }
+  };
+
+  // Log in audit trail
+  db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)').run(
+    req.user.id,
+    'DATABASE_BACKUP_SNAPSHOT',
+    JSON.stringify({ exportedAt: timestamp, stats: backupPayload.stats })
+  );
+
+  const fileDate = timestamp.slice(0, 19).replace(/[:T]/g, '-');
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', `attachment; filename="ctas_backup_snapshot_${fileDate}.json"`);
+  res.send(JSON.stringify(backupPayload, null, 2));
+});
+
 export default router;
+

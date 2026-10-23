@@ -182,4 +182,87 @@ router.get('/department-timetable', (req, res) => {
   });
 });
 
+/**
+ * GET /api/student/export.ics
+ * Exports active timetable for student's section as iCalendar file
+ */
+router.get('/export.ics', (req, res) => {
+  const db = getDatabase();
+  const sectionId = req.user.role === 'admin' && req.query.sectionId
+    ? parseInt(req.query.sectionId, 10)
+    : req.user.studentId;
+
+  if (!sectionId) {
+    return res.status(400).send('Section not specified');
+  }
+
+  const section = db.prepare('SELECT name FROM sections WHERE id = ?').get(sectionId);
+  if (!section) return res.status(404).send('Section not found');
+
+  const entries = db.prepare(`
+    SELECT te.*, s.name as subject_name, s.code as subject_code,
+           f.name as faculty_name, r.name as room_name,
+           wd.day_name, wd.day_index,
+           ts.slot_no, ts.start_time, ts.end_time
+    FROM timetable_entries te
+    JOIN timetable_versions tv ON te.version_id = tv.id AND tv.status = 'active'
+    JOIN subjects s ON te.subject_id = s.id
+    JOIN faculty f ON te.faculty_id = f.id
+    JOIN rooms r ON te.room_id = r.id
+    JOIN working_days wd ON te.day_id = wd.id
+    JOIN time_slots ts ON te.slot_id = ts.id
+    WHERE te.section_id = ?
+    ORDER BY wd.day_index, ts.slot_no
+  `).all(sectionId);
+
+  const dayCodeMap = { 0: 'SU', 1: 'MO', 2: 'TU', 3: 'WE', 4: 'TH', 5: 'FR', 6: 'SA' };
+  const now = new Date();
+  const currentDay = now.getDay();
+  const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday);
+
+  const icsLines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//CTAS//Class Timetable Automation System//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    `X-WR-CALNAME:Section ${section.name} Schedule`,
+    'X-WR-TIMEZONE:UTC'
+  ];
+
+  entries.forEach((e, idx) => {
+    const dayCode = dayCodeMap[e.day_index] || 'MO';
+    const targetDate = new Date(monday);
+    const offset = e.day_index === 0 ? 6 : e.day_index - 1;
+    targetDate.setDate(monday.getDate() + offset);
+
+    const dateStr = targetDate.toISOString().slice(0, 10).replace(/-/g, '');
+    const startTimeClean = (e.start_time || '09:00').replace(/[^0-9]/g, '').slice(0, 4) + '00';
+    const endTimeClean = (e.end_time || '10:00').replace(/[^0-9]/g, '').slice(0, 4) + '00';
+
+    icsLines.push(
+      'BEGIN:VEVENT',
+      `UID:ctas-sec-${sectionId}-${idx}-${Date.now()}@ctas.college.edu`,
+      `DTSTAMP:${dateStr}T000000Z`,
+      `DTSTART:${dateStr}T${startTimeClean}`,
+      `DTEND:${dateStr}T${endTimeClean}`,
+      `RRULE:FREQ=WEEKLY;BYDAY=${dayCode}`,
+      `SUMMARY:${(e.subject_code ? e.subject_code + ': ' : '') + e.subject_name}`.replace(/[,;\\]/g, ''),
+      `LOCATION:${e.room_name}`.replace(/[,;\\]/g, ''),
+      `DESCRIPTION:Instructor: ${e.faculty_name}\\nSection: ${section.name}\\nSubject: ${e.subject_name}`.replace(/[,;\\]/g, ''),
+      'STATUS:CONFIRMED',
+      'END:VEVENT'
+    );
+  });
+
+  icsLines.push('END:VCALENDAR');
+
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="section_${section.name}_schedule.ics"`);
+  res.send(icsLines.join('\r\n'));
+});
+
 export default router;
+

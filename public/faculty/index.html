@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Faculty Portal · CTAS</title>
+  <link rel="icon" type="image/png" href="/assets/aistudio/Faculty_1c75ed3c.png">
   <link rel="stylesheet" href="/css/variables.css">
   <link rel="stylesheet" href="/css/base.css">
   <link rel="stylesheet" href="/css/components.css">
@@ -36,9 +37,9 @@
 <body>
   <!-- Top Bar Contract -->
   <header class="top-nav">
-    <a href="/faculty/" class="brand-mark">
-      <div class="brand-logo-badge">CT</div>
-      <span>CTAS · FACULTY PORTAL</span>
+    <a href="/faculty/" class="brand-mark" aria-label="CTAS Faculty Portal">
+      <img src="/assets/aistudio/Main_Logo_b842f85b.png" alt="CTAS Logo" class="brand-main-logo" />
+      <span class="portal-badge portal-badge-faculty">Faculty Portal</span>
     </a>
 
     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
@@ -49,9 +50,14 @@
     </div>
 
     <div class="top-actions">
-      <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; margin-right: 0.5rem;">
-        <span id="user-display-name" style="font-weight: 600;">Faculty Member</span>
-        <span id="user-role-badge" style="font-size: 0.75rem; color: var(--color-brand-primary); font-weight: 700;">FACULTY</span>
+      <div style="display: flex; align-items: center; gap: 0.65rem; font-size: 0.85rem; margin-right: 0.5rem;">
+        <div class="user-avatar-badge" title="Faculty Profile">
+          <img src="/assets/aistudio/Faculty_1c75ed3c.png" alt="Faculty" class="user-avatar-img" />
+        </div>
+        <div>
+          <div id="user-display-name" style="font-weight: 600; line-height: 1.2;">Faculty Member</div>
+          <div id="user-role-badge" style="font-size: 0.72rem; color: var(--color-brand-primary); font-weight: 700; text-transform: uppercase;">FACULTY</div>
+        </div>
       </div>
       <button id="theme-toggle-btn" class="theme-toggle-btn" title="Toggle Light/Dark Theme" aria-label="Toggle Theme">
         <span id="theme-icon">🌙</span>
@@ -66,12 +72,17 @@
     <!-- Profile & Header Banner -->
     <div class="card animate-fade-in" style="margin-bottom: 1.5rem;">
       <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
-        <div>
-          <h2 style="font-size: 2.25rem; color: var(--color-brand-primary); margin-bottom: 0.25rem;" id="faculty-name-header">
-            Faculty Teaching Workspace
-          </h2>
-          <div style="font-size: 0.95rem; color: var(--text-secondary);" id="faculty-dept-line">
-            Department of Computer Science &amp; Engineering
+        <div style="display: flex; align-items: center; gap: 1.15rem;">
+          <div class="page-header-icon-box" title="Faculty Teaching Workspace">
+            <img src="/assets/aistudio/Faculty_1c75ed3c.png" alt="Faculty Workspace" class="page-header-icon-img" />
+          </div>
+          <div>
+            <h2 style="font-size: 2.25rem; color: var(--color-brand-primary); margin-bottom: 0.25rem;" id="faculty-name-header">
+              Faculty Teaching Workspace
+            </h2>
+            <div style="font-size: 0.95rem; color: var(--text-secondary);" id="faculty-dept-line">
+              Department of Computer Science &amp; Engineering
+            </div>
           </div>
         </div>
 

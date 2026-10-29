@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Student Portal · CTAS</title>
+  <link rel="icon" type="image/png" href="/assets/aistudio/Student_480b4c5d.png">
   <link rel="stylesheet" href="/css/variables.css">
   <link rel="stylesheet" href="/css/base.css">
   <link rel="stylesheet" href="/css/components.css">
@@ -13,9 +14,9 @@
 <body>
   <!-- Top Bar Contract -->
   <header class="top-nav">
-    <a href="/student/" class="brand-mark">
-      <div class="brand-logo-badge">CT</div>
-      <span>CTAS · STUDENT PORTAL</span>
+    <a href="/student/" class="brand-mark" aria-label="CTAS Student Portal">
+      <img src="/assets/aistudio/Main_Logo_b842f85b.png" alt="CTAS Logo" class="brand-main-logo" />
+      <span class="portal-badge portal-badge-student">Student Portal</span>
     </a>
 
     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
@@ -24,9 +25,14 @@
     </div>
 
     <div class="top-actions">
-      <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; margin-right: 0.5rem;">
-        <span id="user-display-name" style="font-weight: 600;">Student</span>
-        <span id="user-role-badge" style="font-size: 0.75rem; color: var(--color-brand-primary); font-weight: 700;">STUDENT</span>
+      <div style="display: flex; align-items: center; gap: 0.65rem; font-size: 0.85rem; margin-right: 0.5rem;">
+        <div class="user-avatar-badge" title="Student Profile">
+          <img src="/assets/aistudio/Student_480b4c5d.png" alt="Student" class="user-avatar-img" />
+        </div>
+        <div>
+          <div id="user-display-name" style="font-weight: 600; line-height: 1.2;">Student</div>
+          <div id="user-role-badge" style="font-size: 0.72rem; color: var(--color-brand-primary); font-weight: 700; text-transform: uppercase;">STUDENT</div>
+        </div>
       </div>
       <button id="theme-toggle-btn" class="theme-toggle-btn" title="Toggle Light/Dark Theme" aria-label="Toggle Theme">
         <span id="theme-icon">🌙</span>
@@ -41,12 +47,17 @@
     <!-- Section Banner -->
     <div class="card animate-fade-in" style="margin-bottom: 1.5rem;">
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-        <div>
-          <h2 style="font-size: 2.25rem; color: var(--color-brand-primary); margin-bottom: 0.25rem;" id="section-title-header">
-            Class Schedule &amp; Timetable
-          </h2>
-          <div style="font-size: 0.95rem; color: var(--text-secondary);" id="section-dept-line">
-            Loading section information...
+        <div style="display: flex; align-items: center; gap: 1.15rem;">
+          <div class="page-header-icon-box" title="Student Class Timetable">
+            <img src="/assets/aistudio/Student_480b4c5d.png" alt="Student Schedule" class="page-header-icon-img" />
+          </div>
+          <div>
+            <h2 style="font-size: 2.25rem; color: var(--color-brand-primary); margin-bottom: 0.25rem;" id="section-title-header">
+              Class Schedule &amp; Timetable
+            </h2>
+            <div style="font-size: 0.95rem; color: var(--text-secondary);" id="section-dept-line">
+              Loading section information...
+            </div>
           </div>
         </div>
 

@@ -7,6 +7,7 @@
   <meta name="description" content="Conflict-free timetable generation, real-time faculty availability, absence substitution, and Grok AI assistance for college scheduling.">
   <link rel="stylesheet" href="/css/variables.css">
   <link rel="stylesheet" href="/css/base.css">
+  <link rel="icon" type="image/png" href="/assets/aistudio/Main_Logo_b842f85b.png">
   <link rel="stylesheet" href="/css/components.css">
   <link rel="stylesheet" href="/css/animations.css">
   <link rel="stylesheet" href="/css/pages.css">
@@ -14,9 +15,8 @@
 <body>
   <!-- Top Navigation (3-zone contract) -->
   <header class="top-nav">
-    <a href="/" class="brand-mark">
-      <div class="brand-logo-badge">CT</div>
-      <span>CTAS · COLLEGE TIMETABLE SYSTEM</span>
+    <a href="/" class="brand-mark" aria-label="CTAS - College Timetable Automation System">
+      <img src="/assets/aistudio/Main_Logo_b842f85b.png" alt="CTAS - College Timetable Automation System" class="brand-main-logo" />
     </a>
 
     <nav class="nav-links">
@@ -68,27 +68,38 @@
           <!-- Right Column: Interactive Role Selection & Login -->
           <div class="hero-portal-panel animate-slide-up stagger-1" id="login">
             <div class="login-box">
-              <div class="login-header">
-                <h2 class="login-title" id="selected-role-title">Admin Portal Login</h2>
-                <p class="login-subtitle">Choose your access profile below to authenticate</p>
+              <div class="login-header login-header-flex">
+                <div>
+                  <h2 class="login-title" id="selected-role-title">Admin Portal Login</h2>
+                  <p class="login-subtitle">Choose your access profile below to authenticate</p>
+                </div>
+                <div class="login-active-icon-badge" id="login-active-icon-preview" title="Active Profile">
+                  <img src="/assets/aistudio/Admin_c2028122.png" alt="Active Profile Icon" id="login-role-avatar" class="login-role-avatar-img" />
+                </div>
               </div>
 
               <!-- Role Selector Cards -->
               <div class="role-card-grid">
                 <div class="role-card active" data-role="admin">
-                  <div class="role-card-icon">⚡</div>
+                  <div class="role-card-icon">
+                    <img src="/assets/aistudio/Admin_c2028122.png" alt="Admin Control Plane" class="role-icon-img" />
+                  </div>
                   <div class="role-card-title">Admin</div>
                   <div class="role-card-desc">Master data, generator &amp; studio</div>
                 </div>
 
                 <div class="role-card" data-role="faculty">
-                  <div class="role-card-icon">👨‍🏫</div>
+                  <div class="role-card-icon">
+                    <img src="/assets/aistudio/Faculty_1c75ed3c.png" alt="Faculty Workspace" class="role-icon-img" />
+                  </div>
                   <div class="role-card-title">Faculty</div>
                   <div class="role-card-desc">Calendar, absence &amp; cover board</div>
                 </div>
 
                 <div class="role-card" data-role="student">
-                  <div class="role-card-icon">🎓</div>
+                  <div class="role-card-icon">
+                    <img src="/assets/aistudio/Student_480b4c5d.png" alt="Student Schedule" class="role-icon-img" />
+                  </div>
                   <div class="role-card-title">Student</div>
                   <div class="role-card-desc">Section schedules &amp; live notices</div>
                 </div>
@@ -144,14 +155,17 @@
                 <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle); font-size: 0.8rem; color: var(--text-muted);">
                   <div style="margin-bottom: 0.4rem; font-weight: 600;">One-Click Quick Sign In:</div>
                   <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.85rem;">
-                    <button type="button" class="btn-secondary demo-fill-btn" style="font-size: 0.75rem; padding: 0.35rem 0.65rem; font-weight: 600;" data-demo-user="sharma" data-demo-pass="sharmajii" data-demo-role="admin">
-                      ⚡ Admin (sharma)
+                    <button type="button" class="btn-secondary demo-fill-btn" style="display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.75rem; padding: 0.35rem 0.65rem; font-weight: 600;" data-demo-user="sharma" data-demo-pass="sharmajii" data-demo-role="admin">
+                      <img src="/assets/aistudio/Admin_c2028122.png" alt="" class="demo-btn-thumb" />
+                      Admin (sharma)
                     </button>
-                    <button type="button" class="btn-secondary demo-fill-btn" style="font-size: 0.75rem; padding: 0.35rem 0.65rem; font-weight: 600;" data-demo-user="raj" data-demo-pass="rajiv2112" data-demo-role="faculty">
-                      👨‍🏫 Faculty (raj)
+                    <button type="button" class="btn-secondary demo-fill-btn" style="display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.75rem; padding: 0.35rem 0.65rem; font-weight: 600;" data-demo-user="raj" data-demo-pass="rajiv2112" data-demo-role="faculty">
+                      <img src="/assets/aistudio/Faculty_1c75ed3c.png" alt="" class="demo-btn-thumb" />
+                      Faculty (raj)
                     </button>
-                    <button type="button" class="btn-secondary demo-fill-btn" style="font-size: 0.75rem; padding: 0.35rem 0.65rem; font-weight: 600;" data-demo-user="jhenkhar" data-demo-pass="rocky(Jg)" data-demo-role="student">
-                      🎓 Student (jhenkhar)
+                    <button type="button" class="btn-secondary demo-fill-btn" style="display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.75rem; padding: 0.35rem 0.65rem; font-weight: 600;" data-demo-user="jhenkhar" data-demo-pass="rocky(Jg)" data-demo-role="student">
+                      <img src="/assets/aistudio/Student_480b4c5d.png" alt="" class="demo-btn-thumb" />
+                      Student (jhenkhar)
                     </button>
                   </div>
 

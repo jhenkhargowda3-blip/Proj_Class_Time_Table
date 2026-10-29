@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   setupNavigation();
   setupModals();
+  setupMetricDrilldowns();
   await checkGenerationStatus();
   await loadOverview();
   await loadMasterData();
@@ -106,10 +107,635 @@ export function switchTab(tab) {
 window.switchTab = switchTab;
 
 
-// 1. Overview Loader
+// 1. Overview Loader & Metric Drilldown System
+let cachedOverviewData = null;
+let currentDrilldownType = null;
+let currentDrilldownItems = [];
+
+const METRIC_ICONS = {
+  faculty: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+    <circle cx="9" cy="7" r="4"/>
+    <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+  </svg>`,
+  subjects: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+    <path d="M6 8h2"/><path d="M6 12h2"/><path d="M16 8h2"/><path d="M16 12h2"/>
+  </svg>`,
+  sections: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+    <polyline points="2 17 12 22 22 17"/>
+    <polyline points="2 12 12 17 22 12"/>
+  </svg>`,
+  rooms: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect width="16" height="20" x="4" y="2" rx="2" ry="2"/>
+    <path d="M9 22v-4h6v4"/>
+    <path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M8 10h.01"/><path d="M16 10h.01"/><path d="M8 14h.01"/><path d="M16 14h.01"/>
+  </svg>`,
+  absences: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 2v4"/><path d="M16 2v4"/>
+    <rect width="18" height="18" x="3" y="4" rx="2"/>
+    <path d="M3 10h18"/>
+    <path d="m14 14-4 4"/><path d="m10 14 4 4"/>
+  </svg>`
+};
+
+const COLOR_PALETTES = {
+  faculty: ['#6B0010', '#940C1E', '#C1121F', '#E63946', '#FF7B88', '#FFA3AC'],
+  subjects: ['#1D4ED8', '#2563EB', '#3B82F6', '#60A5FA', '#93C5FD', '#BFDBFE'],
+  sections: ['#B45309', '#D97706', '#F59E0B', '#FBBF24', '#FCD34D', '#FDE68A'],
+  rooms: ['#15803D', '#16A34A', '#22C55E', '#4ADE80', '#86EFAC', '#BBF7D0'],
+  absences: ['#16A34A', '#D97706', '#E11D48', '#64748B']
+};
+
+function capitalize(str) {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function setupMetricDrilldowns() {
+  const cards = document.querySelectorAll('.admin-metric-card[data-metric-type]');
+  cards.forEach(card => {
+    const type = card.getAttribute('data-metric-type');
+    card.addEventListener('click', (e) => {
+      e.preventDefault();
+      openMetricDrilldown(type);
+    });
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openMetricDrilldown(type);
+      }
+    });
+  });
+
+  const modal = document.getElementById('modal-metric-drilldown');
+  const closeBtn = document.getElementById('btn-close-drilldown');
+  const closeX = document.getElementById('btn-close-drilldown-x');
+  const searchInput = document.getElementById('drilldown-search-input');
+  const searchClear = document.getElementById('btn-drilldown-search-clear');
+
+  closeBtn?.addEventListener('click', closeMetricDrilldown);
+  closeX?.addEventListener('click', closeMetricDrilldown);
+
+  modal?.addEventListener('click', (e) => {
+    if (e.target === modal) closeMetricDrilldown();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal && modal.style.display === 'flex') {
+      closeMetricDrilldown();
+    }
+  });
+
+  searchInput?.addEventListener('input', () => {
+    filterDrilldownTable();
+  });
+
+  searchClear?.addEventListener('click', () => {
+    if (searchInput) {
+      searchInput.value = '';
+      searchClear.style.display = 'none';
+      filterDrilldownTable();
+      searchInput.focus();
+    }
+  });
+}
+
+function closeMetricDrilldown() {
+  const modal = document.getElementById('modal-metric-drilldown');
+  if (modal) modal.style.display = 'none';
+}
+window.closeMetricDrilldown = closeMetricDrilldown;
+
+async function openMetricDrilldown(type) {
+  const modal = document.getElementById('modal-metric-drilldown');
+  if (!modal) return;
+
+  currentDrilldownType = type;
+  const searchInput = document.getElementById('drilldown-search-input');
+  const searchClear = document.getElementById('btn-drilldown-search-clear');
+  if (searchInput) searchInput.value = '';
+  if (searchClear) searchClear.style.display = 'none';
+
+  if (!masterData) await loadMasterData();
+  if (!cachedOverviewData) await loadOverview();
+
+  // Set icon badge
+  const iconBadge = document.getElementById('drilldown-icon-badge');
+  if (iconBadge) {
+    iconBadge.className = `metric-icon-badge metric-badge-${type}`;
+    iconBadge.innerHTML = METRIC_ICONS[type] || '';
+  }
+
+  // Set action button
+  const actionBtn = document.getElementById('btn-drilldown-action');
+  if (actionBtn) {
+    actionBtn.onclick = () => {
+      closeMetricDrilldown();
+      if (type === 'absences') {
+        switchTab('absence');
+      } else {
+        switchTab('master-data');
+        const subtabBtn = document.querySelector(`.master-subtab-btn[data-master-subtab="${type}"]`);
+        if (subtabBtn) subtabBtn.click();
+      }
+    };
+    actionBtn.textContent = type === 'absences' ? 'Open Absence Monitor →' : `Manage ${capitalize(type)} in Master Data →`;
+  }
+
+  renderDrilldownContent(type);
+  modal.style.display = 'flex';
+  if (searchInput) setTimeout(() => searchInput.focus(), 50);
+}
+window.openMetricDrilldown = openMetricDrilldown;
+
+function renderDrilldownContent(type) {
+  const tagEl = document.getElementById('drilldown-category-tag');
+  const titleEl = document.getElementById('drilldown-title');
+  const kpiEl = document.getElementById('drilldown-kpis');
+  const distTitleEl = document.getElementById('drilldown-distribution-title');
+  const distSubtitleEl = document.getElementById('drilldown-distribution-subtitle');
+  const theadEl = document.getElementById('drilldown-thead');
+
+  let kpiHtml = '';
+  const countsMap = {};
+  let totalCount = 0;
+  let distTitle = 'Distribution Breakdown';
+  let distSubtitle = '';
+  let theadHtml = '';
+
+  if (type === 'faculty') {
+    const list = masterData?.faculty || [];
+    currentDrilldownItems = list;
+    totalCount = list.length;
+    tagEl.textContent = 'Faculty Roster Drill-down';
+    titleEl.textContent = 'Active Teaching Faculty Breakdown';
+
+    const depts = new Set(list.map(f => f.department_code || f.department_name || 'General'));
+    const avgDay = totalCount ? (list.reduce((acc, f) => acc + (f.max_periods_per_day || 0), 0) / totalCount).toFixed(1) : '0';
+    const avgWeek = totalCount ? (list.reduce((acc, f) => acc + (f.max_periods_per_week || 0), 0) / totalCount).toFixed(1) : '0';
+
+    kpiHtml = `
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Total Faculty</div>
+        <div class="drilldown-kpi-val" style="color: var(--color-brand-primary);">${totalCount}</div>
+      </div>
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Departments</div>
+        <div class="drilldown-kpi-val">${depts.size}</div>
+      </div>
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Avg Max/Day</div>
+        <div class="drilldown-kpi-val">${avgDay} <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">periods</span></div>
+      </div>
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Avg Max/Week</div>
+        <div class="drilldown-kpi-val">${avgWeek} <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">periods</span></div>
+      </div>
+    `;
+
+    list.forEach(f => {
+      const d = f.department_code || f.department_name || 'General';
+      countsMap[d] = (countsMap[d] || 0) + 1;
+    });
+    distTitle = 'Faculty by Department';
+    distSubtitle = `${depts.size} Departments Enrolled`;
+
+    theadHtml = `
+      <tr>
+        <th style="width: 25%;">Faculty Name</th>
+        <th style="width: 15%;">Department</th>
+        <th style="width: 25%;">Email</th>
+        <th style="width: 15%;">Phone</th>
+        <th style="width: 10%; text-align: center;">Max/Day</th>
+        <th style="width: 10%; text-align: right;">Action</th>
+      </tr>
+    `;
+  } else if (type === 'subjects') {
+    const list = masterData?.subjects || [];
+    currentDrilldownItems = list;
+    totalCount = list.length;
+    tagEl.textContent = 'Curriculum Drill-down';
+    titleEl.textContent = 'Curriculum Subjects & Course Breakdown';
+
+    const theory = list.filter(s => s.type === 'theory').length;
+    const lab = list.filter(s => s.type === 'lab').length;
+    const totalPeriods = list.reduce((acc, s) => acc + (s.weekly_periods || 0), 0);
+
+    kpiHtml = `
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Total Subjects</div>
+        <div class="drilldown-kpi-val" style="color: #2563EB;">${totalCount}</div>
+      </div>
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Theory Courses</div>
+        <div class="drilldown-kpi-val">${theory}</div>
+      </div>
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Practical / Labs</div>
+        <div class="drilldown-kpi-val">${lab}</div>
+      </div>
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Weekly Class Load</div>
+        <div class="drilldown-kpi-val">${totalPeriods} <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">periods</span></div>
+      </div>
+    `;
+
+    countsMap['Theory'] = theory;
+    countsMap['Practical / Lab'] = lab;
+    distTitle = 'Course Type Distribution';
+    distSubtitle = `${theory} Theory · ${lab} Labs`;
+
+    theadHtml = `
+      <tr>
+        <th style="width: 15%;">Code</th>
+        <th style="width: 30%;">Subject Name</th>
+        <th style="width: 15%;">Department</th>
+        <th style="width: 10%; text-align: center;">Semester</th>
+        <th style="width: 12%; text-align: center;">Type</th>
+        <th style="width: 10%; text-align: center;">Weekly</th>
+        <th style="width: 8%; text-align: right;">Action</th>
+      </tr>
+    `;
+  } else if (type === 'sections') {
+    const list = masterData?.sections || [];
+    currentDrilldownItems = list;
+    totalCount = list.length;
+    tagEl.textContent = 'Student Cohorts Drill-down';
+    titleEl.textContent = 'Enrolled Student Sections Breakdown';
+
+    const depts = new Set(list.map(s => s.department_code || s.department_name || 'General'));
+    const sems = new Set(list.map(s => s.semester));
+    const totalStrength = list.reduce((acc, s) => acc + (s.strength || 0), 0);
+
+    kpiHtml = `
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Total Sections</div>
+        <div class="drilldown-kpi-val" style="color: #D97706;">${totalCount}</div>
+      </div>
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Departments</div>
+        <div class="drilldown-kpi-val">${depts.size}</div>
+      </div>
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Semesters</div>
+        <div class="drilldown-kpi-val">${sems.size}</div>
+      </div>
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Total Student Capacity</div>
+        <div class="drilldown-kpi-val">${totalStrength || (totalCount * 60)}</div>
+      </div>
+    `;
+
+    list.forEach(s => {
+      const key = `Semester ${s.semester}`;
+      countsMap[key] = (countsMap[key] || 0) + 1;
+    });
+    distTitle = 'Sections by Academic Semester';
+    distSubtitle = `${list.length} cohorts across ${sems.size} levels`;
+
+    theadHtml = `
+      <tr>
+        <th style="width: 25%;">Section Name</th>
+        <th style="width: 25%;">Department</th>
+        <th style="width: 15%; text-align: center;">Semester</th>
+        <th style="width: 20%;">Academic Year</th>
+        <th style="width: 15%; text-align: right;">Action</th>
+      </tr>
+    `;
+  } else if (type === 'rooms') {
+    const list = masterData?.rooms || [];
+    currentDrilldownItems = list;
+    totalCount = list.length;
+    tagEl.textContent = 'Infrastructure Drill-down';
+    titleEl.textContent = 'Campus Classrooms & Specialized Labs';
+
+    const classrooms = list.filter(r => r.type === 'classroom').length;
+    const labs = list.filter(r => r.type === 'lab').length;
+    const seminars = list.filter(r => r.type === 'seminar').length;
+    const totalCap = list.reduce((acc, r) => acc + (r.capacity || 0), 0);
+
+    kpiHtml = `
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Total Venues</div>
+        <div class="drilldown-kpi-val" style="color: #16A34A;">${totalCount}</div>
+      </div>
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Classrooms</div>
+        <div class="drilldown-kpi-val">${classrooms}</div>
+      </div>
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Computer / Science Labs</div>
+        <div class="drilldown-kpi-val">${labs}</div>
+      </div>
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Total Seating Capacity</div>
+        <div class="drilldown-kpi-val">${totalCap} <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">seats</span></div>
+      </div>
+    `;
+
+    countsMap['Classrooms'] = classrooms;
+    countsMap['Specialized Labs'] = labs;
+    if (seminars > 0) countsMap['Seminar Halls'] = seminars;
+    distTitle = 'Venue Type Distribution';
+    distSubtitle = `${totalCap} Total Campus Seating Capacity`;
+
+    theadHtml = `
+      <tr>
+        <th style="width: 30%;">Room / Hall Name</th>
+        <th style="width: 25%;">Venue Type</th>
+        <th style="width: 20%; text-align: center;">Capacity</th>
+        <th style="width: 15%; text-align: center;">Status</th>
+        <th style="width: 10%; text-align: right;">Action</th>
+      </tr>
+    `;
+  } else if (type === 'absences') {
+    const list = cachedOverviewData?.todayAbsences || [];
+    currentDrilldownItems = list;
+    totalCount = list.length;
+    tagEl.textContent = 'Daily Disruptions Drill-down';
+    titleEl.textContent = "Today's Faculty Absence & Coverage Breakdown";
+
+    const covered = list.filter(a => a.status === 'covered').length;
+    const pending = list.filter(a => a.status === 'pending' || !a.status).length;
+    const rate = totalCount > 0 ? Math.round((covered / totalCount) * 100) : 100;
+
+    kpiHtml = `
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Total Absences Today</div>
+        <div class="drilldown-kpi-val" style="color: ${totalCount > 0 ? '#E11D48' : '#16A34A'};">${totalCount}</div>
+      </div>
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Substitutions Covered</div>
+        <div class="drilldown-kpi-val" style="color: #16A34A;">${covered}</div>
+      </div>
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Pending Coverage</div>
+        <div class="drilldown-kpi-val" style="color: ${pending > 0 ? '#D97706' : 'var(--text-muted)'};">${pending}</div>
+      </div>
+      <div class="drilldown-kpi-card">
+        <div class="drilldown-kpi-label">Coverage Rate</div>
+        <div class="drilldown-kpi-val">${rate}%</div>
+      </div>
+    `;
+
+    if (totalCount > 0) {
+      countsMap['Covered'] = covered;
+      countsMap['Pending Coverage'] = pending;
+    } else {
+      countsMap['No Disruptions'] = 1;
+    }
+    distTitle = 'Absence Coverage Resolution';
+    distSubtitle = totalCount > 0 ? `${covered} resolved, ${pending} needing attention` : 'All faculty active & present';
+
+    theadHtml = `
+      <tr>
+        <th style="width: 25%;">Faculty Name</th>
+        <th style="width: 15%;">Date</th>
+        <th style="width: 15%;">Disruption Type</th>
+        <th style="width: 25%;">Reason / Remarks</th>
+        <th style="width: 10%; text-align: center;">Status</th>
+        <th style="width: 10%; text-align: right;">Action</th>
+      </tr>
+    `;
+  }
+
+  kpiEl.innerHTML = kpiHtml;
+  distTitleEl.textContent = distTitle;
+  distSubtitleEl.textContent = distSubtitle;
+  theadEl.innerHTML = theadHtml;
+
+  renderDistributionBar(countsMap, totalCount || 1, COLOR_PALETTES[type] || COLOR_PALETTES.faculty);
+  filterDrilldownTable();
+}
+
+function renderDistributionBar(countsMap, total, palette) {
+  const barEl = document.getElementById('drilldown-segments');
+  const legendEl = document.getElementById('drilldown-legend');
+  if (!barEl || !legendEl) return;
+
+  const entries = Object.entries(countsMap).filter(([_, count]) => count > 0);
+  if (entries.length === 0) {
+    barEl.innerHTML = `<div class="drilldown-segment" style="width: 100%; background: var(--border-subtle);"></div>`;
+    legendEl.innerHTML = `<span style="color: var(--text-muted); font-size: 0.75rem;">No category breakdown records available</span>`;
+    return;
+  }
+
+  let segHtml = '';
+  let legHtml = '';
+
+  entries.forEach(([label, count], idx) => {
+    const color = palette[idx % palette.length];
+    const pct = ((count / total) * 100).toFixed(1);
+    segHtml += `
+      <div class="drilldown-segment" style="width: ${pct}%; background: ${color};" title="${escapeHtml(label)}: ${count} (${pct}%)"></div>
+    `;
+    legHtml += `
+      <div class="drilldown-legend-item">
+        <span class="drilldown-legend-dot" style="background: ${color};"></span>
+        <span><strong>${escapeHtml(label)}</strong>: ${count} <span style="color: var(--text-muted); font-size: 0.72rem;">(${pct}%)</span></span>
+      </div>
+    `;
+  });
+
+  barEl.innerHTML = segHtml;
+  legendEl.innerHTML = legHtml;
+}
+
+function filterDrilldownTable() {
+  const searchInput = document.getElementById('drilldown-search-input');
+  const clearBtn = document.getElementById('btn-drilldown-search-clear');
+  const tbodyEl = document.getElementById('drilldown-tbody');
+  const footerInfo = document.getElementById('drilldown-footer-info');
+  if (!tbodyEl) return;
+
+  const q = (searchInput?.value || '').trim().toLowerCase();
+  if (clearBtn) clearBtn.style.display = q ? 'inline-block' : 'none';
+
+  const type = currentDrilldownType;
+  const items = currentDrilldownItems || [];
+
+  const filtered = items.filter(item => {
+    if (!q) return true;
+    if (type === 'faculty') {
+      const name = (item.name || '').toLowerCase();
+      const email = (item.email || '').toLowerCase();
+      const phone = (item.phone || '').toLowerCase();
+      const dept = (item.department_name || item.department_code || '').toLowerCase();
+      return name.includes(q) || email.includes(q) || phone.includes(q) || dept.includes(q);
+    }
+    if (type === 'subjects') {
+      const code = (item.code || '').toLowerCase();
+      const name = (item.name || '').toLowerCase();
+      const dept = (item.department_name || item.department_code || '').toLowerCase();
+      const sType = (item.type || '').toLowerCase();
+      return code.includes(q) || name.includes(q) || dept.includes(q) || sType.includes(q);
+    }
+    if (type === 'sections') {
+      const name = (item.name || '').toLowerCase();
+      const dept = (item.department_name || item.department_code || '').toLowerCase();
+      const sem = String(item.semester || '');
+      const year = (item.academic_year || '').toLowerCase();
+      return name.includes(q) || dept.includes(q) || sem.includes(q) || year.includes(q);
+    }
+    if (type === 'rooms') {
+      const name = (item.name || '').toLowerCase();
+      const rType = (item.type || '').toLowerCase();
+      const cap = String(item.capacity || '');
+      return name.includes(q) || rType.includes(q) || cap.includes(q);
+    }
+    if (type === 'absences') {
+      const name = (item.faculty_name || '').toLowerCase();
+      const reason = (item.reason || '').toLowerCase();
+      const aType = (item.type || '').toLowerCase();
+      const status = (item.status || '').toLowerCase();
+      return name.includes(q) || reason.includes(q) || aType.includes(q) || status.includes(q);
+    }
+    return true;
+  });
+
+  if (footerInfo) {
+    footerInfo.textContent = `Showing ${filtered.length} of ${items.length} records · Live synchronized system records`;
+  }
+
+  if (filtered.length === 0) {
+    tbodyEl.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
+          <div style="font-size: 1.5rem; margin-bottom: 0.35rem;">🔍</div>
+          <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 0.2rem;">No matching records found</div>
+          <span style="font-size: 0.78rem;">Try clearing or adjusting your search filter keywords</span>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbodyEl.innerHTML = filtered.map(item => {
+    if (type === 'faculty') {
+      return `
+        <tr>
+          <td>
+            <div style="font-weight: 700; color: var(--text-primary);">${escapeHtml(item.name)}</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">${escapeHtml(item.username ? '@' + item.username : '')}</div>
+          </td>
+          <td>
+            <span class="drilldown-badge-pill" style="background: var(--color-brand-blush-soft); color: var(--color-brand-primary);">
+              ${escapeHtml(item.department_code || item.department_name || 'General')}
+            </span>
+          </td>
+          <td><a href="mailto:${escapeHtml(item.email)}" style="color: var(--color-brand-primary); text-decoration: none;">${escapeHtml(item.email || '—')}</a></td>
+          <td style="color: var(--text-secondary); font-size: 0.8rem;">${escapeHtml(item.phone || '—')}</td>
+          <td style="text-align: center; font-weight: 600;" class="tabular-nums">${item.max_periods_per_day || 4}</td>
+          <td style="text-align: right;">
+            <button class="btn-secondary" style="font-size: 0.72rem; padding: 0.2rem 0.5rem;" onclick="window.closeMetricDrilldown(); window.editFaculty(${item.id});">
+              Edit
+            </button>
+          </td>
+        </tr>
+      `;
+    }
+    if (type === 'subjects') {
+      const isLab = item.type === 'lab';
+      return `
+        <tr>
+          <td><span style="font-family: monospace; font-weight: 700; color: var(--color-brand-primary);">${escapeHtml(item.code)}</span></td>
+          <td><div style="font-weight: 600;">${escapeHtml(item.name)}</div></td>
+          <td><span style="font-size: 0.78rem; color: var(--text-secondary);">${escapeHtml(item.department_code || item.department_name || '—')}</span></td>
+          <td style="text-align: center;" class="tabular-nums">Sem ${item.semester}</td>
+          <td style="text-align: center;">
+            <span class="drilldown-badge-pill" style="${isLab ? 'background: #FDF4FF; color: #9333EA; border: 1px solid rgba(147,51,234,0.2);' : 'background: #EFF6FF; color: #2563EB; border: 1px solid rgba(37,99,235,0.2);'}">
+              ${isLab ? '🧪 Practical Lab' : '📖 Theory'}
+            </span>
+          </td>
+          <td style="text-align: center; font-weight: 700;" class="tabular-nums">${item.weekly_periods} / wk</td>
+          <td style="text-align: right;">
+            <button class="btn-secondary" style="font-size: 0.72rem; padding: 0.2rem 0.5rem;" onclick="window.closeMetricDrilldown(); window.editSubject(${item.id});">
+              Edit
+            </button>
+          </td>
+        </tr>
+      `;
+    }
+    if (type === 'sections') {
+      return `
+        <tr>
+          <td><div style="font-weight: 700; color: var(--text-primary);">${escapeHtml(item.name)}</div></td>
+          <td>
+            <span class="drilldown-badge-pill" style="background: #FFFBEB; color: #D97706; border: 1px solid rgba(217,119,6,0.2);">
+              ${escapeHtml(item.department_code || item.department_name || 'General')}
+            </span>
+          </td>
+          <td style="text-align: center; font-weight: 600;" class="tabular-nums">Semester ${item.semester}</td>
+          <td style="color: var(--text-secondary); font-size: 0.8rem;">${escapeHtml(item.academic_year || 'Current')}</td>
+          <td style="text-align: right;">
+            <button class="btn-secondary" style="font-size: 0.72rem; padding: 0.2rem 0.5rem;" onclick="window.closeMetricDrilldown(); window.editSection(${item.id});">
+              Edit
+            </button>
+          </td>
+        </tr>
+      `;
+    }
+    if (type === 'rooms') {
+      const isLab = item.type === 'lab';
+      return `
+        <tr>
+          <td><div style="font-weight: 700; color: var(--text-primary); font-family: monospace;">${escapeHtml(item.name)}</div></td>
+          <td>
+            <span class="drilldown-badge-pill" style="${isLab ? 'background: #F0FDF4; color: #16A34A; border: 1px solid rgba(22,163,74,0.2);' : 'background: var(--bg-surface-subtle); color: var(--text-secondary); border: 1px solid var(--border-subtle);'}">
+              ${isLab ? '💻 Specialized Lab' : '🏛️ Lecture Classroom'}
+            </span>
+          </td>
+          <td style="text-align: center; font-weight: 700;" class="tabular-nums">${item.capacity} seats</td>
+          <td style="text-align: center;">
+            <span class="drilldown-badge-pill" style="background: var(--color-success-bg); color: var(--color-success); border: 1px solid var(--color-success);">
+              ● Active
+            </span>
+          </td>
+          <td style="text-align: right;">
+            <button class="btn-secondary" style="font-size: 0.72rem; padding: 0.2rem 0.5rem;" onclick="window.closeMetricDrilldown(); window.editRoom(${item.id});">
+              Edit
+            </button>
+          </td>
+        </tr>
+      `;
+    }
+    if (type === 'absences') {
+      const isCovered = item.status === 'covered';
+      return `
+        <tr>
+          <td><div style="font-weight: 700;">${escapeHtml(item.faculty_name || 'Faculty Member')}</div></td>
+          <td class="tabular-nums" style="font-size: 0.8rem; color: var(--text-secondary);">${escapeHtml(item.date || 'Today')}</td>
+          <td>
+            <span class="drilldown-badge-pill" style="background: #FFF1F2; color: #E11D48; border: 1px solid rgba(225,29,72,0.2);">
+              ${escapeHtml(capitalize(item.type || 'Absent'))}
+            </span>
+          </td>
+          <td style="color: var(--text-secondary); font-size: 0.8rem;">${escapeHtml(item.reason || 'Personal / Academic leave')}</td>
+          <td style="text-align: center;">
+            <span class="drilldown-badge-pill" style="${isCovered ? 'background: var(--color-success-bg); color: var(--color-success); border: 1px solid var(--color-success);' : 'background: var(--color-warning-bg); color: var(--color-warning); border: 1px solid var(--color-warning);'}">
+              ${isCovered ? '✓ Covered' : '⏳ Pending'}
+            </span>
+          </td>
+          <td style="text-align: right;">
+            <button class="btn-secondary" style="font-size: 0.72rem; padding: 0.2rem 0.5rem;" onclick="window.closeMetricDrilldown(); window.switchTab('absence');">
+              Manage
+            </button>
+          </td>
+        </tr>
+      `;
+    }
+    return '';
+  }).join('');
+}
+
 async function loadOverview() {
   try {
     const data = await apiRequest('/api/admin/overview');
+    cachedOverviewData = data;
     document.getElementById('stat-faculty').textContent = data.stats.facultyCount;
     document.getElementById('stat-subjects').textContent = data.stats.subjectsCount;
     document.getElementById('stat-sections').textContent = data.stats.sectionsCount;

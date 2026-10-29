@@ -56,6 +56,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (roleTitle) {
       roleTitle.textContent = `${newRole.charAt(0).toUpperCase() + newRole.slice(1)} Portal Login`;
     }
+    const roleAvatar = document.getElementById('login-role-avatar');
+    if (roleAvatar) {
+      if (newRole === 'faculty') {
+        roleAvatar.src = '/assets/aistudio/Faculty_1c75ed3c.png';
+        roleAvatar.alt = 'Faculty Profile';
+      } else if (newRole === 'student') {
+        roleAvatar.src = '/assets/aistudio/Student_480b4c5d.png';
+        roleAvatar.alt = 'Student Profile';
+      } else {
+        roleAvatar.src = '/assets/aistudio/Admin_c2028122.png';
+        roleAvatar.alt = 'Admin Profile';
+      }
+    }
   }
 
   // Switch between Login, Forgot Password, and Reset Password views

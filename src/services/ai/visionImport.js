@@ -4,7 +4,7 @@ import { z } from 'zod';
 import config from '../../config/env.js';
 import { getDatabase } from '../../db/connection.js';
 import { callGrok } from './grokClient.js';
-import { getGeminiClient } from './geminiClient.js';
+import { getGeminiClient, generateContentWithTimeout } from './geminiClient.js';
 import { validateTimetable } from '../validator.js';
 
 // Zod schema for structured timetable extraction
@@ -271,45 +271,37 @@ Rules:
 
     // 1. Try Gemini Vision
     if (gemini) {
-      let geminiSuccess = false;
-      for (let attempt = 1; attempt <= 2 && !geminiSuccess; attempt++) {
-        try {
-          const response = await gemini.models.generateContent({
-            model: 'gemini-3.8-flash',
-            contents: [
-              { text: prompt },
-              {
-                inlineData: {
-                  mimeType: mimeType || 'image/png',
-                  data: base64Data
-                }
+      try {
+        const response = await generateContentWithTimeout({
+          model: 'gemini-2.5-flash',
+          contents: [
+            { text: prompt },
+            {
+              inlineData: {
+                mimeType: mimeType || 'image/png',
+                data: base64Data
               }
-            ],
-            config: {
-              responseMimeType: 'application/json'
             }
-          });
-
-          const cleanJson = response.text?.trim() || '{}';
-          const parsed = JSON.parse(cleanJson);
-          const validated = TimetableGridSchema.parse(parsed);
-          const matched = fuzzyMatchEntities(validated.cells, options.sectionId);
-
-          return {
-            success: true,
-            mode: 'gemini_vision',
-            modelUsed: 'gemini-3.8-flash',
-            sectionName: validated.sectionName,
-            ...matched
-          };
-        } catch (err) {
-          if (attempt === 1 && (err?.status === 503 || err?.message?.includes('503') || err?.message?.includes('high demand'))) {
-            await new Promise((resolve) => setTimeout(resolve, 800));
-            continue;
+          ],
+          config: {
+            responseMimeType: 'application/json'
           }
-          console.log('[VisionImport] Gemini Vision call failed, checking fallback:', err.message);
-          break;
-        }
+        }, 5000);
+
+        const cleanJson = response.text?.trim() || '{}';
+        const parsed = JSON.parse(cleanJson);
+        const validated = TimetableGridSchema.parse(parsed);
+        const matched = fuzzyMatchEntities(validated.cells, options.sectionId);
+
+        return {
+          success: true,
+          mode: 'gemini_vision',
+          modelUsed: 'gemini-2.5-flash',
+          sectionName: validated.sectionName,
+          ...matched
+        };
+      } catch (err) {
+        console.log('[VisionImport] Gemini Vision call failed, checking fallback:', err.message);
       }
     }
 

@@ -19,9 +19,10 @@ export function getDatabase() {
 
   dbInstance = new Database(config.dbPath);
   
-  // Enforce WAL mode, busy timeout, and foreign key constraints
+  // Enforce WAL mode, busy timeout, synchronous mode, and foreign key constraints
   dbInstance.pragma('journal_mode = WAL');
-  dbInstance.pragma('busy_timeout = 5000');
+  dbInstance.pragma('synchronous = NORMAL');
+  dbInstance.pragma('busy_timeout = 10000');
   dbInstance.pragma('foreign_keys = ON');
 
   // Initialize schema if not present

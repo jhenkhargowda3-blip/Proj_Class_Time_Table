@@ -154,12 +154,12 @@ Return JSON ONLY with this schema:
     if (gemini) {
       try {
         const response = await generateContentWithTimeout({
-          model: 'gemini-3.8-flash',
+          model: 'gemini-2.5-flash',
           contents: prompt,
           config: {
             responseMimeType: 'application/json'
           }
-        }, 4000);
+        }, 3500);
         const parsed = JSON.parse(response.text?.trim() || '{}');
         issues = parsed.issues || [];
         if (issues.length > 0) {

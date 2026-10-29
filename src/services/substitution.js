@@ -363,47 +363,47 @@ export function findEligibleSubstitutes(timetableEntryId, dateStr) {
 export function claimSubstitution({ timetableEntryId, dateStr, substituteFacultyId, userId }) {
   const db = getDatabase();
 
+  // Find substitution record
+  const sub = db.prepare(`
+    SELECT sub.*, a.faculty_id as absent_faculty_id,
+           te.slot_id, te.day_id, te.subject_id, te.version_id,
+           s.name as subject_name, ts.slot_no, ts.start_time, ts.end_time,
+           orig_f.name as absent_faculty_name
+    FROM substitutions sub
+    JOIN absences a ON sub.absence_id = a.id
+    JOIN timetable_entries te ON sub.timetable_entry_id = te.id
+    JOIN subjects s ON te.subject_id = s.id
+    JOIN time_slots ts ON te.slot_id = ts.id
+    JOIN faculty orig_f ON a.faculty_id = orig_f.id
+    WHERE sub.timetable_entry_id = ? AND sub.date = ?
+  `).get(timetableEntryId, dateStr);
+
+  if (!sub) {
+    throw new Error(`No substitution request found for timetable entry ${timetableEntryId} on ${dateStr}`);
+  }
+
+  if (sub.status === 'accepted' || sub.status === 'assigned') {
+    throw new Error('This substitution slot has already been claimed or assigned.');
+  }
+
+  if (sub.absent_faculty_id === substituteFacultyId) {
+    throw new Error('You cannot substitute for your own class.');
+  }
+
+  // Verify substitute faculty is active
+  const subFaculty = db.prepare('SELECT * FROM faculty WHERE id = ? AND is_active = 1').get(substituteFacultyId);
+  if (!subFaculty) {
+    throw new Error('Substitute faculty not found or inactive');
+  }
+
+  // Verify candidate is eligible via hard constraints
+  const eligibleList = findEligibleSubstitutes(timetableEntryId, dateStr);
+  const eligible = eligibleList.find(c => c.facultyId === substituteFacultyId);
+  if (!eligible) {
+    throw new Error('You are not eligible for this slot due to a timetable clash, absence, or daily load limit.');
+  }
+
   const claimTx = db.transaction(() => {
-    // Find substitution record
-    const sub = db.prepare(`
-      SELECT sub.*, a.faculty_id as absent_faculty_id,
-             te.slot_id, te.day_id, te.subject_id, te.version_id,
-             s.name as subject_name, ts.slot_no, ts.start_time, ts.end_time,
-             orig_f.name as absent_faculty_name
-      FROM substitutions sub
-      JOIN absences a ON sub.absence_id = a.id
-      JOIN timetable_entries te ON sub.timetable_entry_id = te.id
-      JOIN subjects s ON te.subject_id = s.id
-      JOIN time_slots ts ON te.slot_id = ts.id
-      JOIN faculty orig_f ON a.faculty_id = orig_f.id
-      WHERE sub.timetable_entry_id = ? AND sub.date = ?
-    `).get(timetableEntryId, dateStr);
-
-    if (!sub) {
-      throw new Error(`No substitution request found for timetable entry ${timetableEntryId} on ${dateStr}`);
-    }
-
-    if (sub.status === 'accepted' || sub.status === 'assigned') {
-      throw new Error('This substitution slot has already been claimed or assigned.');
-    }
-
-    if (sub.absent_faculty_id === substituteFacultyId) {
-      throw new Error('You cannot substitute for your own class.');
-    }
-
-    // Verify substitute faculty is active
-    const subFaculty = db.prepare('SELECT * FROM faculty WHERE id = ? AND is_active = 1').get(substituteFacultyId);
-    if (!subFaculty) {
-      throw new Error('Substitute faculty not found or inactive');
-    }
-
-    // Verify candidate is eligible via hard constraints
-    const eligibleList = findEligibleSubstitutes(timetableEntryId, dateStr);
-    const eligible = eligibleList.find(c => c.facultyId === substituteFacultyId);
-    if (!eligible) {
-      throw new Error('You are not eligible for this slot due to a timetable clash, absence, or daily load limit.');
-    }
-
     // Atomic update with status guard
     const updateRes = db.prepare(`
       UPDATE substitutions
@@ -473,37 +473,37 @@ export function claimSubstitution({ timetableEntryId, dateStr, substituteFaculty
 export function assignSubstitution({ timetableEntryId, dateStr, substituteFacultyId, adminUserId }) {
   const db = getDatabase();
 
+  const sub = db.prepare(`
+    SELECT sub.*, a.faculty_id as absent_faculty_id,
+           te.slot_id, te.day_id, te.subject_id, te.version_id,
+           s.name as subject_name, ts.slot_no,
+           orig_f.name as absent_faculty_name
+    FROM substitutions sub
+    JOIN absences a ON sub.absence_id = a.id
+    JOIN timetable_entries te ON sub.timetable_entry_id = te.id
+    JOIN subjects s ON te.subject_id = s.id
+    JOIN time_slots ts ON te.slot_id = ts.id
+    JOIN faculty orig_f ON a.faculty_id = orig_f.id
+    WHERE sub.timetable_entry_id = ? AND sub.date = ?
+  `).get(timetableEntryId, dateStr);
+
+  if (!sub) {
+    throw new Error(`No substitution request found for timetable entry ${timetableEntryId} on ${dateStr}`);
+  }
+
+  const subFaculty = db.prepare('SELECT * FROM faculty WHERE id = ? AND is_active = 1').get(substituteFacultyId);
+  if (!subFaculty) {
+    throw new Error('Selected substitute faculty not found or inactive');
+  }
+
+  // Verify candidate is eligible
+  const eligibleList = findEligibleSubstitutes(timetableEntryId, dateStr);
+  const eligible = eligibleList.find(c => c.facultyId === substituteFacultyId);
+  if (!eligible) {
+    throw new Error(`Faculty ${subFaculty.name} is not eligible for this slot due to a clash, absence, or daily load limit.`);
+  }
+
   const assignTx = db.transaction(() => {
-    const sub = db.prepare(`
-      SELECT sub.*, a.faculty_id as absent_faculty_id,
-             te.slot_id, te.day_id, te.subject_id, te.version_id,
-             s.name as subject_name, ts.slot_no,
-             orig_f.name as absent_faculty_name
-      FROM substitutions sub
-      JOIN absences a ON sub.absence_id = a.id
-      JOIN timetable_entries te ON sub.timetable_entry_id = te.id
-      JOIN subjects s ON te.subject_id = s.id
-      JOIN time_slots ts ON te.slot_id = ts.id
-      JOIN faculty orig_f ON a.faculty_id = orig_f.id
-      WHERE sub.timetable_entry_id = ? AND sub.date = ?
-    `).get(timetableEntryId, dateStr);
-
-    if (!sub) {
-      throw new Error(`No substitution request found for timetable entry ${timetableEntryId} on ${dateStr}`);
-    }
-
-    const subFaculty = db.prepare('SELECT * FROM faculty WHERE id = ? AND is_active = 1').get(substituteFacultyId);
-    if (!subFaculty) {
-      throw new Error('Selected substitute faculty not found or inactive');
-    }
-
-    // Verify candidate is eligible
-    const eligibleList = findEligibleSubstitutes(timetableEntryId, dateStr);
-    const eligible = eligibleList.find(c => c.facultyId === substituteFacultyId);
-    if (!eligible) {
-      throw new Error(`Faculty ${subFaculty.name} is not eligible for this slot due to a clash, absence, or daily load limit.`);
-    }
-
     db.prepare(`
       UPDATE substitutions
       SET substitute_faculty_id = ?, status = 'assigned', requested_by = ?

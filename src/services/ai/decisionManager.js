@@ -88,49 +88,43 @@ Return JSON ONLY with this schema:
 
   // 1. Try Gemini
   if (gemini) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const response = await gemini.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: prompt,
-          config: {
-            responseMimeType: 'application/json'
-          }
+    try {
+      const response = await generateContentWithTimeout({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json'
+        }
+      }, 3500);
+
+      const parsed = JSON.parse(response.text?.trim() || '{}');
+      if (parsed.rankedOptions && Array.isArray(parsed.rankedOptions)) {
+        const rankedOptions = parsed.rankedOptions.map((ro, idx) => {
+          const cand = eligibleCandidates.find(c => c.facultyId === ro.facultyId) || eligibleCandidates[idx];
+          return {
+            ...cand,
+            aiRank: ro.rank || idx + 1,
+            aiScore: ro.score,
+            aiSummary: ro.aiSummary
+          };
         });
 
-        const parsed = JSON.parse(response.text?.trim() || '{}');
-        if (parsed.rankedOptions && Array.isArray(parsed.rankedOptions)) {
-          const rankedOptions = parsed.rankedOptions.map((ro, idx) => {
-            const cand = eligibleCandidates.find(c => c.facultyId === ro.facultyId) || eligibleCandidates[idx];
-            return {
-              ...cand,
-              aiRank: ro.rank || idx + 1,
-              aiScore: ro.score,
-              aiSummary: ro.aiSummary
-            };
-          });
-
-          return {
-            success: true,
-            hasCandidates: true,
-            mode: 'gemini_decision',
-            modelUsed: 'gemini-3.8-flash',
-            timetableEntryId,
-            dateStr,
-            entry,
-            chosenOptionId: parsed.chosenOptionId || rankedOptions[0]?.facultyId,
-            rankedOptions,
-            justification: parsed.justification || 'Candidate selected based on optimal qualification and workload balancing.',
-            risks: parsed.risks || []
-          };
-        }
-      } catch (err) {
-        if (attempt === 0 && (err.status === 503 || err.message?.includes('503') || err.message?.includes('high demand'))) {
-          await new Promise(r => setTimeout(r, 600));
-          continue;
-        }
-        break;
+        return {
+          success: true,
+          hasCandidates: true,
+          mode: 'gemini_decision',
+          modelUsed: 'gemini-2.5-flash',
+          timetableEntryId,
+          dateStr,
+          entry,
+          chosenOptionId: parsed.chosenOptionId || rankedOptions[0]?.facultyId,
+          rankedOptions,
+          justification: parsed.justification || 'Candidate selected based on optimal qualification and workload balancing.',
+          risks: parsed.risks || []
+        };
       }
+    } catch (err) {
+      console.warn('[DecisionManager] Gemini call failed, falling back:', err.message);
     }
   }
 

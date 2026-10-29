@@ -23,6 +23,12 @@
       transform: translateY(-2px);
       box-shadow: var(--shadow-md);
     }
+    .alert-absences-transition {
+      transition: color 0.3s ease, transform 0.2s ease;
+      color: #E11D48 !important;
+      transform: scale(1.2);
+      display: inline-block;
+    }
   </style>
 </head>
 <body>
@@ -135,14 +141,22 @@
           <div class="admin-metric-card" data-metric-type="faculty" role="button" tabindex="0" title="Click to view detailed faculty breakdown" aria-haspopup="dialog">
             <div>
               <div class="metric-header">
-                <span class="metric-label">Active Faculty</span>
-                <div class="metric-icon-badge metric-badge-faculty" title="Teaching Faculty">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-                    <circle cx="9" cy="7" r="4"/>
-                    <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                  </svg>
+                <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+                  <span class="metric-label">Active Faculty</span>
+                  <span class="metric-live-ping" id="faculty-live-ping" style="display: none;">Status Updated</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.45rem;">
+                  <button type="button" class="metric-pulse-preview-btn" id="btn-preview-faculty-pulse" title="Preview live status pulse animation" aria-label="Preview live pulse">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                  </button>
+                  <div class="metric-icon-badge metric-badge-faculty" title="Teaching Faculty">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                      <circle cx="9" cy="7" r="4"/>
+                      <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                  </div>
                 </div>
               </div>
               <div class="metric-value-row">
@@ -248,16 +262,24 @@
           <div class="admin-metric-card" data-metric-type="absences" role="button" tabindex="0" title="Click to view today's absences and coverage" aria-haspopup="dialog">
             <div>
               <div class="metric-header">
-                <span class="metric-label">Today's Absences</span>
-                <div class="metric-icon-badge metric-badge-absences" title="Absence Monitoring">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M8 2v4"/>
-                    <path d="M16 2v4"/>
-                    <rect width="18" height="18" x="3" y="4" rx="2"/>
-                    <path d="M3 10h18"/>
-                    <path d="m14 14-4 4"/>
-                    <path d="m10 14 4 4"/>
-                  </svg>
+                <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
+                  <span class="metric-label">Today's Absences</span>
+                  <span class="metric-live-ping" id="absences-live-ping" style="display: none;">Updated</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.45rem;">
+                  <button type="button" class="metric-pulse-preview-btn" id="btn-preview-absences-pulse" title="Preview absences count alert animation" aria-label="Preview absences pulse">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                  </button>
+                  <div class="metric-icon-badge metric-badge-absences" title="Absence Monitoring">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M8 2v4"/>
+                      <path d="M16 2v4"/>
+                      <rect width="18" height="18" x="3" y="4" rx="2"/>
+                      <path d="M3 10h18"/>
+                      <path d="m14 14-4 4"/>
+                      <path d="m10 14 4 4"/>
+                    </svg>
+                  </div>
                 </div>
               </div>
               <div class="metric-value-row">

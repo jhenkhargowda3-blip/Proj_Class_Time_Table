@@ -623,9 +623,34 @@
 
 .metric-value-absences {
   color: var(--color-success);
+  display: inline-block;
+  transform-origin: left center;
+  transition: color 0.45s cubic-bezier(0.16, 1, 0.3, 1), transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), text-shadow 0.45s ease;
 }
 [data-theme="dark"] .metric-value-absences {
   color: #4ADE80;
+}
+
+/* Alert Red & Scale transition on Today's Absences count update */
+.metric-value-absences.absences-alert-pulse,
+#stat-absences.absences-alert-pulse {
+  color: #E11D48 !important;
+  transform: scale(1.22);
+  text-shadow: 0 0 16px rgba(225, 29, 72, 0.45);
+}
+
+[data-theme="dark"] .metric-value-absences.absences-alert-pulse,
+[data-theme="dark"] #stat-absences.absences-alert-pulse {
+  color: #FF4D6D !important;
+  text-shadow: 0 0 18px rgba(255, 77, 109, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metric-value-absences,
+  .metric-value-absences.absences-alert-pulse,
+  #stat-absences.absences-alert-pulse {
+    transform: none !important;
+  }
 }
 
 .metric-subtext {
@@ -891,3 +916,123 @@
   display: inline-block;
   line-height: 1.2;
 }
+
+/* ==========================================================================
+   Subtle 'Pulse' Animation & Attention Cues for Active Faculty Status
+   ========================================================================== */
+.admin-metric-card.pulse-active {
+  animation: metricAttentionPulse 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  border-color: var(--color-brand-primary) !important;
+  background: var(--bg-surface) !important;
+  z-index: 5;
+}
+
+.admin-metric-card.pulse-active::before {
+  background: linear-gradient(90deg, var(--color-brand-primary), var(--color-brand-accent), var(--color-brand-primary)) !important;
+  height: 4px !important;
+}
+
+.admin-metric-card.pulse-active .metric-badge-faculty {
+  animation: metricBadgeGlow 1.8s ease-in-out !important;
+}
+
+.admin-metric-card.pulse-active #stat-faculty {
+  animation: metricValueBounce 1.8s ease-in-out !important;
+}
+
+/* Live Status Update Ping Badge */
+.metric-live-ping {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 9999px;
+  line-height: 1.2;
+  transition: opacity 0.3s ease;
+  white-space: nowrap;
+}
+
+.metric-live-ping::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pingDot 1s infinite ease-in-out;
+}
+
+.metric-ping-alert {
+  background: rgba(225, 29, 72, 0.12);
+  color: #E11D48;
+  border: 1px solid rgba(225, 29, 72, 0.3);
+}
+
+.metric-ping-success {
+  background: rgba(22, 163, 74, 0.12);
+  color: #16A34A;
+  border: 1px solid rgba(22, 163, 74, 0.3);
+}
+
+.metric-ping-info {
+  background: var(--color-brand-blush-soft);
+  color: var(--color-brand-primary);
+  border: 1px solid rgba(107, 0, 16, 0.25);
+}
+
+.metric-pulse-preview-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.metric-pulse-preview-btn:hover {
+  color: var(--color-brand-primary);
+  border-color: var(--color-brand-primary);
+  background: var(--color-brand-blush-soft);
+  transform: scale(1.08);
+}
+
+[data-theme="dark"] .admin-metric-card.pulse-active {
+  box-shadow: 0 0 24px rgba(230, 57, 70, 0.38) !important;
+  border-color: #E63946 !important;
+}
+
+[data-theme="dark"] .metric-ping-alert {
+  background: rgba(225, 29, 72, 0.25);
+  color: #FDA4AF;
+  border-color: rgba(225, 29, 72, 0.45);
+}
+
+[data-theme="dark"] .metric-ping-success {
+  background: rgba(22, 163, 74, 0.25);
+  color: #86EFAC;
+  border-color: rgba(22, 163, 74, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-metric-card.pulse-active {
+    animation: none !important;
+    border-color: var(--color-brand-primary) !important;
+    box-shadow: 0 0 12px rgba(107, 0, 16, 0.3) !important;
+  }
+  .admin-metric-card.pulse-active .metric-badge-faculty,
+  .admin-metric-card.pulse-active #stat-faculty,
+  .metric-live-ping::before {
+    animation: none !important;
+  }
+}
+

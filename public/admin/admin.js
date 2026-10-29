@@ -17,6 +17,9 @@ let isGenerationRunning = false;
 let generationStartTime = null;
 let generationTimerInterval = null;
 
+// Absence Tracking & Active Faculty Pulse Notification State
+let lastObservedAbsenceCount = null;
+
 document.addEventListener('DOMContentLoaded', async () => {
   const user = await checkSession('admin');
   if (!user) return;
@@ -42,16 +45,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   onEvent('absence:created', (data) => {
     showToast(`Faculty notice: ${data.facultyName} reported ${data.type} on ${data.date}`, 'warning');
+    triggerFacultyCardPulse({ type: 'absence', facultyName: data.facultyName });
+    triggerAbsencesCountAlert({ type: 'absence', facultyName: data.facultyName });
     if (currentTab === 'absence') loadAbsenceMonitor();
     if (currentTab === 'overview') loadOverview();
   });
   onEvent('substitution:claimed', (data) => {
     showToast(`Substitution claimed: ${data.substituteFacultyName} for ${data.subjectName}`, 'success');
+    triggerFacultyCardPulse({ type: 'substitution', substituteFacultyName: data.substituteFacultyName });
+    triggerAbsencesCountAlert({ type: 'substitution', substituteFacultyName: data.substituteFacultyName });
     if (currentTab === 'absence') loadAbsenceMonitor();
     if (currentTab === 'overview') loadOverview();
   });
   onEvent('substitution:assigned', (data) => {
     showToast(`Substitution assigned: ${data.substituteFacultyName} for ${data.subjectName}`, 'info');
+    triggerFacultyCardPulse({ type: 'substitution', substituteFacultyName: data.substituteFacultyName });
+    triggerAbsencesCountAlert({ type: 'substitution', substituteFacultyName: data.substituteFacultyName });
     if (currentTab === 'absence') loadAbsenceMonitor();
     if (currentTab === 'overview') loadOverview();
   });
@@ -160,6 +169,8 @@ function setupMetricDrilldowns() {
   cards.forEach(card => {
     const type = card.getAttribute('data-metric-type');
     card.addEventListener('click', (e) => {
+      // Don't open drilldown if clicked on interactive buttons inside header
+      if (e.target.closest('#btn-preview-faculty-pulse') || e.target.closest('#btn-preview-absences-pulse')) return;
       e.preventDefault();
       openMetricDrilldown(type);
     });
@@ -169,6 +180,20 @@ function setupMetricDrilldowns() {
         openMetricDrilldown(type);
       }
     });
+  });
+
+  const previewPulseBtn = document.getElementById('btn-preview-faculty-pulse');
+  previewPulseBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    triggerFacultyCardPulse({ reason: 'preview' });
+  });
+
+  const previewAbsencesBtn = document.getElementById('btn-preview-absences-pulse');
+  previewAbsencesBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    triggerAbsencesCountAlert({ reason: 'preview' });
   });
 
   const modal = document.getElementById('modal-metric-drilldown');
@@ -203,6 +228,91 @@ function setupMetricDrilldowns() {
     }
   });
 }
+
+/**
+ * Triggers a subtle, refined visual pulse animation on the Active Faculty metric card
+ * when faculty availability / absence status updates.
+ */
+export function triggerFacultyCardPulse(details = {}) {
+  const card = document.querySelector('.admin-metric-card[data-metric-type="faculty"]');
+  if (!card) return;
+
+  // Clear existing animation class to permit seamless re-triggering
+  card.classList.remove('pulse-active');
+  void card.offsetWidth; // Force DOM reflow to restart CSS animation cleanly
+
+  card.classList.add('pulse-active');
+
+  // Handle live status badge/beacon
+  const pingBadge = document.getElementById('faculty-live-ping');
+  if (pingBadge) {
+    if (details.type === 'absence' || (details.currentAbsences !== undefined && details.previousAbsences !== undefined && details.currentAbsences > details.previousAbsences)) {
+      const diff = (details.currentAbsences && details.previousAbsences) ? (details.currentAbsences - details.previousAbsences) : 1;
+      pingBadge.textContent = diff > 0 ? `+${diff} Absence` : 'Absence Logged';
+      pingBadge.className = 'metric-live-ping metric-ping-alert animate-fade-in';
+    } else if (details.type === 'substitution' || (details.currentAbsences !== undefined && details.previousAbsences !== undefined && details.currentAbsences < details.previousAbsences)) {
+      pingBadge.textContent = 'Substituted';
+      pingBadge.className = 'metric-live-ping metric-ping-success animate-fade-in';
+    } else if (details.reason === 'preview') {
+      pingBadge.textContent = 'Live Pulse';
+      pingBadge.className = 'metric-live-ping metric-ping-info animate-fade-in';
+    } else {
+      pingBadge.textContent = 'Status Updated';
+      pingBadge.className = 'metric-live-ping metric-ping-info animate-fade-in';
+    }
+    pingBadge.style.display = 'inline-flex';
+  }
+
+  // Clear existing timer if already scheduled
+  if (card._pulseTimer) clearTimeout(card._pulseTimer);
+  card._pulseTimer = setTimeout(() => {
+    card.classList.remove('pulse-active');
+    if (pingBadge) {
+      setTimeout(() => {
+        pingBadge.style.display = 'none';
+      }, 1200);
+    }
+  }, 2200);
+}
+window.triggerFacultyCardPulse = triggerFacultyCardPulse;
+
+/**
+ * Triggers a CSS transition on 'Today's Absences' number text:
+ * briefly changes the number text color to alert red and scales it slightly,
+ * emphasizing the change to the user.
+ */
+export function triggerAbsencesCountAlert(details = {}) {
+  const el = document.getElementById('stat-absences');
+  if (!el) return;
+
+  // Clear existing transition timeout & classes for seamless re-triggering
+  el.classList.remove('alert-absences-transition', 'absences-alert-pulse');
+  void el.offsetWidth; // Force reflow to re-arm transition
+
+  // Apply alert state: changes color to alert red and scales slightly via .alert-absences-transition
+  el.classList.add('alert-absences-transition', 'absences-alert-pulse');
+
+  // Also handle card ping/badge if present
+  const pingBadge = document.getElementById('absences-live-ping');
+  if (pingBadge) {
+    pingBadge.textContent = 'Updated';
+    pingBadge.className = 'metric-live-ping metric-ping-alert animate-fade-in';
+    pingBadge.style.display = 'inline-flex';
+  }
+
+  // Clear any existing timer
+  if (el._alertTimer) clearTimeout(el._alertTimer);
+  el._alertTimer = setTimeout(() => {
+    // Transition back smoothly to normal state
+    el.classList.remove('alert-absences-transition', 'absences-alert-pulse');
+    if (pingBadge) {
+      setTimeout(() => {
+        pingBadge.style.display = 'none';
+      }, 1000);
+    }
+  }, 1200);
+}
+window.triggerAbsencesCountAlert = triggerAbsencesCountAlert;
 
 function closeMetricDrilldown() {
   const modal = document.getElementById('modal-metric-drilldown');
@@ -736,6 +846,23 @@ async function loadOverview() {
   try {
     const data = await apiRequest('/api/admin/overview');
     cachedOverviewData = data;
+
+    const currentAbsences = Number(data.stats.todayAbsencesCount) || 0;
+    // Check if absences count has changed after initial baseline load
+    if (lastObservedAbsenceCount !== null && currentAbsences !== lastObservedAbsenceCount) {
+      triggerFacultyCardPulse({
+        previousAbsences: lastObservedAbsenceCount,
+        currentAbsences: currentAbsences,
+        reason: 'absence_count_changed'
+      });
+      triggerAbsencesCountAlert({
+        previousCount: lastObservedAbsenceCount,
+        currentCount: currentAbsences,
+        reason: 'absence_count_changed'
+      });
+    }
+    lastObservedAbsenceCount = currentAbsences;
+
     document.getElementById('stat-faculty').textContent = data.stats.facultyCount;
     document.getElementById('stat-subjects').textContent = data.stats.subjectsCount;
     document.getElementById('stat-sections').textContent = data.stats.sectionsCount;

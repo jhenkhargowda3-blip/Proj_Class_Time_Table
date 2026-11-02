@@ -383,7 +383,7 @@
               <span style="color: #D97706; font-size: 1.3rem; font-weight: 800;">⚠</span>
               <div>
                 <span style="font-weight: 800; color: #92400E; font-size: 0.95rem;" id="draft-conflict-banner-text">
-                  Draft generated with 13 conflicts. Click Regenerate or Resolve to fix them.
+                  Draft generated with conflicts. Click Regenerate to resolve them.
                 </span>
                 <div style="font-size: 0.8rem; color: #B45309; margin-top: 0.15rem;">
                   Real collisions detected across faculty schedules, room bookings, and teaching periods.
@@ -472,7 +472,7 @@
             <div>
               <div style="display: flex; align-items: center; gap: 0.5rem;">
                 <span style="color: #16A34A; font-size: 1.2rem; font-weight: 800;">✓</span>
-                <span style="font-weight: 800; color: #166534; font-size: 1.05rem;">0 conflicts found. All disputes resolved.</span>
+                <span style="font-weight: 800; color: #166534; font-size: 1.05rem;" id="resolve-success-heading">0 conflicts. All disputes resolved.</span>
                 <span style="background: #DCFCE7; color: #15803D; font-weight: 700; font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px; border: 1px solid #86EFAC;">Working Draft Preview</span>
               </div>
               <div id="resolve-summary-text" style="font-size: 0.88rem; color: #15803D; margin-top: 0.25rem; font-weight: 600;">
@@ -528,7 +528,7 @@
             <!-- Compare with Original Toggle -->
             <label id="compare-toggle-label" style="display: none; align-items: center; gap: 0.45rem; font-size: 0.82rem; font-weight: 600; cursor: pointer; background: #FEF3C7; color: #92400E; padding: 0.25rem 0.65rem; border-radius: 4px; border: 1px solid #FCD34D; margin-left: 0.75rem;">
               <input type="checkbox" id="chk-compare-original">
-              <span>Compare with original (highlight changes)</span>
+              <span id="compare-toggle-text">Compare Before / After</span>
             </label>
           </div>
 
@@ -1014,7 +1014,7 @@
     <div class="card" style="max-width: 620px; width: 90%; max-height: 85vh; overflow-y: auto; background: var(--bg-surface);">
       <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
         <div>
-          <h3 style="font-size: 1.6rem; color: var(--color-brand-primary); margin-bottom: 0.25rem;">Assign Substitute Faculty</h3>
+          <h3 id="assign-sub-title" style="font-size: 1.6rem; color: var(--color-brand-primary); margin-bottom: 0.25rem;">Assign Substitute Faculty</h3>
           <p style="font-size: 0.85rem; color: var(--text-secondary);" id="assign-sub-subtitle">
             Ranked candidates evaluated by hard conflict check, qualification, and workload balance.
           </p>

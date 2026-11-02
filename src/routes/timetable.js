@@ -55,7 +55,7 @@ router.post('/generate', requireAuth, requireRole('admin'), (req, res) => {
       });
     }
 
-    if (req.body.publishNow && result.versionId) {
+    if (req.body.publishNow && result.versionId && !result.hasConflicts && (!result.conflictsCount || result.conflictsCount === 0)) {
       const db = getDatabase();
       db.prepare("UPDATE timetable_versions SET status = 'archived' WHERE status = 'active'").run();
       db.prepare("UPDATE timetable_versions SET status = 'active' WHERE id = ?").run(result.versionId);

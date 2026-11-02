@@ -1187,6 +1187,23 @@ function setupStudioControls() {
 
   const versionSelector = document.getElementById('studio-version-selector');
   versionSelector?.addEventListener('change', () => {
+    if (activeResolver && activeResolver.isRunning) {
+      const ok = confirm('Conflict resolution is currently in progress. Switching versions will cancel resolution and discard the copy. Continue?');
+      if (!ok) {
+        versionSelector.value = activeVersionId;
+        return;
+      }
+      activeResolver.cancel();
+      activeResolver = null;
+      resetResolvedPreviewState();
+    } else if (isResolvedDraftPreview) {
+      const ok = confirm('You have an unsaved resolved preview. Switching versions will discard this copy. Continue?');
+      if (!ok) {
+        versionSelector.value = activeVersionId;
+        return;
+      }
+      resetResolvedPreviewState();
+    }
     activeVersionId = parseInt(versionSelector.value, 10);
     loadStudioVersion(activeVersionId);
   });
@@ -1215,15 +1232,21 @@ function setupStudioControls() {
 
   populateStudioEntitySelector();
 
-  // Studio actions
-  // Studio actions
+  // Studio actions: Generate New naturally conflicted draft
   document.getElementById('btn-studio-generate')?.addEventListener('click', async () => {
-    if (isGenerationRunning) {
-      showToast('A timetable generation computation is active in the background.', 'warning');
+    if (isGenerationRunning || (activeResolver && activeResolver.isRunning)) {
+      showToast('A timetable generation or resolution is active in the background.', 'warning');
       return;
     }
-    const conflictLevel = document.getElementById('select-conflict-level')?.value || 'medium';
-    const targetName = `Initial Draft (${conflictLevel} conflicts)`;
+
+    if (isResolvedDraftPreview) {
+      resetResolvedPreviewState();
+    }
+
+    const now = new Date();
+    const timeFormatted = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const dateFormatted = now.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    const targetName = `Draft – ${dateFormatted} ${timeFormatted}`;
 
     updateGenerationProgress({
       isRunning: true,
@@ -1236,7 +1259,7 @@ function setupStudioControls() {
     try {
       const res = await apiRequest('/api/timetable/generate', {
         method: 'POST',
-        body: { name: targetName, conflictLevel },
+        body: { name: targetName },
         showErrorToast: false
       });
       onGenerationCompleted(res);
@@ -1526,14 +1549,20 @@ function setupStudioControls() {
     showToast('Keeping partial resolution draft for manual edits.', 'info');
   });
 
-  // Task 4: Compare with original toggle
+  // Task 4: Compare Before / After toggle
   document.getElementById('chk-compare-original')?.addEventListener('change', (e) => {
     isComparingWithOriginal = !!e.target.checked;
+    const compText = document.getElementById('compare-toggle-text');
+    if (compText) {
+      compText.textContent = isComparingWithOriginal ? 'Showing: Original Conflicted Draft (Before)' : 'Compare Before / After';
+    }
     renderStudioGrid();
   });
 }
 
 function resetResolvedPreviewState() {
+  const compText = document.getElementById('compare-toggle-text');
+  if (compText) compText.textContent = 'Compare Before / After';
   if (activeResolver) {
     activeResolver.cancel();
     activeResolver = null;
@@ -1668,11 +1697,8 @@ function runSharedValidation(targetEntries = null) {
 
   if (resolveBtn && resolveBtnText && resolveBtnBadge) {
     if (lastSharedValidation.errorCount > 0) {
-      resolveBtnText.textContent = 'Resolve';
-      resolveBtnBadge.textContent = lastSharedValidation.errorCount;
-      resolveBtnBadge.style.display = 'inline-block';
-      resolveBtnBadge.style.background = 'var(--color-error)';
-      resolveBtnBadge.style.color = '#fff';
+      resolveBtnText.textContent = `Resolve ${lastSharedValidation.errorCount}`;
+      resolveBtnBadge.style.display = 'none';
       resolveBtn.style.color = 'var(--color-error)';
       resolveBtn.style.borderColor = 'var(--color-error)';
       resolveBtn.style.background = 'var(--bg-surface)';
@@ -1685,7 +1711,7 @@ function runSharedValidation(targetEntries = null) {
       resolveBtn.style.borderColor = '#86EFAC';
       resolveBtn.style.background = '#DCFCE7';
       resolveBtn.style.cursor = 'pointer';
-      resolveBtn.title = '0 conflicts found. Click to re-run verification.';
+      resolveBtn.title = '0 conflicts found. Fully verified.';
     }
   }
 
@@ -1725,7 +1751,7 @@ async function startResolveWorkflow() {
   const logPanel = document.getElementById('studio-resolve-log-panel');
   const logContent = document.getElementById('resolve-log-content');
   const logBadge = document.getElementById('resolve-log-count-badge');
-  const conflictBanner = document.getElementById('studio-conflict-banner');
+  const conflictBanner = document.getElementById('studio-draft-conflict-banner') || document.getElementById('studio-conflict-banner');
   const resolvedBanner = document.getElementById('studio-resolved-banner');
   const failedBanner = document.getElementById('studio-resolve-failed-banner');
   const crossChip = document.getElementById('resolve-cross-section-chip');
@@ -1743,6 +1769,7 @@ async function startResolveWorkflow() {
   if (logBadge) logBadge.textContent = '0 steps';
 
   const initialVal = runSharedValidation(draftWorkingEntries);
+  const initialConflictsCount = initialVal.errorCount;
   if (progressCounter) progressCounter.textContent = `${initialVal.errorCount} Conflicts`;
   if (progressStatus) progressStatus.textContent = 'Initializing Min-Conflicts local search heuristics...';
 
@@ -1758,12 +1785,15 @@ async function startResolveWorkflow() {
     stepDelayMs: initialStepDelay,
     onStep: (stepData) => {
       const { step, entries, conflictsCount, iterations, log } = stepData;
+      pushUndoSnapshot();
       draftWorkingEntries = entries;
       runSharedValidation(draftWorkingEntries);
 
       if (progressCounter) progressCounter.textContent = `${conflictsCount} Conflicts`;
+      const resolveBtnText = document.getElementById('resolve-btn-text');
       const resolveBadge = document.getElementById('resolve-btn-badge');
-      if (resolveBadge) resolveBadge.textContent = conflictsCount;
+      if (resolveBtnText) resolveBtnText.textContent = conflictsCount > 0 ? `Resolve ${conflictsCount}` : '0 Conflicts ✓ Done';
+      if (resolveBadge) resolveBadge.style.display = 'none';
       if (progressStatus) progressStatus.textContent = `Iteration ${iterations.toLocaleString()}: ${step.description || 'Interchanging periods'}`;
 
       if (logContent) {
@@ -1802,8 +1832,10 @@ async function startResolveWorkflow() {
       if (progressCounter) progressCounter.textContent = `${p.conflictsCount} Conflicts`;
       if (progressStatus) progressStatus.textContent = `Iteration ${p.iterations.toLocaleString()}: ${p.phase}`;
       
+      const resolveBtnText = document.getElementById('resolve-btn-text');
       const resolveBadge = document.getElementById('resolve-btn-badge');
-      if (resolveBadge) resolveBadge.textContent = p.conflictsCount;
+      if (resolveBtnText) resolveBtnText.textContent = p.conflictsCount > 0 ? `Resolve ${p.conflictsCount}` : '0 Conflicts ✓ Done';
+      if (resolveBadge) resolveBadge.style.display = 'none';
 
       draftWorkingEntries = p.entries;
       runSharedValidation(draftWorkingEntries);
@@ -1856,10 +1888,28 @@ async function startResolveWorkflow() {
         }
       }
 
+      const totalChanges = movedCount + facCount + roomCount;
+
+      // Independent re-verification: whole resolved timetable checked by validator
+      const finalVal = runSharedValidation(draftWorkingEntries);
+      if (!finalVal.isValid || finalVal.errorCount > 0) {
+        const failedTitle = document.getElementById('resolve-failed-title');
+        if (failedTitle) failedTitle.textContent = `Could not resolve ${finalVal.errorCount} conflicts`;
+        const failedBanner = document.getElementById('studio-resolve-failed-banner');
+        if (failedBanner) failedBanner.style.display = 'block';
+        showToast(`Resolution stopped: ${finalVal.errorCount} conflicts remaining.`, 'warning');
+        return;
+      }
+
+      if (totalChanges === 0 && initialConflictsCount > 0) {
+        showToast('No classes could be moved to reduce conflicts.', 'warning');
+        return;
+      }
+
       // Populate Success State & Diff
       const summaryText = document.getElementById('resolve-summary-text');
       if (summaryText) {
-        summaryText.textContent = `${movedCount} classes moved/swapped, ${facCount} faculty reassigned, ${roomCount} rooms changed. Time taken ${durationSec}s`;
+        summaryText.textContent = `${initialConflictsCount} conflicts resolved: ${movedCount} classes moved/swapped, ${facCount} faculty reassigned, ${roomCount} rooms changed. Time taken ${durationSec}s`;
       }
 
       const diffListContainer = document.getElementById('studio-diff-list');
@@ -1886,7 +1936,7 @@ async function startResolveWorkflow() {
 
       runSharedValidation(draftWorkingEntries);
       renderStudioGrid();
-      showToast('0 conflicts found. All disputes resolved.', 'success');
+      showToast('0 conflicts. All disputes resolved.', 'success');
     },
     onError: (err) => {
       activeStepHighlight = null;
@@ -1951,13 +2001,13 @@ async function loadStudioVersion(versionId) {
     const val = runSharedValidation(currentVersionData.entries);
 
     // Sync draft conflict banner
-    const conflictBanner = document.getElementById('studio-conflict-banner');
+    const conflictBanner = document.getElementById('studio-draft-conflict-banner') || document.getElementById('studio-conflict-banner');
     const conflictText = document.getElementById('draft-conflict-banner-text');
     if (conflictBanner) {
       if (val && val.errorCount > 0) {
         conflictBanner.style.display = 'block';
         if (conflictText) {
-          conflictText.textContent = `Draft generated with ${val.errorCount} conflicts. Click Regenerate or Resolve to fix them.`;
+          conflictText.textContent = `Draft generated with ${val.errorCount} conflicts. Click Regenerate to resolve them.`;
         }
       } else {
         conflictBanner.style.display = 'none';
@@ -1975,7 +2025,9 @@ function renderStudioGrid() {
   if (!container || !currentVersionData || !masterData) return;
 
   const { workingDays, timeSlots } = masterData;
-  const entries = draftWorkingEntries || currentVersionData.entries || [];
+  const entries = (isComparingWithOriginal && originalVersionEntries)
+    ? originalVersionEntries
+    : (draftWorkingEntries || currentVersionData.entries || []);
 
   // Filter entries based on studioMode
   let filteredEntries = [];
@@ -2037,12 +2089,15 @@ function renderStudioGrid() {
         const entryConflicts = conflictsByEntry[entry.id] || [];
         const hasConflict = entryConflicts.length > 0;
 
-        // Check if modified compared to original for comparison highlight
+        // Check if modified compared to original / resolved for comparison highlight
         let isModified = false;
-        if (isComparingWithOriginal && originalVersionEntries) {
+        if (originalVersionEntries && draftWorkingEntries) {
           const orig = originalVersionEntries.find(o => o.id === entry.id);
-          if (!orig || orig.day_id !== entry.day_id || orig.slot_id !== entry.slot_id || orig.faculty_id !== entry.faculty_id || orig.room_id !== entry.room_id) {
-            isModified = true;
+          const draft = draftWorkingEntries.find(d => d.id === entry.id);
+          if (orig && draft) {
+            if (orig.day_id !== draft.day_id || orig.slot_id !== draft.slot_id || orig.faculty_id !== draft.faculty_id || orig.room_id !== draft.room_id) {
+              isModified = true;
+            }
           }
         }
 
@@ -2052,6 +2107,8 @@ function renderStudioGrid() {
         } else if (isStepTarget) {
           chipStyle += ' background: #DBEAFE; border: 2px solid #2563EB; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.45); transform: scale(1.02);';
         } else if (isComparingWithOriginal && isModified) {
+          chipStyle += ' background: #FEF3C7; border: 2px solid #D97706; outline: 2px solid #FCD34D; box-shadow: 0 0 8px rgba(217, 119, 6, 0.25);';
+        } else if (!isComparingWithOriginal && isModified) {
           chipStyle += ' background: #EFF6FF; border: 2px solid #2563EB; outline: 2px solid #93C5FD; box-shadow: 0 0 8px rgba(37, 99, 235, 0.25);';
         } else if (hasConflict) {
           chipStyle += ' background: #FEF2F2; border: 2px solid var(--color-error); box-shadow: 0 0 0 1px var(--color-error);';
@@ -2071,7 +2128,7 @@ function renderStudioGrid() {
                 <div style="display: flex; align-items: center; gap: 0.25rem;">
                   ${isStepSource ? '<span style="font-size: 0.65rem; background: #D97706; color: #FFFFFF; font-weight: 700; padding: 0.05rem 0.35rem; border-radius: 3px;">SRC</span>' : ''}
                   ${isStepTarget ? '<span style="font-size: 0.65rem; background: #2563EB; color: #FFFFFF; font-weight: 700; padding: 0.05rem 0.35rem; border-radius: 3px;">TGT</span>' : ''}
-                  ${!isStepSource && !isStepTarget && isComparingWithOriginal && isModified ? '<span style="font-size: 0.65rem; background: #2563EB; color: #FFFFFF; font-weight: 700; padding: 0.05rem 0.35rem; border-radius: 3px;">MOVED</span>' : ''}
+                  ${!isStepSource && !isStepTarget && isModified ? `<span style="font-size: 0.65rem; background: ${isComparingWithOriginal ? '#D97706' : '#2563EB'}; color: #FFFFFF; font-weight: 700; padding: 0.05rem 0.35rem; border-radius: 3px;">${isComparingWithOriginal ? 'CHANGED' : 'MOVED'}</span>` : ''}
                   ${hasConflict ? '<span style="font-size: 0.72rem; color: var(--color-error); font-weight: 800;" title="Collision">⚠</span>' : ''}
                   ${entry.locked ? '<span style="font-size: 0.72rem;" title="Locked">🔒</span>' : ''}
                 </div>
@@ -2471,7 +2528,7 @@ function onGenerationCompleted(data) {
     const phaseEl = document.getElementById('gen-banner-phase');
     if (phaseEl) {
       phaseEl.textContent = hasConflicts
-        ? `Draft generated with ${conflictsCount} conflicts. Click Regenerate or Resolve to fix them.`
+        ? `Draft generated with ${conflictsCount} conflicts. Click Regenerate to resolve them.`
         : `Successfully computed ${data.entriesCount || 0} collision-free periods with zero hard conflicts in ${data.durationMs || 0}ms. Soft constraint score: ${data.score || 100}/100.`;
     }
 
@@ -2510,13 +2567,13 @@ function onGenerationCompleted(data) {
   }
 
   // Also sync studio conflict banner
-  const studioConflictBanner = document.getElementById('studio-conflict-banner');
+  const studioConflictBanner = document.getElementById('studio-draft-conflict-banner') || document.getElementById('studio-conflict-banner');
   const draftConflictText = document.getElementById('draft-conflict-banner-text');
   if (studioConflictBanner) {
     if (hasConflicts) {
       studioConflictBanner.style.display = 'block';
       if (draftConflictText) {
-        draftConflictText.textContent = `Draft generated with ${conflictsCount} conflicts. Click Regenerate or Resolve to fix them.`;
+        draftConflictText.textContent = `Draft generated with ${conflictsCount} conflicts. Click Regenerate to resolve them.`;
       }
     } else {
       studioConflictBanner.style.display = 'none';
@@ -2667,8 +2724,6 @@ function setupModals() {
     const scopeSectionVal = document.getElementById('gen-scope-section')?.value;
     const sectionId = scopeSectionVal ? parseInt(scopeSectionVal, 10) : undefined;
     const publishNow = document.getElementById('gen-publish-now')?.checked || false;
-    const conflictLevelVal = document.getElementById('gen-conflict-level')?.value;
-    const conflictLevel = conflictLevelVal === 'none' ? null : (conflictLevelVal || 'medium');
 
     const btn = document.getElementById('btn-submit-generate');
     if (btn) {
@@ -2688,7 +2743,7 @@ function setupModals() {
     try {
       const res = await apiRequest('/api/timetable/generate', {
         method: 'POST',
-        body: { name, sectionId, publishNow, conflictLevel },
+        body: { name, sectionId, publishNow },
         showErrorToast: false
       });
 
@@ -2698,7 +2753,11 @@ function setupModals() {
         return;
       }
 
-      showToast(res.message || 'Timetable generated successfully', 'success');
+      if (res.hasConflicts) {
+        showToast(`Draft generated with ${res.conflictsCount} conflicts. Click Regenerate to resolve them.`, 'warning');
+      } else {
+        showToast(res.message || 'Timetable generated successfully', 'success');
+      }
       onGenerationCompleted(res);
       switchTab('studio');
     } catch (err) {
@@ -3502,7 +3561,7 @@ window.openAssignModal = async (timetableEntryId, date, subjectName, slotLabel, 
   if (!modal || !list) return;
 
   if (title) title.textContent = substitutionId ? 'Reassign Substitute Faculty' : 'Assign Substitute Faculty';
-  subtitle.textContent = `Ranking eligible substitutes for ${subjectName} (${slotLabel}) on ${date}:`;
+  if (subtitle) subtitle.textContent = `Ranking eligible substitutes for ${subjectName} (${slotLabel}) on ${date}:`;
   list.innerHTML = `<div style="color: var(--text-muted); font-size: 0.85rem; padding: 1.5rem; text-align: center;">Evaluating hard constraints and scoring qualified colleagues...</div>`;
   modal.style.display = 'flex';
 

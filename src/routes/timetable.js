@@ -198,10 +198,72 @@ router.post('/validate-move', requireAuth, requireRole('admin'), (req, res) => {
   res.json(result);
 });
 
-// 6. Execute Move or Cell Update
+// 5.5 Create New Timetable Version directly (e.g. from resolved preview draft)
+router.post('/versions', requireAuth, requireRole('admin'), (req, res) => {
+  const { name, notes, entries, status = 'draft', activateNow } = req.body;
+  const db = getDatabase();
+
+  if (!name) {
+    return res.status(400).json({ error: 'Version name is required' });
+  }
+
+  const createTx = db.transaction(() => {
+    const newVersion = db.prepare(`
+      INSERT INTO timetable_versions (name, status, created_by, notes)
+      VALUES (?, ?, ?, ?)
+    `).run(name, status, req.user.id, notes || 'Generated / Resolved Timetable');
+
+    const newVersionId = newVersion.lastInsertRowid;
+
+    if (Array.isArray(entries) && entries.length > 0) {
+      const insertEntry = db.prepare(`
+        INSERT INTO timetable_entries (version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      for (const e of entries) {
+        insertEntry.run(
+          newVersionId,
+          e.section_id,
+          e.subject_id,
+          e.faculty_id,
+          e.room_id,
+          e.day_id,
+          e.slot_id,
+          e.is_lab_block || 0,
+          e.locked || 0
+        );
+      }
+    }
+
+    if (activateNow) {
+      db.prepare("UPDATE timetable_versions SET status = 'archived' WHERE status = 'active'").run();
+      db.prepare("UPDATE timetable_versions SET status = 'active' WHERE id = ?").run(newVersionId);
+    }
+
+    return { versionId: newVersionId, name };
+  });
+
+  const result = createTx();
+
+  broadcast('timetable.updated', {
+    type: 'version_generated',
+    versionId: result.versionId,
+    versionName: result.name
+  });
+
+  res.status(201).json({
+    success: true,
+    message: 'Timetable generation successful',
+    versionId: result.versionId,
+    versionName: result.name
+  });
+});
+
+// 6. Execute Move or Cell Update (Supports Swapping & Non-blocking Admin Edits)
 router.post('/entries/:id/move', requireAuth, requireRole('admin'), (req, res) => {
   const entryId = parseInt(req.params.id, 10);
-  const { targetDayId, targetSlotId, targetRoomId, targetFacultyId, overrideWarnings } = req.body;
+  const { targetDayId, targetSlotId, targetRoomId, targetFacultyId, swapWithEntryId, overrideWarnings, force } = req.body;
   const db = getDatabase();
 
   const entry = db.prepare('SELECT * FROM timetable_entries WHERE id = ?').get(entryId);
@@ -209,42 +271,38 @@ router.post('/entries/:id/move', requireAuth, requireRole('admin'), (req, res) =
     return res.status(404).json({ error: 'Timetable entry not found' });
   }
 
-  const validation = validateMove({
-    versionId: entry.version_id,
-    entryId,
-    targetDayId,
-    targetSlotId,
-    targetRoomId: targetRoomId || entry.room_id,
-    targetFacultyId: targetFacultyId || entry.faculty_id
+  let swappedEntry = null;
+  if (swapWithEntryId) {
+    swappedEntry = db.prepare('SELECT * FROM timetable_entries WHERE id = ? AND version_id = ?').get(swapWithEntryId, entry.version_id);
+  }
+
+  const tx = db.transaction(() => {
+    if (swappedEntry) {
+      // Move swapped entry to the source entry's slot
+      db.prepare(`
+        UPDATE timetable_entries
+        SET day_id = ?, slot_id = ?
+        WHERE id = ?
+      `).run(entry.day_id, entry.slot_id, swappedEntry.id);
+    }
+
+    // Move source entry to target slot
+    db.prepare(`
+      UPDATE timetable_entries
+      SET day_id = ?, slot_id = ?, room_id = ?, faculty_id = ?
+      WHERE id = ?
+    `).run(
+      targetDayId,
+      targetSlotId,
+      targetRoomId || entry.room_id,
+      targetFacultyId || entry.faculty_id,
+      entryId
+    );
   });
 
-  if (!validation.isValid) {
-    return res.status(400).json({
-      error: 'Move rejected by deterministic conflict validator',
-      violations: validation.violations
-    });
-  }
+  tx();
 
-  if (validation.warningCount > 0 && !overrideWarnings) {
-    return res.status(409).json({
-      warning: true,
-      message: 'Move creates soft constraint warnings. Confirm override to proceed.',
-      violations: validation.violations
-    });
-  }
-
-  // Update entry in database
-  db.prepare(`
-    UPDATE timetable_entries
-    SET day_id = ?, slot_id = ?, room_id = ?, faculty_id = ?
-    WHERE id = ?
-  `).run(
-    targetDayId,
-    targetSlotId,
-    targetRoomId || entry.room_id,
-    targetFacultyId || entry.faculty_id,
-    entryId
-  );
+  const validation = validateTimetable(entry.version_id);
 
   broadcast('timetable.updated', {
     type: 'entry_moved',
@@ -254,8 +312,9 @@ router.post('/entries/:id/move', requireAuth, requireRole('admin'), (req, res) =
 
   res.json({
     success: true,
-    message: 'Timetable entry moved successfully',
-    validation
+    message: swappedEntry ? 'Timetable entries swapped successfully' : 'Timetable entry moved successfully',
+    validation,
+    swapped: !!swappedEntry
   });
 });
 
@@ -384,78 +443,6 @@ router.get('/versions/:id/export.csv', requireAuth, (req, res) => {
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', `attachment; filename="timetable_v${versionId}_export.csv"`);
   res.send(csv);
-});
-
-// 13. Export Version to ICS (iCalendar)
-router.get('/versions/:id/export.ics', requireAuth, (req, res) => {
-  const versionId = parseInt(req.params.id, 10);
-  const db = getDatabase();
-
-  const version = db.prepare('SELECT name FROM timetable_versions WHERE id = ?').get(versionId);
-  if (!version) return res.status(404).send('Version not found');
-
-  const entries = db.prepare(`
-    SELECT wd.day_name, wd.day_index, ts.slot_no, ts.start_time, ts.end_time,
-           sec.name as section_name, s.code as subject_code, s.name as subject_name,
-           f.name as faculty_name, r.name as room_name, s.type as subject_type
-    FROM timetable_entries te
-    JOIN working_days wd ON te.day_id = wd.id
-    JOIN time_slots ts ON te.slot_id = ts.id
-    JOIN sections sec ON te.section_id = sec.id
-    JOIN subjects s ON te.subject_id = s.id
-    JOIN faculty f ON te.faculty_id = f.id
-    JOIN rooms r ON te.room_id = r.id
-    WHERE te.version_id = ?
-    ORDER BY wd.day_index, ts.slot_no, sec.name
-  `).all(versionId);
-
-  const dayCodeMap = { 0: 'SU', 1: 'MO', 2: 'TU', 3: 'WE', 4: 'TH', 5: 'FR', 6: 'SA' };
-  const now = new Date();
-  const currentDay = now.getDay();
-  const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() + diffToMonday);
-
-  const icsLines = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//CTAS//Class Timetable Automation System//EN',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
-    `X-WR-CALNAME:${version.name.replace(/[,;\\]/g, '')}`,
-    'X-WR-TIMEZONE:UTC'
-  ];
-
-  entries.forEach((e, idx) => {
-    const dayCode = dayCodeMap[e.day_index] || 'MO';
-    const targetDate = new Date(monday);
-    const offset = e.day_index === 0 ? 6 : e.day_index - 1;
-    targetDate.setDate(monday.getDate() + offset);
-
-    const dateStr = targetDate.toISOString().slice(0, 10).replace(/-/g, '');
-    const startTimeClean = (e.start_time || '09:00').replace(/[^0-9]/g, '').slice(0, 4) + '00';
-    const endTimeClean = (e.end_time || '10:00').replace(/[^0-9]/g, '').slice(0, 4) + '00';
-
-    icsLines.push(
-      'BEGIN:VEVENT',
-      `UID:ctas-v${versionId}-${idx}-${Date.now()}@ctas.college.edu`,
-      `DTSTAMP:${dateStr}T000000Z`,
-      `DTSTART:${dateStr}T${startTimeClean}`,
-      `DTEND:${dateStr}T${endTimeClean}`,
-      `RRULE:FREQ=WEEKLY;BYDAY=${dayCode}`,
-      `SUMMARY:${(e.subject_code ? e.subject_code + ': ' : '') + e.subject_name}`.replace(/[,;\\]/g, ''),
-      `LOCATION:${e.room_name}`.replace(/[,;\\]/g, ''),
-      `DESCRIPTION:Instructor: ${e.faculty_name}\\nSection: ${e.section_name}\\nSubject: ${e.subject_name}`.replace(/[,;\\]/g, ''),
-      'STATUS:CONFIRMED',
-      'END:VEVENT'
-    );
-  });
-
-  icsLines.push('END:VCALENDAR');
-
-  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="timetable_v${versionId}.ics"`);
-  res.send(icsLines.join('\r\n'));
 });
 
 export default router;

@@ -2,7 +2,9 @@ import { apiRequest } from '/js/api.js';
 import { checkSession, logout } from '/js/auth.js';
 import { showToast } from '/js/toast.js';
 import { initSSE, onEvent } from '/js/sse.js';
-import { exportTimetableToPdf, printOrExportPdf, exportToIcs, downloadFile } from '/js/exportUtils.js';
+import { exportTimetableToPdf, printOrExportPdf, downloadFile } from '/js/exportUtils.js';
+import { evaluateTimetableConflicts } from '/js/timetableValidator.js';
+import { TimetableResolver } from '/js/timetableResolver.js';
 
 let currentTab = 'overview';
 let activeVersionId = null;
@@ -11,6 +13,16 @@ let masterData = null;
 let studioMode = 'section'; // 'section' | 'faculty' | 'room'
 let studioEntityId = null;
 let draggedEntryId = null;
+
+// Conflict Resolution & Manual Editing State
+let draftWorkingEntries = null;
+let originalVersionEntries = null;
+let isResolvedDraftPreview = false;
+let isComparingWithOriginal = false;
+let activeResolver = null;
+let lastSharedValidation = null;
+let undoStack = [];
+let redoStack = [];
 
 // CSP Timetable Generation Progress Tracker State
 let isGenerationRunning = false;
@@ -1206,11 +1218,39 @@ function setupStudioControls() {
     openGenerateModal();
   });
 
-  document.getElementById('btn-studio-regenerate')?.addEventListener('click', async () => {
+  // Task 5: "Regenerate" becomes "Generate" when in resolved draft preview state
+  const regenBtn = document.getElementById('btn-studio-regenerate');
+  regenBtn?.addEventListener('click', async () => {
     if (isGenerationRunning) {
       showToast('A timetable generation computation is active in the background.', 'warning');
       return;
     }
+
+    // If draft is resolved and ready for review: click "Generate" saves the previewed draft
+    if (isResolvedDraftPreview && draftWorkingEntries) {
+      try {
+        const baseName = currentVersionData?.version?.name || 'Academic Master';
+        const newVersionName = `${baseName} (Resolved)`;
+        const saveRes = await apiRequest('/api/timetable/versions', {
+          method: 'POST',
+          body: {
+            name: newVersionName,
+            notes: 'Created via automated 0-conflict resolution studio engine',
+            entries: draftWorkingEntries,
+            status: 'draft'
+          }
+        });
+
+        showToast('Timetable generation successful', 'success');
+        resetResolvedPreviewState();
+        await loadStudio(saveRes.versionId);
+      } catch (err) {
+        showToast(err.message || 'Failed to save resolved timetable version', 'error');
+      }
+      return;
+    }
+
+    // Normal state: Regenerate alternative timetable
     const currentName = currentVersionData?.version?.name || 'Academic Master';
     const altName = `${currentName} (Variant ${Math.floor(Math.random() * 900 + 100)})`;
 
@@ -1268,7 +1308,7 @@ function setupStudioControls() {
       return;
     }
     const { workingDays, timeSlots } = masterData;
-    const entries = currentVersionData.entries || [];
+    const entries = draftWorkingEntries || currentVersionData.entries || [];
     let filteredEntries = entries;
     let entityName = 'Master College Grid';
 
@@ -1294,7 +1334,7 @@ function setupStudioControls() {
         meta: {
           'View': `By ${studioMode.charAt(0).toUpperCase() + studioMode.slice(1)}`,
           'Scheduled Periods': `${filteredEntries.length} classes`,
-          'Integrity': currentVersionData.validation?.isValid ? '✓ 0 Conflicts' : `⚠ ${currentVersionData.validation?.errorCount || 0} Conflicts`
+          'Integrity': lastSharedValidation?.isValid ? '✓ 0 Conflicts' : `⚠ ${lastSharedValidation?.errorCount || 0} Conflicts`
         },
         days: workingDays,
         slots: timeSlots,
@@ -1311,7 +1351,7 @@ function setupStudioControls() {
         meta: {
           'View': `By ${studioMode.charAt(0).toUpperCase() + studioMode.slice(1)}`,
           'Scheduled Periods': `${filteredEntries.length} classes`,
-          'Integrity': currentVersionData.validation?.isValid ? '✓ 0 Conflicts' : `⚠ ${currentVersionData.validation?.errorCount || 0} Conflicts`
+          'Integrity': lastSharedValidation?.isValid ? '✓ 0 Conflicts' : `⚠ ${lastSharedValidation?.errorCount || 0} Conflicts`
         },
         days: workingDays,
         slots: timeSlots,
@@ -1320,16 +1360,409 @@ function setupStudioControls() {
     }
   });
 
-  document.getElementById('btn-studio-export-ics')?.addEventListener('click', () => {
-    if (!activeVersionId || !currentVersionData) {
-      showToast('No timetable version loaded to export', 'warning');
+  // Task 6: Undo / Redo Toolbar buttons & Keyboard shortcuts
+  document.getElementById('btn-studio-undo')?.addEventListener('click', () => executeUndo());
+  document.getElementById('btn-studio-redo')?.addEventListener('click', () => executeRedo());
+
+  window.addEventListener('keydown', (e) => {
+    // Only intercept when studio panel is active and not typing in an input
+    if (currentTab !== 'studio') return;
+    const tag = e.target?.tagName?.toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      executeUndo();
+    } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
+      e.preventDefault();
+      executeRedo();
+    }
+  });
+
+  // Task 2 & 3: Resolve Button Click Handler
+  document.getElementById('btn-studio-resolve')?.addEventListener('click', () => {
+    if (activeResolver && activeResolver.isRunning) {
+      showToast('Resolution engine is currently solving conflicts...', 'info');
       return;
     }
-    const versionName = currentVersionData.version?.name || `Timetable_v${activeVersionId}`;
-    const cleanName = versionName.replace(/[^a-zA-Z0-9_-]/g, '_');
-    exportToIcs(`timetable_${cleanName}`, versionName, currentVersionData.entries || []);
-    showToast('ICS Calendar file generated and downloaded', 'success');
+    const val = runSharedValidation();
+    if (val.errorCount === 0) {
+      showToast('0 conflicts found. Timetable is fully compliant.', 'success');
+      return;
+    }
+    startResolveWorkflow();
   });
+
+  // Resolution Progress Cancel button
+  document.getElementById('btn-cancel-resolve')?.addEventListener('click', () => {
+    if (activeResolver) {
+      activeResolver.cancel();
+      activeResolver = null;
+    }
+    document.getElementById('studio-resolve-progress-strip').style.display = 'none';
+    if (originalVersionEntries) {
+      draftWorkingEntries = JSON.parse(JSON.stringify(originalVersionEntries));
+    }
+    runSharedValidation();
+    renderStudioGrid();
+    showToast('Conflict resolution cancelled. Working draft restored.', 'info');
+  });
+
+  // Diff toggle button
+  document.getElementById('btn-toggle-diff-details')?.addEventListener('click', () => {
+    const diffContainer = document.getElementById('studio-diff-container');
+    const toggleBtn = document.getElementById('btn-toggle-diff-details');
+    if (!diffContainer || !toggleBtn) return;
+    const isHidden = diffContainer.style.display === 'none';
+    diffContainer.style.display = isHidden ? 'block' : 'none';
+    toggleBtn.textContent = isHidden ? 'Hide Change Details ▲' : 'Show Change Details (Diff) ▼';
+  });
+
+  // Discard Draft buttons
+  document.getElementById('btn-discard-draft')?.addEventListener('click', () => {
+    resetResolvedPreviewState();
+    loadStudioVersion(activeVersionId);
+    showToast('Resolved working draft discarded. Restored original version.', 'info');
+  });
+
+  document.getElementById('btn-discard-failed-draft')?.addEventListener('click', () => {
+    resetResolvedPreviewState();
+    loadStudioVersion(activeVersionId);
+    showToast('Partial draft discarded. Restored original version.', 'info');
+  });
+
+  document.getElementById('btn-keep-partial-draft')?.addEventListener('click', () => {
+    document.getElementById('studio-resolve-failed-banner').style.display = 'none';
+    showToast('Keeping partial resolution draft for manual edits.', 'info');
+  });
+
+  // Task 4: Compare with original toggle
+  document.getElementById('chk-compare-original')?.addEventListener('change', (e) => {
+    isComparingWithOriginal = !!e.target.checked;
+    renderStudioGrid();
+  });
+}
+
+function resetResolvedPreviewState() {
+  if (activeResolver) {
+    activeResolver.cancel();
+    activeResolver = null;
+  }
+  draftWorkingEntries = null;
+  originalVersionEntries = null;
+  isResolvedDraftPreview = false;
+  isComparingWithOriginal = false;
+  undoStack = [];
+  redoStack = [];
+  updateUndoRedoButtons();
+
+  // Reset UI elements
+  document.getElementById('studio-resolve-progress-strip').style.display = 'none';
+  document.getElementById('studio-resolved-banner').style.display = 'none';
+  document.getElementById('studio-resolve-failed-banner').style.display = 'none';
+  const compLabel = document.getElementById('compare-toggle-label');
+  if (compLabel) compLabel.style.display = 'none';
+  const chkComp = document.getElementById('chk-compare-original');
+  if (chkComp) chkComp.checked = false;
+
+  // Reset "Regenerate" button styling and label
+  const regenBtn = document.getElementById('btn-studio-regenerate');
+  if (regenBtn) {
+    regenBtn.textContent = 'Regenerate';
+    regenBtn.className = 'btn-secondary';
+    regenBtn.title = 'Regenerate alternative timetable with randomized ordering';
+  }
+}
+
+// Undo / Redo Core Functions
+function updateUndoRedoButtons() {
+  const undoBtn = document.getElementById('btn-studio-undo');
+  const redoBtn = document.getElementById('btn-studio-redo');
+  if (undoBtn) {
+    undoBtn.disabled = undoStack.length === 0;
+    undoBtn.style.opacity = undoStack.length === 0 ? '0.5' : '1';
+  }
+  if (redoBtn) {
+    redoBtn.disabled = redoStack.length === 0;
+    redoBtn.style.opacity = redoStack.length === 0 ? '0.5' : '1';
+  }
+}
+
+function pushUndoSnapshot() {
+  const current = draftWorkingEntries || currentVersionData?.entries || [];
+  undoStack.push(JSON.parse(JSON.stringify(current)));
+  if (undoStack.length > 50) undoStack.shift();
+  redoStack = [];
+  updateUndoRedoButtons();
+}
+
+async function executeUndo() {
+  if (undoStack.length === 0) return;
+  const current = draftWorkingEntries || currentVersionData?.entries || [];
+  redoStack.push(JSON.parse(JSON.stringify(current)));
+  const restored = undoStack.pop();
+  updateUndoRedoButtons();
+
+  if (draftWorkingEntries) {
+    draftWorkingEntries = restored;
+  } else if (currentVersionData) {
+    currentVersionData.entries = restored;
+    // Persist restored slot placements
+    await syncRestoredEntriesToDb(restored);
+  }
+
+  runSharedValidation();
+  renderStudioGrid();
+  showToast('Undone manual move (Ctrl+Z)', 'info');
+}
+
+async function executeRedo() {
+  if (redoStack.length === 0) return;
+  const current = draftWorkingEntries || currentVersionData?.entries || [];
+  undoStack.push(JSON.parse(JSON.stringify(current)));
+  const restored = redoStack.pop();
+  updateUndoRedoButtons();
+
+  if (draftWorkingEntries) {
+    draftWorkingEntries = restored;
+  } else if (currentVersionData) {
+    currentVersionData.entries = restored;
+    await syncRestoredEntriesToDb(restored);
+  }
+
+  runSharedValidation();
+  renderStudioGrid();
+  showToast('Redone manual move (Ctrl+Y)', 'info');
+}
+
+async function syncRestoredEntriesToDb(entriesList) {
+  if (!entriesList || !activeVersionId) return;
+  for (const e of entriesList) {
+    try {
+      await apiRequest(`/api/timetable/entries/${e.id}/move`, {
+        method: 'POST',
+        body: {
+          targetDayId: e.day_id,
+          targetSlotId: e.slot_id,
+          targetRoomId: e.room_id,
+          targetFacultyId: e.faculty_id
+        },
+        showErrorToast: false
+      });
+    } catch (err) {}
+  }
+}
+
+// Single Shared Validator Function for Header Badge, Resolve Button, Grid Cells, and Resolver
+function runSharedValidation(targetEntries = null) {
+  const entriesToValidate = targetEntries || draftWorkingEntries || currentVersionData?.entries || [];
+  lastSharedValidation = evaluateTimetableConflicts(entriesToValidate, masterData);
+
+  // 1. Sync Studio Header Validation Badge
+  const statusBadge = document.getElementById('studio-validation-badge');
+  if (statusBadge) {
+    if (lastSharedValidation.isValid) {
+      statusBadge.innerHTML = `<span style="color: var(--color-success); font-weight: 700;">✓ 0 Conflicts · Fully Verified</span>`;
+    } else {
+      statusBadge.innerHTML = `<span style="color: var(--color-error); font-weight: 700;">⚠ ${lastSharedValidation.errorCount} Conflicts Detected</span>`;
+    }
+  }
+
+  // 2. Sync Studio Toolbar Resolve Button
+  const resolveBtn = document.getElementById('btn-studio-resolve');
+  const resolveBtnText = document.getElementById('resolve-btn-text');
+  const resolveBtnBadge = document.getElementById('resolve-btn-badge');
+
+  if (resolveBtn && resolveBtnText && resolveBtnBadge) {
+    if (lastSharedValidation.errorCount > 0) {
+      resolveBtnText.textContent = 'Resolve';
+      resolveBtnBadge.textContent = lastSharedValidation.errorCount;
+      resolveBtnBadge.style.display = 'inline-block';
+      resolveBtnBadge.style.background = 'var(--color-error)';
+      resolveBtnBadge.style.color = '#fff';
+      resolveBtn.style.color = 'var(--color-error)';
+      resolveBtn.style.borderColor = 'var(--color-error)';
+      resolveBtn.style.background = 'var(--bg-surface)';
+      resolveBtn.style.cursor = 'pointer';
+      resolveBtn.title = `Click to resolve all ${lastSharedValidation.errorCount} conflicts with min-conflicts heuristic search`;
+    } else {
+      resolveBtnText.textContent = '0 Conflicts ✓ Done';
+      resolveBtnBadge.style.display = 'none';
+      resolveBtn.style.color = '#15803D';
+      resolveBtn.style.borderColor = '#86EFAC';
+      resolveBtn.style.background = '#DCFCE7';
+      resolveBtn.style.cursor = 'pointer';
+      resolveBtn.title = '0 conflicts found. Click to re-run verification.';
+    }
+  }
+
+  return lastSharedValidation;
+}
+
+// Task 3: The Resolve Workflow (Min-Conflicts Local Search on Working Draft)
+async function startResolveWorkflow() {
+  if (!currentVersionData?.entries?.length || !masterData) {
+    showToast('No timetable loaded to resolve', 'warning');
+    return;
+  }
+
+  // Isolation check: if active/published version is open, duplicate to draft first
+  if (currentVersionData.version?.status === 'active') {
+    showToast('Active timetable detected: creating working draft to isolate changes...', 'info');
+    try {
+      const dupRes = await apiRequest(`/api/timetable/versions/${activeVersionId}/duplicate`, { method: 'POST' });
+      await loadStudio(dupRes.versionId);
+    } catch (err) {
+      showToast('Failed to clone active version for safe draft resolution', 'error');
+      return;
+    }
+  }
+
+  // Establish isolated draft copies
+  draftWorkingEntries = JSON.parse(JSON.stringify(currentVersionData.entries));
+  originalVersionEntries = JSON.parse(JSON.stringify(currentVersionData.entries));
+  undoStack = [];
+  redoStack = [];
+  updateUndoRedoButtons();
+
+  // Show live progress strip
+  const progressStrip = document.getElementById('studio-resolve-progress-strip');
+  const progressCounter = document.getElementById('resolve-progress-counter');
+  const progressStatus = document.getElementById('resolve-progress-status');
+  const resolvedBanner = document.getElementById('studio-resolved-banner');
+  const failedBanner = document.getElementById('studio-resolve-failed-banner');
+
+  if (progressStrip) progressStrip.style.display = 'block';
+  if (resolvedBanner) resolvedBanner.style.display = 'none';
+  if (failedBanner) failedBanner.style.display = 'none';
+
+  const initialVal = runSharedValidation(draftWorkingEntries);
+  if (progressCounter) progressCounter.textContent = `${initialVal.errorCount} Conflicts`;
+  if (progressStatus) progressStatus.textContent = 'Initializing Min-Conflicts local search heuristics...';
+
+  // Instantiate deterministic non-blocking solver
+  activeResolver = new TimetableResolver(draftWorkingEntries, masterData, {
+    maxDurationMs: 5000,
+    maxIterations: 20000,
+    onProgress: (p) => {
+      // Live badge countdown (e.g. 13 -> 11 -> 8 -> 4 -> 0)
+      if (progressCounter) progressCounter.textContent = `${p.conflictsCount} Conflicts`;
+      if (progressStatus) progressStatus.textContent = `Iteration ${p.iterations.toLocaleString()}: ${p.phase}`;
+      
+      const resolveBadge = document.getElementById('resolve-btn-badge');
+      if (resolveBadge) resolveBadge.textContent = p.conflictsCount;
+
+      draftWorkingEntries = p.entries;
+      runSharedValidation(draftWorkingEntries);
+      renderStudioGrid();
+    },
+    onComplete: (res) => {
+      activeResolver = null;
+      if (progressStrip) progressStrip.style.display = 'none';
+
+      // Compute detailed change diff
+      const diffList = [];
+      let movedCount = 0;
+      let facCount = 0;
+      let roomCount = 0;
+
+      for (const draft of res.entries) {
+        const orig = originalVersionEntries.find(o => o.id === draft.id);
+        if (!orig) continue;
+        const slotChanged = orig.day_id !== draft.day_id || orig.slot_id !== draft.slot_id;
+        const facChanged = orig.faculty_id !== draft.faculty_id;
+        const roomChanged = orig.room_id !== draft.room_id;
+
+        if (slotChanged) movedCount++;
+        if (facChanged) facCount++;
+        if (roomChanged) roomCount++;
+
+        if (slotChanged || facChanged || roomChanged) {
+          const origDay = masterData.workingDays?.find(d => d.id === orig.day_id)?.day_name || `Day ${orig.day_id}`;
+          const draftDay = masterData.workingDays?.find(d => d.id === draft.day_id)?.day_name || `Day ${draft.day_id}`;
+          const origSlot = masterData.timeSlots?.find(s => s.id === orig.slot_id)?.label || `Period ${orig.slot_id}`;
+          const draftSlot = masterData.timeSlots?.find(s => s.id === draft.slot_id)?.label || `Period ${draft.slot_id}`;
+          const origFac = masterData.faculty?.find(f => f.id === orig.faculty_id)?.name || 'Instructor';
+          const draftFac = masterData.faculty?.find(f => f.id === draft.faculty_id)?.name || 'Instructor';
+          const origRoom = masterData.rooms?.find(r => r.id === orig.room_id)?.name || 'Room';
+          const draftRoom = masterData.rooms?.find(r => r.id === draft.room_id)?.name || 'Room';
+
+          const changes = [];
+          if (slotChanged) changes.push(`moved from ${origDay} ${origSlot} &rarr; ${draftDay} ${draftSlot}`);
+          if (facChanged) changes.push(`reassigned from ${origFac} &rarr; ${draftFac}`);
+          if (roomChanged) changes.push(`relocated from ${origRoom} &rarr; ${draftRoom}`);
+
+          diffList.push(`
+            <div style="padding: 0.35rem 0.6rem; background: #fff; border-radius: 4px; border: 1px solid #BBF7D0;">
+              <strong>${escapeHtml(draft.subject_code)}</strong> (${escapeHtml(draft.section_name)}): ${changes.join(', ')}
+            </div>
+          `);
+        }
+      }
+
+      // Populate Success State & Diff
+      const summaryText = document.getElementById('resolve-summary-text');
+      if (summaryText) {
+        summaryText.textContent = `${movedCount} classes moved, ${facCount} faculty reassigned, ${roomCount} rooms changed`;
+      }
+
+      const diffListContainer = document.getElementById('studio-diff-list');
+      if (diffListContainer) {
+        diffListContainer.innerHTML = diffList.length ? diffList.join('') : '<div>All disputes resolved with 0 slot relocations.</div>';
+      }
+
+      if (resolvedBanner) resolvedBanner.style.display = 'block';
+
+      // Show "Compare with original" toggle
+      const compLabel = document.getElementById('compare-toggle-label');
+      if (compLabel) compLabel.style.display = 'inline-flex';
+
+      // Task 5: Change "Regenerate" button to "Generate" prominently
+      isResolvedDraftPreview = true;
+      const regenBtn = document.getElementById('btn-studio-regenerate');
+      if (regenBtn) {
+        regenBtn.textContent = 'Generate';
+        regenBtn.className = 'btn-primary';
+        regenBtn.style.fontWeight = '700';
+        regenBtn.style.boxShadow = '0 2px 8px rgba(107, 0, 16, 0.25)';
+        regenBtn.title = 'Accept and save this conflict-free timetable draft as a new version';
+      }
+
+      runSharedValidation(draftWorkingEntries);
+      renderStudioGrid();
+      showToast('0 conflicts found. All disputes resolved.', 'success');
+    },
+    onError: (err) => {
+      activeResolver = null;
+      if (progressStrip) progressStrip.style.display = 'none';
+
+      // Populate Diagnostics Banner
+      const failedTitle = document.getElementById('resolve-failed-title');
+      if (failedTitle) failedTitle.textContent = `Could not resolve ${err.conflictsRemaining} conflicts`;
+
+      const failedReason = document.getElementById('resolve-failed-reason');
+      if (failedReason) failedReason.textContent = `${err.reason} Review diagnostic reasons and suggested fixes below:`;
+
+      const diagList = document.getElementById('resolve-failed-diagnostics-list');
+      if (diagList) {
+        diagList.innerHTML = (err.violations || []).map(v => `
+          <div style="padding: 0.6rem 0.85rem; background: #fff; border-radius: 4px; border: 1px solid #FECACA;">
+            <div style="font-weight: 700; color: #DC2626; margin-bottom: 0.2rem;">⚠ ${escapeHtml(v.message)}</div>
+            <div style="font-size: 0.78rem; color: #4B5563;">
+              💡 <strong>Suggested Fix:</strong> ${escapeHtml(v.suggestedFix || 'Adjust faculty availability, add faculty, or balance periods.')}
+            </div>
+          </div>
+        `).join('');
+      }
+
+      if (failedBanner) failedBanner.style.display = 'block';
+      runSharedValidation(draftWorkingEntries);
+      renderStudioGrid();
+      showToast(`Resolution stopped: ${err.conflictsRemaining} conflicts remaining.`, 'warning');
+    }
+  });
+
+  activeResolver.start();
 }
 
 function populateStudioEntitySelector() {
@@ -1355,22 +1788,12 @@ function populateStudioEntitySelector() {
 
 async function loadStudioVersion(versionId) {
   try {
+    resetResolvedPreviewState();
     currentVersionData = await apiRequest(`/api/timetable/versions/${versionId}`);
+    runSharedValidation(currentVersionData.entries);
     renderStudioGrid();
-    renderValidationStatus(currentVersionData.validation);
   } catch (err) {
     console.error('Failed to load version:', err);
-  }
-}
-
-function renderValidationStatus(validation) {
-  const statusBadge = document.getElementById('studio-validation-badge');
-  if (!statusBadge || !validation) return;
-
-  if (validation.isValid) {
-    statusBadge.innerHTML = `<span style="color: var(--color-success); font-weight: 700;">✓ 0 Conflicts · Fully Verified</span>`;
-  } else {
-    statusBadge.innerHTML = `<span style="color: var(--color-error); font-weight: 700;">⚠ ${validation.errorCount} Conflicts Detected</span>`;
   }
 }
 
@@ -1379,7 +1802,7 @@ function renderStudioGrid() {
   if (!container || !currentVersionData || !masterData) return;
 
   const { workingDays, timeSlots } = masterData;
-  const entries = currentVersionData.entries || [];
+  const entries = draftWorkingEntries || currentVersionData.entries || [];
 
   // Filter entries based on studioMode
   let filteredEntries = [];
@@ -1390,6 +1813,8 @@ function renderStudioGrid() {
   } else if (studioMode === 'room') {
     filteredEntries = entries.filter(e => e.room_id === studioEntityId);
   }
+
+  const conflictsByEntry = lastSharedValidation?.conflictsByEntryId || {};
 
   let html = `
     <table style="width: 100%; border-collapse: collapse; min-width: 820px; text-align: center; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden;">
@@ -1434,18 +1859,47 @@ function renderStudioGrid() {
       const entry = filteredEntries.find(e => e.day_id === day.id && e.slot_id === slot.id);
 
       if (entry) {
+        const entryConflicts = conflictsByEntry[entry.id] || [];
+        const hasConflict = entryConflicts.length > 0;
+
+        // Check if modified compared to original for comparison highlight
+        let isModified = false;
+        if (isComparingWithOriginal && originalVersionEntries) {
+          const orig = originalVersionEntries.find(o => o.id === entry.id);
+          if (!orig || orig.day_id !== entry.day_id || orig.slot_id !== entry.slot_id || orig.faculty_id !== entry.faculty_id || orig.room_id !== entry.room_id) {
+            isModified = true;
+          }
+        }
+
+        let chipStyle = 'padding: 0.45rem 0.5rem; border-radius: var(--radius-sm); cursor: grab; text-align: left; height: 100%; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.15s, box-shadow 0.15s;';
+        if (hasConflict) {
+          chipStyle += ' background: #FEF2F2; border: 2px solid var(--color-error); box-shadow: 0 0 0 1px var(--color-error);';
+        } else if (isModified) {
+          chipStyle += ' background: #FEF3C7; border: 2px dashed #D97706;';
+        } else {
+          chipStyle += ' background: var(--color-brand-blush-soft); border: 1px solid var(--border-strong);';
+        }
+
+        const conflictTooltip = hasConflict
+          ? `title="[CONFLICT DETECTED] ${escapeHtml(entryConflicts.map(c => c.message).join(' | '))}"`
+          : (isModified ? `title="[MODIFIED] Class changed during conflict resolution"` : '');
+
         html += `
-          <td class="timetable-cell-drop-target" data-day-id="${day.id}" data-slot-id="${slot.id}" style="padding: 0.4rem; border: 1px solid var(--border-subtle); vertical-align: top; height: 75px;">
-            <div class="studio-entry-chip" draggable="true" data-entry-id="${entry.id}" style="padding: 0.45rem 0.5rem; background: var(--color-brand-blush-soft); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); cursor: grab; text-align: left; height: 100%; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.15s, box-shadow 0.15s;">
-              <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <span style="font-weight: 700; font-size: 0.85rem; color: var(--color-brand-primary);">${entry.subject_code}</span>
-                ${entry.locked ? '<span style="font-size: 0.75rem;" title="Locked">🔒</span>' : ''}
+          <td class="timetable-cell-drop-target" data-day-id="${day.id}" data-slot-id="${slot.id}" data-entry-id="${entry.id}" style="padding: 0.4rem; border: 1px solid var(--border-subtle); vertical-align: top; height: 75px;">
+            <div class="studio-entry-chip" draggable="true" data-entry-id="${entry.id}" ${conflictTooltip} style="${chipStyle}">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.25rem;">
+                <span style="font-weight: 700; font-size: 0.85rem; color: ${hasConflict ? 'var(--color-error)' : 'var(--color-brand-primary)'};">${escapeHtml(entry.subject_code)}</span>
+                <div style="display: flex; align-items: center; gap: 0.25rem;">
+                  ${isModified ? '<span style="font-size: 0.65rem; background: #FDE68A; color: #92400E; font-weight: 700; padding: 0.05rem 0.3rem; border-radius: 3px;">MOD</span>' : ''}
+                  ${hasConflict ? '<span style="font-size: 0.72rem; color: var(--color-error); font-weight: 800;" title="Collision">⚠</span>' : ''}
+                  ${entry.locked ? '<span style="font-size: 0.72rem;" title="Locked">🔒</span>' : ''}
+                </div>
               </div>
-              <div style="font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                ${studioMode === 'faculty' ? entry.section_name : entry.faculty_name}
+              <div style="font-size: 0.75rem; color: ${hasConflict ? 'var(--color-error)' : 'var(--text-secondary)'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${escapeHtml(studioMode === 'faculty' ? entry.section_name : entry.faculty_name)}
               </div>
               <div style="font-size: 0.7rem; color: var(--text-muted);">
-                ${studioMode === 'room' ? entry.section_name : entry.room_name} ${entry.is_lab_block ? '· Lab' : ''}
+                ${escapeHtml(studioMode === 'room' ? entry.section_name : entry.room_name)} ${entry.is_lab_block ? '· Lab' : ''}
               </div>
             </div>
           </td>
@@ -1471,7 +1925,7 @@ function renderStudioGrid() {
   attachDragAndDropHandlers();
 }
 
-// Drag & Drop Implementation with Live Validation
+// Drag & Drop Implementation with Full Manual Authority (Swap on Occupied Drop)
 function attachDragAndDropHandlers() {
   const chips = document.querySelectorAll('.studio-entry-chip');
   const cells = document.querySelectorAll('.timetable-cell-drop-target');
@@ -1485,7 +1939,10 @@ function attachDragAndDropHandlers() {
 
     chip.addEventListener('dragend', () => {
       chip.style.opacity = '1';
-      cells.forEach(c => c.classList.remove('valid-drop-target', 'invalid-drop-target'));
+      cells.forEach(c => {
+        c.style.backgroundColor = '';
+        c.style.outline = '';
+      });
     });
 
     chip.addEventListener('click', (e) => {
@@ -1496,34 +1953,11 @@ function attachDragAndDropHandlers() {
   });
 
   cells.forEach(cell => {
-    cell.addEventListener('dragover', async (e) => {
+    cell.addEventListener('dragover', (e) => {
       e.preventDefault();
       if (!draggedEntryId) return;
-
-      const targetDayId = parseInt(cell.getAttribute('data-day-id'), 10);
-      const targetSlotId = parseInt(cell.getAttribute('data-slot-id'), 10);
-
-      // Instant live validation call
-      try {
-        const valRes = await apiRequest('/api/timetable/validate-move', {
-          method: 'POST',
-          body: {
-            versionId: activeVersionId,
-            entryId: draggedEntryId,
-            targetDayId,
-            targetSlotId
-          },
-          showErrorToast: false
-        });
-
-        if (valRes.isValid) {
-          cell.style.backgroundColor = 'var(--color-success-bg)';
-          cell.style.outline = '2px dashed var(--color-success)';
-        } else {
-          cell.style.backgroundColor = 'var(--color-error-bg)';
-          cell.style.outline = '2px dashed var(--color-error)';
-        }
-      } catch (err) {}
+      cell.style.backgroundColor = 'var(--bg-surface-subtle)';
+      cell.style.outline = '2px dashed var(--color-brand-primary)';
     });
 
     cell.addEventListener('dragleave', () => {
@@ -1541,29 +1975,75 @@ function attachDragAndDropHandlers() {
       const targetDayId = parseInt(cell.getAttribute('data-day-id'), 10);
       const targetSlotId = parseInt(cell.getAttribute('data-slot-id'), 10);
 
+      // Record undo snapshot before executing move or swap
+      pushUndoSnapshot();
+
+      const activeEntries = draftWorkingEntries || currentVersionData?.entries || [];
+      const draggedEntry = activeEntries.find(ent => ent.id === draggedEntryId);
+      if (!draggedEntry) {
+        draggedEntryId = null;
+        return;
+      }
+
+      // Check if target cell already has an occupant in the same section view or target cell
+      const targetOccupant = activeEntries.find(ent =>
+        ent.day_id === targetDayId &&
+        ent.slot_id === targetSlotId &&
+        ent.id !== draggedEntryId &&
+        (studioMode === 'section' ? ent.section_id === draggedEntry.section_id : ent.section_id === draggedEntry.section_id)
+      );
+
+      if (draftWorkingEntries) {
+        // Working draft mode
+        if (targetOccupant) {
+          // Swap positions
+          targetOccupant.day_id = draggedEntry.day_id;
+          targetOccupant.slot_id = draggedEntry.slot_id;
+          draggedEntry.day_id = targetDayId;
+          draggedEntry.slot_id = targetSlotId;
+          showToast(`Swapped '${draggedEntry.subject_code}' with '${targetOccupant.subject_code}'`, 'info');
+        } else {
+          draggedEntry.day_id = targetDayId;
+          draggedEntry.slot_id = targetSlotId;
+          showToast(`Moved '${draggedEntry.subject_code}' to target slot`, 'info');
+        }
+
+        runSharedValidation(draftWorkingEntries);
+        renderStudioGrid();
+        draggedEntryId = null;
+        return;
+      }
+
+      // Standard active/draft version: execute non-blocking move/swap on server
       try {
         const res = await apiRequest(`/api/timetable/entries/${draggedEntryId}/move`, {
           method: 'POST',
           body: {
             targetDayId,
-            targetSlotId
+            targetSlotId,
+            swapWithEntryId: targetOccupant ? targetOccupant.id : null,
+            force: true
           }
         });
 
-        showToast('Timetable entry moved and validated successfully!', 'success');
-        await loadStudioVersion(activeVersionId);
-      } catch (err) {
-        if (err.status === 409) {
-          // Warning override confirm
-          if (confirm('This move introduces a soft constraint warning. Do you wish to override?')) {
-            await apiRequest(`/api/timetable/entries/${draggedEntryId}/move`, {
-              method: 'POST',
-              body: { targetDayId, targetSlotId, overrideWarnings: true }
-            });
-            showToast('Entry moved with confirmed override', 'info');
-            await loadStudioVersion(activeVersionId);
-          }
+        // Apply in memory immediately
+        if (targetOccupant) {
+          targetOccupant.day_id = draggedEntry.day_id;
+          targetOccupant.slot_id = draggedEntry.slot_id;
         }
+        draggedEntry.day_id = targetDayId;
+        draggedEntry.slot_id = targetSlotId;
+
+        const val = runSharedValidation();
+        renderStudioGrid();
+
+        if (!val.isValid) {
+          showToast(`Move applied. Warning: created ${val.errorCount} conflict(s). Click Resolve to auto-fix.`, 'warning');
+        } else {
+          showToast(res.message || 'Timetable entry moved successfully!', 'success');
+        }
+      } catch (err) {
+        showToast(err.message || 'Failed to move timetable entry', 'error');
       } finally {
         draggedEntryId = null;
       }
@@ -2004,32 +2484,77 @@ function setupModals() {
     }
   });
 
-  // Edit Timetable Entry Modal handlers
+  // Edit Timetable Entry Modal handlers (Task 6: Unrestricted Manual Edit Authority)
   document.getElementById('modal-edit-entry-close')?.addEventListener('click', () => {
+    document.getElementById('modal-edit-entry').style.display = 'none';
+  });
+  document.getElementById('modal-edit-entry-close-btn')?.addEventListener('click', () => {
     document.getElementById('modal-edit-entry').style.display = 'none';
   });
   document.getElementById('modal-edit-entry-x')?.addEventListener('click', () => {
     document.getElementById('modal-edit-entry').style.display = 'none';
   });
+
   document.getElementById('form-edit-entry')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const entryId = document.getElementById('edit-entry-id')?.value;
+    const entryId = parseInt(document.getElementById('edit-entry-id')?.value, 10);
+    const subjectId = parseInt(document.getElementById('edit-entry-subject')?.value, 10);
     const facultyId = parseInt(document.getElementById('edit-entry-faculty')?.value, 10);
     const roomId = parseInt(document.getElementById('edit-entry-room')?.value, 10);
+    const locked = document.getElementById('edit-entry-lock')?.checked ? 1 : 0;
     if (!entryId) return;
+
+    // Record undo state
+    pushUndoSnapshot();
+
+    const activeList = draftWorkingEntries || currentVersionData?.entries || [];
+    const entry = activeList.find(ent => ent.id === entryId);
+
+    if (draftWorkingEntries) {
+      if (entry) {
+        if (!isNaN(subjectId)) entry.subject_id = subjectId;
+        if (!isNaN(facultyId)) entry.faculty_id = facultyId;
+        if (!isNaN(roomId)) entry.room_id = roomId;
+        entry.locked = locked;
+        entry.is_locked = locked;
+      }
+      document.getElementById('modal-edit-entry').style.display = 'none';
+      const val = runSharedValidation(draftWorkingEntries);
+      renderStudioGrid();
+      if (!val.isValid) {
+        showToast(`Assignment saved. Notice: ${val.errorCount} conflict(s) detected.`, 'warning');
+      } else {
+        showToast('Assignment updated in working draft', 'success');
+      }
+      return;
+    }
 
     try {
       await apiRequest(`/api/timetable/entries/${entryId}`, {
         method: 'PUT',
-        body: { facultyId, roomId }
+        body: { subjectId, facultyId, roomId, locked }
       });
-      showToast('Timetable slot updated successfully', 'success');
+
+      // Update in memory
+      if (entry) {
+        if (!isNaN(subjectId)) entry.subject_id = subjectId;
+        if (!isNaN(facultyId)) entry.faculty_id = facultyId;
+        if (!isNaN(roomId)) entry.room_id = roomId;
+        entry.locked = locked;
+        entry.is_locked = locked;
+      }
+
       document.getElementById('modal-edit-entry').style.display = 'none';
-      if (activeVersionId) {
-        await loadStudioVersion(activeVersionId);
+      const val = runSharedValidation();
+      renderStudioGrid();
+
+      if (!val.isValid) {
+        showToast(`Assignment updated. Warning: created ${val.errorCount} conflict(s). Click Resolve to auto-fix.`, 'warning');
+      } else {
+        showToast('Timetable assignment updated successfully', 'success');
       }
     } catch (err) {
-      showToast(err.message || 'Failed to update slot', 'error');
+      showToast(err.message || 'Failed to update assignment', 'error');
     }
   });
 

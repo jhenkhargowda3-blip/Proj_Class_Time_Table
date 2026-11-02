@@ -86,6 +86,13 @@ router.get('/master-data', (req, res) => {
   const workingDays = db.prepare('SELECT * FROM working_days ORDER BY day_index ASC').all();
   const timeSlots = db.prepare('SELECT * FROM time_slots ORDER BY slot_no ASC').all();
   const holidays = db.prepare('SELECT * FROM holidays ORDER BY date ASC').all();
+  const facultyAvailability = db.prepare('SELECT faculty_id, day_id, slot_id, is_available FROM faculty_availability').all();
+  const sectionSubjects = db.prepare(`
+    SELECT ss.*, s.name as subject_name, s.code as subject_code, s.weekly_periods, s.type as subject_type, s.lab_block_length
+    FROM section_subjects ss
+    JOIN subjects s ON ss.subject_id = s.id
+  `).all();
+  const facultySubjects = db.prepare('SELECT * FROM faculty_subjects').all();
 
   res.json({
     departments,
@@ -95,7 +102,10 @@ router.get('/master-data', (req, res) => {
     rooms,
     workingDays,
     timeSlots,
-    holidays
+    holidays,
+    facultyAvailability,
+    sectionSubjects,
+    facultySubjects
   });
 });
 

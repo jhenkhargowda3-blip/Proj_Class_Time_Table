@@ -122,4 +122,47 @@ test('Batch 1: Exports and Printing (Shared PDF Logic, Timetable Studio & Studen
     assert.ok(icsResult.includes('Dr. Turing'));
     assert.ok(icsResult.includes('END:VCALENDAR'));
   });
+
+  await t.test('4. exportTimetableToPdf generates valid PDF with jsPDF and autoTable', async () => {
+    const exportUtils = await import('../public/js/exportUtils.js');
+    assert.ok(typeof exportUtils.exportTimetableToPdf === 'function', 'exportTimetableToPdf should be exported');
+
+    const sampleDays = [
+      { id: 1, day_name: 'Monday', day_index: 1 },
+      { id: 2, day_name: 'Tuesday', day_index: 2 }
+    ];
+    const sampleSlots = [
+      { id: 1, slot_no: 1, label: 'Period 1', start_time: '09:00', end_time: '10:00', is_break: false },
+      { id: 2, slot_no: 2, label: 'Break', start_time: '10:00', end_time: '10:15', is_break: true }
+    ];
+    const sampleEntries = [
+      {
+        id: 101,
+        day_index: 1,
+        day_id: 1,
+        slot_no: 1,
+        slot_id: 1,
+        subject_code: 'CS301',
+        subject_name: 'Data Structures',
+        faculty_name: 'Dr. Turing',
+        room_name: 'Room 101',
+        section_name: 'CSE-5A'
+      }
+    ];
+
+    const doc = await exportUtils.exportTimetableToPdf({
+      title: 'Test Section Timetable',
+      subtitle: 'Dept of CSE',
+      meta: { Section: 'CSE-5A' },
+      days: sampleDays,
+      slots: sampleSlots,
+      entries: sampleEntries,
+      filename: 'test_timetable.pdf'
+    });
+
+    assert.ok(doc, 'Should return a jsPDF document instance');
+    const output = doc.output();
+    assert.ok(typeof output === 'string' && output.length > 500, 'PDF output should be a valid string');
+    assert.ok(output.startsWith('%PDF-'), 'PDF content must start with %PDF- header');
+  });
 });

@@ -2,7 +2,7 @@ import { apiRequest } from '/js/api.js';
 import { checkSession, logout } from '/js/auth.js';
 import { showToast } from '/js/toast.js';
 import { initSSE, onEvent } from '/js/sse.js';
-import { printOrExportPdf, exportToIcs } from '/js/exportUtils.js';
+import { exportTimetableToPdf, printOrExportPdf, exportToIcs } from '/js/exportUtils.js';
 
 // Local date utilities to prevent timezone and UTC boundary shifts
 function getLocalDateString(d = new Date()) {
@@ -358,7 +358,62 @@ function setupControls() {
     });
   };
 
-  document.getElementById('btn-student-export-pdf')?.addEventListener('click', triggerPdfOrPrint);
+  const exportStudentPdf = async () => {
+    if (!currentScheduleData) {
+      showToast('No schedule data available to export', 'warning');
+      return;
+    }
+
+    const days = [
+      { id: 1, day_name: 'Monday', day_index: 1 },
+      { id: 2, day_name: 'Tuesday', day_index: 2 },
+      { id: 3, day_name: 'Wednesday', day_index: 3 },
+      { id: 4, day_name: 'Thursday', day_index: 4 },
+      { id: 5, day_name: 'Friday', day_index: 5 },
+      { id: 6, day_name: 'Saturday', day_index: 6 }
+    ];
+
+    const slotMap = new Map();
+    (currentScheduleData.fullWeeklySchedule || []).forEach(e => {
+      if (!slotMap.has(e.slot_no)) {
+        slotMap.set(e.slot_no, {
+          id: e.slot_id,
+          slot_no: e.slot_no,
+          label: e.slot_label || `Period ${e.slot_no}`,
+          start_time: e.start_time,
+          end_time: e.end_time,
+          is_break: false
+        });
+      }
+    });
+
+    const slots = Array.from(slotMap.values()).sort((a, b) => a.slot_no - b.slot_no);
+    const sec = currentScheduleData.section || {};
+
+    try {
+      showToast('Generating timetable PDF...', 'info');
+      await exportTimetableToPdf({
+        title: `Student Timetable · Section ${sec.name || 'General'}`,
+        subtitle: `${sec.department_name || ''} · Semester ${sec.semester || ''} · Academic Year 2026`,
+        meta: {
+          'Section': sec.name || 'N/A',
+          'Department': sec.department_name || 'N/A',
+          'Total Weekly Periods': `${(currentScheduleData.fullWeeklySchedule || []).length} classes`
+        },
+        days,
+        slots,
+        entries: currentScheduleData.fullWeeklySchedule || [],
+        filename: `Timetable_Section_${(sec.name || 'Student').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`
+      });
+      showToast('Timetable PDF generated and downloaded', 'success');
+    } catch (err) {
+      console.error('PDF export failed:', err);
+      showToast('Opening fallback print preview...', 'warning');
+      triggerPdfOrPrint();
+    }
+  };
+
+  document.getElementById('btn-student-export-pdf')?.addEventListener('click', exportStudentPdf);
   document.getElementById('btn-student-print-schedule')?.addEventListener('click', triggerPdfOrPrint);
 
   // Student avatar profile and separate real-time notification bell click handlers

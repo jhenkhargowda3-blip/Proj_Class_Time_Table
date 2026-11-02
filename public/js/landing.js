@@ -98,23 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (r) {
         setRole(r);
         switchAuthView('login');
-        if (usernameInput && passwordInput) {
-          const currentU = usernameInput.value.trim().toLowerCase();
-          const knownUsers = ['admin', 'faculty', 'student', 'sharma', 'raj', 'jhenkhar'];
-          if (!currentU || knownUsers.includes(currentU)) {
-            if (r === 'admin') {
-              usernameInput.value = 'sharma';
-              passwordInput.value = 'sharmajii';
-            } else if (r === 'faculty') {
-              usernameInput.value = 'raj';
-              passwordInput.value = 'rajiv2112';
-            } else if (r === 'student') {
-              usernameInput.value = 'jhenkhar';
-              passwordInput.value = 'rocky(Jg)';
-            }
-            passwordInput.dispatchEvent(new Event('input'));
-          }
-        }
       }
     });
   });
@@ -181,35 +164,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Demo credential helpers (fills credentials and immediately authenticates)
-  const demoButtons = document.querySelectorAll('[data-demo-creds], .demo-fill-btn');
-  demoButtons.forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const u = btn.getAttribute('data-demo-user') || btn.getAttribute('data-demo-creds')?.split(':')[0];
-      const p = btn.getAttribute('data-demo-pass') || btn.getAttribute('data-demo-creds')?.split(':')[1];
-      const r = btn.getAttribute('data-demo-role') || btn.getAttribute('data-demo-creds')?.split(':')[2];
-
-      if (usernameInput && u) usernameInput.value = u;
-      if (passwordInput && p) passwordInput.value = p;
-      if (r) setRole(r);
-
-      switchAuthView('login');
-      showToast(`Signing in as ${r || u}...`, 'info');
-      await login(u, p, r);
-    });
-  });
-
-  // Prefill default admin credentials on initial load for instant convenience
-  if (usernameInput && !usernameInput.value) {
-    usernameInput.value = 'sharma';
-  }
-  if (passwordInput && !passwordInput.value) {
-    passwordInput.value = 'sharmajii';
-  }
-  if (passwordInput) {
-    passwordInput.dispatchEvent(new Event('input'));
-  }
-
   // Form submit handler
   if (loginForm) {
     loginForm.addEventListener('submit', async (e) => {
@@ -252,16 +206,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-
-  // Instant Presentation Demo Mode
-  document.getElementById('btn-instant-demo')?.addEventListener('click', async () => {
-    showToast('Starting instant presentation demo mode...', 'info');
-    try {
-      await login('sharma', 'sharmajii', 'admin');
-    } catch (err) {
-      showToast('Demo login failed: ' + err.message, 'error');
-    }
-  });
 
   // ==========================================
   // FORGOT PASSWORD FLOW

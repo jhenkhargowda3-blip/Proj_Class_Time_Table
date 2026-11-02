@@ -180,10 +180,11 @@ export function findEligibleSubstitutes(timetableEntryId, dateStr) {
     JOIN sections sec ON te.section_id = sec.id
     JOIN rooms r ON te.room_id = r.id
     JOIN faculty orig_fac ON te.faculty_id = orig_fac.id
-    WHERE te.id = ? AND te.version_id = ?
-  `).get(timetableEntryId, activeVersion.id);
+    WHERE te.id = ?
+  `).get(timetableEntryId);
 
   if (!entry) return [];
+  const versionIdToUse = entry.version_id || (activeVersion ? activeVersion.id : null);
 
   // Parse date (Note JS Date.UTC month is 0-indexed)
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -208,7 +209,7 @@ export function findEligibleSubstitutes(timetableEntryId, dateStr) {
   const busyBaseRows = db.prepare(`
     SELECT faculty_id FROM timetable_entries
     WHERE version_id = ? AND day_id = ? AND slot_id = ?
-  `).all(activeVersion.id, entry.day_id, entry.slot_id);
+  `).all(versionIdToUse, entry.day_id, entry.slot_id);
   const busyBaseSet = new Set(busyBaseRows.map(r => r.faculty_id));
 
   // Faculty who already accepted/assigned a substitution in this slot on this date
@@ -243,7 +244,7 @@ export function findEligibleSubstitutes(timetableEntryId, dateStr) {
     FROM timetable_entries
     WHERE version_id = ?
     GROUP BY faculty_id
-  `).all(activeVersion.id);
+  `).all(versionIdToUse);
   const weeklyLoadMap = new Map();
   for (const w of weeklyLoads) weeklyLoadMap.set(w.faculty_id, w.count);
 
@@ -253,7 +254,7 @@ export function findEligibleSubstitutes(timetableEntryId, dateStr) {
     FROM timetable_entries
     WHERE version_id = ? AND day_id = ?
     GROUP BY faculty_id
-  `).all(activeVersion.id, entry.day_id);
+  `).all(versionIdToUse, entry.day_id);
   const dailyLoadMap = new Map();
   for (const dl of dailyLoads) dailyLoadMap.set(dl.faculty_id, dl.count);
 

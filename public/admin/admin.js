@@ -2,7 +2,7 @@ import { apiRequest } from '/js/api.js';
 import { checkSession, logout } from '/js/auth.js';
 import { showToast } from '/js/toast.js';
 import { initSSE, onEvent } from '/js/sse.js';
-import { printOrExportPdf, exportToIcs, downloadFile } from '/js/exportUtils.js';
+import { exportTimetableToPdf, printOrExportPdf, exportToIcs, downloadFile } from '/js/exportUtils.js';
 
 let currentTab = 'overview';
 let activeVersionId = null;
@@ -1218,7 +1218,7 @@ function setupStudioControls() {
     window.location.href = `/api/timetable/versions/${activeVersionId}/export.csv`;
   });
 
-  document.getElementById('btn-studio-export-pdf')?.addEventListener('click', () => {
+  document.getElementById('btn-studio-export-pdf')?.addEventListener('click', async () => {
     if (!currentVersionData || !masterData) {
       showToast('No timetable version loaded to export', 'warning');
       return;
@@ -1242,18 +1242,38 @@ function setupStudioControls() {
       if (rm) entityName = `Room ${rm.name} (${rm.type || 'Classroom'})`;
     }
 
-    printOrExportPdf({
-      title: `Timetable Studio Schedule · ${entityName}`,
-      subtitle: `Version: ${currentVersionData.version?.name || 'Academic Master'} (${currentVersionData.version?.status || 'draft'})`,
-      meta: {
-        'View': `By ${studioMode.charAt(0).toUpperCase() + studioMode.slice(1)}`,
-        'Scheduled Periods': `${filteredEntries.length} classes`,
-        'Integrity': currentVersionData.validation?.isValid ? '✓ 0 Conflicts' : `⚠ ${currentVersionData.validation?.errorCount || 0} Conflicts`
-      },
-      days: workingDays,
-      slots: timeSlots,
-      entries: filteredEntries
-    });
+    try {
+      showToast('Generating timetable PDF...', 'info');
+      await exportTimetableToPdf({
+        title: `Timetable Studio Schedule · ${entityName}`,
+        subtitle: `Version: ${currentVersionData.version?.name || 'Academic Master'} (${currentVersionData.version?.status || 'draft'})`,
+        meta: {
+          'View': `By ${studioMode.charAt(0).toUpperCase() + studioMode.slice(1)}`,
+          'Scheduled Periods': `${filteredEntries.length} classes`,
+          'Integrity': currentVersionData.validation?.isValid ? '✓ 0 Conflicts' : `⚠ ${currentVersionData.validation?.errorCount || 0} Conflicts`
+        },
+        days: workingDays,
+        slots: timeSlots,
+        entries: filteredEntries,
+        filename: `Timetable_${entityName.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`
+      });
+      showToast('Timetable PDF generated and downloaded', 'success');
+    } catch (err) {
+      console.error('PDF export failed:', err);
+      showToast('Opening fallback print preview...', 'warning');
+      printOrExportPdf({
+        title: `Timetable Studio Schedule · ${entityName}`,
+        subtitle: `Version: ${currentVersionData.version?.name || 'Academic Master'} (${currentVersionData.version?.status || 'draft'})`,
+        meta: {
+          'View': `By ${studioMode.charAt(0).toUpperCase() + studioMode.slice(1)}`,
+          'Scheduled Periods': `${filteredEntries.length} classes`,
+          'Integrity': currentVersionData.validation?.isValid ? '✓ 0 Conflicts' : `⚠ ${currentVersionData.validation?.errorCount || 0} Conflicts`
+        },
+        days: workingDays,
+        slots: timeSlots,
+        entries: filteredEntries
+      });
+    }
   });
 
   document.getElementById('btn-studio-export-ics')?.addEventListener('click', () => {

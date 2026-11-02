@@ -98,40 +98,6 @@
   font-size: 0.9rem;
 }
 
-.nav-links {
-  display: flex;
-  align-items: center;
-  gap: 1.75rem;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.nav-links a {
-  position: relative;
-  white-space: nowrap;
-  transition: color var(--transition-fast);
-}
-
-.nav-links a:hover {
-  color: var(--color-brand-primary);
-}
-
-.nav-links a::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  bottom: -4px;
-  width: 0;
-  height: 2px;
-  background-color: var(--color-brand-primary);
-  transition: width var(--transition-normal);
-}
-
-.nav-links a:hover::after {
-  width: 100%;
-}
-
 .top-actions {
   display: flex;
   align-items: center;
@@ -318,19 +284,6 @@
   image-rendering: -webkit-optimize-contrast;
 }
 
-/* Demo Button Micro Thumbnails */
-.demo-btn-thumb {
-  width: 19px;
-  height: 19px;
-  border-radius: 4px;
-  object-fit: cover;
-  display: inline-block;
-  vertical-align: middle;
-  background-color: #080203;
-  border: 1px solid rgba(148, 12, 30, 0.35);
-  flex-shrink: 0;
-}
-
 /* Portal Topbar User Avatar */
 .user-avatar-badge {
   width: 36px;
@@ -425,9 +378,6 @@
 @media (max-width: 768px) {
   .top-nav {
     padding: 0.75rem 1rem;
-  }
-  .nav-links {
-    display: none;
   }
   .role-card-grid {
     grid-template-columns: 1fr;

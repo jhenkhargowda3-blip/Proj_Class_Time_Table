@@ -118,7 +118,11 @@ try {
 }
 
 let serverInstance = null;
-const isDirectRun = !process.env.NODE_TEST_CONTEXT;
+const isDirectRun = Boolean(
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === path.resolve(__filename) &&
+  !process.env.NODE_TEST_CONTEXT
+);
 
 if (isDirectRun) {
   serverInstance = app.listen(config.port, '0.0.0.0', () => {

@@ -10,6 +10,15 @@
   <link rel="stylesheet" href="/css/components.css">
   <link rel="stylesheet" href="/css/animations.css">
   <link rel="stylesheet" href="/css/pages.css">
+  <script>
+    (function() {
+      try {
+        var savedTheme = localStorage.getItem('ctas_theme') || 
+          (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', savedTheme);
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <!-- Top Bar Contract -->
@@ -222,6 +231,8 @@
     <p>Class Timetable Automation System (CTAS) · Student Portal</p>
   </footer>
 
+  <script src="/vendor/jspdf/jspdf.umd.min.js"></script>
+  <script src="/vendor/jspdf/jspdf.plugin.autotable.min.js"></script>
   <script type="module" src="/js/theme.js"></script>
   <script type="module" src="/js/toast.js"></script>
   <script type="module" src="/student/student.js"></script>

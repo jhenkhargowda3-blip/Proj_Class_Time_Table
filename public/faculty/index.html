@@ -10,6 +10,15 @@
   <link rel="stylesheet" href="/css/components.css">
   <link rel="stylesheet" href="/css/animations.css">
   <link rel="stylesheet" href="/css/pages.css">
+  <script>
+    (function() {
+      try {
+        var savedTheme = localStorage.getItem('ctas_theme') || 
+          (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', savedTheme);
+      } catch (e) {}
+    })();
+  </script>
   <style>
     .cal-day-cell:hover {
       transform: scale(1.02);

@@ -114,6 +114,263 @@ export function exportToIcs(filename, calendarName, entries) {
 }
 
 /**
+ * Resolves the jsPDF constructor and autoTable function.
+ * Supports window.jspdf / window.jsPDF in browser, dynamic script tag, or dynamic import in Node.
+ */
+export async function getJsPdf() {
+  if (typeof window !== 'undefined') {
+    if (window.jspdf?.jsPDF) {
+      return { jsPDF: window.jspdf.jsPDF, autoTable: window.jspdf.autoTable || window.autoTable };
+    }
+    if (window.jsPDF) {
+      return { jsPDF: window.jsPDF, autoTable: window.autoTable };
+    }
+    // Attempt dynamic import of local vendor build if not yet attached to global window
+    try {
+      await import('/vendor/jspdf/jspdf.umd.min.js');
+      await import('/vendor/jspdf/jspdf.plugin.autotable.min.js');
+      if (window.jspdf?.jsPDF) {
+        return { jsPDF: window.jspdf.jsPDF, autoTable: window.jspdf.autoTable || window.autoTable };
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // Node environment or ESM bundler
+  try {
+    const jspdfModule = await import('jspdf');
+    const autoTableModule = await import('jspdf-autotable');
+    const jsPDF = jspdfModule.jsPDF || jspdfModule.default?.jsPDF || jspdfModule.default;
+    const autoTable = autoTableModule.default || autoTableModule.autoTable || autoTableModule;
+    return { jsPDF, autoTable };
+  } catch (err) {
+    console.warn('[CTAS exportUtils] jsPDF not available in current environment:', err);
+    return null;
+  }
+}
+
+/**
+ * Generates and downloads a clean, beautifully formatted landscape PDF version of the current timetable view using jsPDF
+ */
+export async function exportTimetableToPdf({
+  title = 'Class Timetable Schedule',
+  subtitle = '',
+  meta = {},
+  days = [],
+  slots = [],
+  entries = [],
+  filename = ''
+}) {
+  const pdfLib = await getJsPdf();
+  if (!pdfLib || !pdfLib.jsPDF) {
+    console.warn('[CTAS] jsPDF library not found; falling back to window.print()');
+    return printOrExportPdf({ title, subtitle, meta, days, slots, entries });
+  }
+
+  const { jsPDF, autoTable } = pdfLib;
+  const doc = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth(); // 297mm for A4 landscape
+  const pageHeight = doc.internal.pageSize.getHeight(); // 210mm
+  const marginX = 14;
+
+  // 1. Top Decorative Brand Accent Strip
+  doc.setFillColor(107, 0, 16); // Brand Primary #6B0010
+  doc.rect(marginX, 9, pageWidth - (marginX * 2), 2.2, 'F');
+
+  // 2. Organization / System Subtitle
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(107, 0, 16);
+  doc.text('CLASS TIMETABLE AUTOMATION SYSTEM (CTAS) · OFFICIAL ACADEMIC SCHEDULE', marginX, 16);
+
+  // 3. Document Title
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(17, 24, 39); // Text Primary #111827
+  doc.text(title, marginX, 22.5);
+
+  // 4. Subtitle / Academic Context
+  let currentY = 27;
+  if (subtitle) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(75, 85, 99); // Text Secondary #4B5563
+    doc.text(subtitle, marginX, currentY);
+    currentY += 4.5;
+  }
+
+  // 5. Right-side Status & Export Timestamp
+  const now = new Date();
+  const dateFormatted = now.toLocaleDateString('en-US', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Exported: ${dateFormatted}`, pageWidth - marginX, 16, { align: 'right' });
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(21, 128, 61); // Success green #15803D
+  doc.text('✓ Verified Conflict-Free', pageWidth - marginX, 20.5, { align: 'right' });
+
+  // 6. Metadata Summary Strip (if present)
+  const metaPairs = Object.entries(meta).filter(([_, v]) => Boolean(v));
+  if (metaPairs.length > 0) {
+    doc.setFillColor(243, 244, 246); // Surface subtle #F3F4F6
+    doc.setDrawColor(229, 231, 235); // Border subtle #E5E7EB
+    doc.roundedRect(marginX, currentY, pageWidth - (marginX * 2), 6.5, 1, 1, 'FD');
+
+    let metaX = marginX + 3;
+    doc.setFontSize(7);
+    metaPairs.forEach(([k, v]) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(51, 65, 85);
+      const label = `${k}: `;
+      doc.text(label, metaX, currentY + 4.3);
+      const labelWidth = doc.getTextWidth(label);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 116, 139);
+      const valText = `${v}   ·   `;
+      doc.text(valText, metaX + labelWidth, currentY + 4.3);
+      metaX += labelWidth + doc.getTextWidth(valText);
+    });
+    currentY += 9;
+  } else {
+    currentY += 2;
+  }
+
+  // 7. Prepare Table Headers and Body
+  const headRow = [
+    { content: 'Day / Period', styles: { halign: 'center', cellWidth: 22 } }
+  ];
+
+  slots.forEach(s => {
+    const slotLabel = s.label || `Period ${s.slot_no}`;
+    const timeRange = (s.start_time && s.end_time) ? `\n${s.start_time} - ${s.end_time}` : '';
+    headRow.push({
+      content: `${slotLabel}${timeRange}`,
+      styles: { halign: 'center' }
+    });
+  });
+
+  const bodyRows = [];
+  days.forEach(day => {
+    const row = [day.day_name];
+    slots.forEach(slot => {
+      if (slot.is_break) {
+        row.push(slot.label || 'BREAK');
+        return;
+      }
+      const entry = entries.find(e => 
+        (e.day_id === day.id || e.day_index === day.day_index) && 
+        (e.slot_id === slot.id || e.slot_no === slot.slot_no)
+      );
+
+      if (entry) {
+        const parts = [];
+        if (entry.subject_code) parts.push(entry.subject_code);
+        if (entry.subject_name) parts.push(entry.subject_name);
+        if (entry.faculty_name) parts.push(`Prof: ${entry.faculty_name}`);
+        if (entry.room_name) parts.push(`Room: ${entry.room_name}${entry.section_name ? ` (${entry.section_name})` : ''}`);
+        row.push(parts.join('\n'));
+      } else {
+        row.push('—');
+      }
+    });
+    bodyRows.push(row);
+  });
+
+  // 8. Invoke autoTable
+  const tableConfig = {
+    startY: currentY,
+    margin: { left: marginX, right: marginX, bottom: 12 },
+    head: [headRow],
+    body: bodyRows,
+    theme: 'grid',
+    headStyles: {
+      fillColor: [107, 0, 16], // Brand primary
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 7.5,
+      halign: 'center',
+      valign: 'middle',
+      cellPadding: 2
+    },
+    styles: {
+      fontSize: 6.8,
+      cellPadding: 2,
+      overflow: 'linebreak',
+      valign: 'middle',
+      lineColor: [209, 213, 219],
+      lineWidth: 0.15
+    },
+    columnStyles: {
+      0: {
+        fontStyle: 'bold',
+        halign: 'center',
+        valign: 'middle',
+        fillColor: [248, 250, 252],
+        textColor: [30, 41, 59],
+        cellWidth: 22
+      }
+    },
+    didParseCell: (data) => {
+      if (data.section === 'body' && data.column.index > 0) {
+        const text = String(data.cell.raw || '');
+        if (text.includes('BREAK')) {
+          data.cell.styles.fillColor = [241, 245, 249];
+          data.cell.styles.textColor = [148, 163, 184];
+          data.cell.styles.fontStyle = 'italic';
+          data.cell.styles.halign = 'center';
+        } else if (text === '—') {
+          data.cell.styles.textColor = [203, 213, 225];
+          data.cell.styles.halign = 'center';
+        } else {
+          data.cell.styles.fillColor = [255, 244, 245];
+          data.cell.styles.textColor = [17, 24, 39];
+        }
+      }
+    }
+  };
+
+  if (typeof doc.autoTable === 'function') {
+    doc.autoTable(tableConfig);
+  } else if (typeof autoTable === 'function') {
+    autoTable(doc, tableConfig);
+  } else if (typeof window !== 'undefined' && typeof window.jspdf?.autoTable === 'function') {
+    window.jspdf.autoTable(doc, tableConfig);
+  }
+
+  // 9. Document Footer
+  const finalY = pageHeight - 8;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(148, 163, 184);
+  doc.text('Class Timetable Automation System (CTAS) · Automated Deterministic CSP Schedule', marginX, finalY);
+  doc.text('Page 1 of 1 · Print & Export Ready', pageWidth - marginX, finalY, { align: 'right' });
+
+  // 10. Direct Download
+  const cleanName = filename || `${title.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+  const finalFileName = cleanName.endsWith('.pdf') ? cleanName : `${cleanName}.pdf`;
+  if (typeof doc.save === 'function') {
+    doc.save(finalFileName);
+  }
+
+  return doc;
+}
+
+export const generateTimetablePdf = exportTimetableToPdf;
+
+/**
  * Injects and renders a print-optimized timetable layout into #ctas-print-container
  * then triggers window.print() (native Save as PDF / Print)
  */

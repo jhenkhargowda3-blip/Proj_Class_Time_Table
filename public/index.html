@@ -11,6 +11,15 @@
   <link rel="stylesheet" href="/css/components.css">
   <link rel="stylesheet" href="/css/animations.css">
   <link rel="stylesheet" href="/css/pages.css">
+  <script>
+    (function() {
+      try {
+        var savedTheme = localStorage.getItem('ctas_theme') || 
+          (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', savedTheme);
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <!-- Top Navigation (3-zone contract) -->
@@ -18,13 +27,6 @@
     <a href="/" class="brand-mark" aria-label="CTAS - College Timetable Automation System">
       <img src="/assets/aistudio/Main_Logo_b842f85b.png" alt="CTAS - College Timetable Automation System" class="brand-main-logo" />
     </a>
-
-    <nav class="nav-links">
-      <a href="#features">Capabilities</a>
-      <a href="#solver">CSP Engine</a>
-      <a href="#substitution">Live Substitutions</a>
-      <a href="#grok">Grok AI</a>
-    </nav>
 
     <div class="top-actions">
       <button id="theme-toggle-btn" class="theme-toggle-btn" title="Toggle Light/Dark Theme" aria-label="Toggle Theme">
@@ -49,9 +51,6 @@
             <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 2rem;">
               <a href="#login" class="btn-primary" style="padding: 0.75rem 1.6rem; font-size: 1rem;">
                 Select Role &amp; Enter
-              </a>
-              <a href="#features" class="btn-secondary" style="padding: 0.75rem 1.4rem;">
-                Explore Features
               </a>
             </div>
 
@@ -150,36 +149,6 @@
                     </button>
                   </div>
                 </form>
-
-                <!-- Quick Demo Fill Helpers & Instant Demo Presentation -->
-                <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle); font-size: 0.8rem; color: var(--text-muted);">
-                  <div style="margin-bottom: 0.4rem; font-weight: 600;">One-Click Quick Sign In:</div>
-                  <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.85rem;">
-                    <button type="button" class="btn-secondary demo-fill-btn" style="display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.75rem; padding: 0.35rem 0.65rem; font-weight: 600;" data-demo-user="sharma" data-demo-pass="sharmajii" data-demo-role="admin">
-                      <img src="/assets/aistudio/Admin_c2028122.png" alt="" class="demo-btn-thumb" />
-                      Admin (sharma)
-                    </button>
-                    <button type="button" class="btn-secondary demo-fill-btn" style="display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.75rem; padding: 0.35rem 0.65rem; font-weight: 600;" data-demo-user="raj" data-demo-pass="rajiv2112" data-demo-role="faculty">
-                      <img src="/assets/aistudio/Faculty_1c75ed3c.png" alt="" class="demo-btn-thumb" />
-                      Faculty (raj)
-                    </button>
-                    <button type="button" class="btn-secondary demo-fill-btn" style="display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.75rem; padding: 0.35rem 0.65rem; font-weight: 600;" data-demo-user="jhenkhar" data-demo-pass="rocky(Jg)" data-demo-role="student">
-                      <img src="/assets/aistudio/Student_480b4c5d.png" alt="" class="demo-btn-thumb" />
-                      Student (jhenkhar)
-                    </button>
-                  </div>
-
-                  <div style="background: var(--bg-surface-subtle); padding: 0.6rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); font-size: 0.73rem; color: var(--text-secondary); line-height: 1.45; margin-bottom: 0.75rem;">
-                    <div style="font-weight: 600; margin-bottom: 0.2rem; color: var(--text-primary);">Configured Credentials:</div>
-                    <div>• <strong>Admin:</strong> user <code>sharma</code> (pass: <code>sharmajii</code>)</div>
-                    <div>• <strong>Faculty:</strong> user <code>raj</code> (pass: <code>rajiv2112</code>)</div>
-                    <div>• <strong>Student:</strong> user <code>jhenkhar</code> (pass: <code>rocky(Jg)</code>)</div>
-                  </div>
-
-                  <button type="button" id="btn-instant-demo" class="btn-primary" style="width: 100%; font-size: 0.8rem; padding: 0.5rem; background: linear-gradient(135deg, var(--color-brand-primary) 0%, #a81d33 100%);">
-                    🚀 Launch Instant Presentation Demo Mode
-                  </button>
-                </div>
               </div>
 
               <!-- VIEW 2: FORGOT PASSWORD REQUEST -->

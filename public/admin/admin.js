@@ -25,6 +25,7 @@ let activeResolver = null;
 let lastSharedValidation = null;
 let undoStack = [];
 let redoStack = [];
+let activeStepHighlight = null;
 
 // CSP Timetable Generation Progress Tracker State
 let isGenerationRunning = false;
@@ -1541,12 +1542,15 @@ function resetResolvedPreviewState() {
   originalVersionEntries = null;
   isResolvedDraftPreview = false;
   isComparingWithOriginal = false;
+  activeStepHighlight = null;
   undoStack = [];
   redoStack = [];
   updateUndoRedoButtons();
 
   // Reset UI elements
   document.getElementById('studio-resolve-progress-strip').style.display = 'none';
+  document.getElementById('studio-resolve-log-panel').style.display = 'none';
+  document.getElementById('resolve-cross-section-chip').style.display = 'none';
   document.getElementById('studio-resolved-banner').style.display = 'none';
   document.getElementById('studio-resolve-failed-banner').style.display = 'none';
   const compLabel = document.getElementById('compare-toggle-label');
@@ -1714,25 +1718,85 @@ async function startResolveWorkflow() {
   redoStack = [];
   updateUndoRedoButtons();
 
-  // Show live progress strip
+  // Show live progress strip and log panel
   const progressStrip = document.getElementById('studio-resolve-progress-strip');
   const progressCounter = document.getElementById('resolve-progress-counter');
   const progressStatus = document.getElementById('resolve-progress-status');
+  const logPanel = document.getElementById('studio-resolve-log-panel');
+  const logContent = document.getElementById('resolve-log-content');
+  const logBadge = document.getElementById('resolve-log-count-badge');
+  const conflictBanner = document.getElementById('studio-conflict-banner');
   const resolvedBanner = document.getElementById('studio-resolved-banner');
   const failedBanner = document.getElementById('studio-resolve-failed-banner');
+  const crossChip = document.getElementById('resolve-cross-section-chip');
 
   if (progressStrip) progressStrip.style.display = 'block';
+  if (logPanel) logPanel.style.display = 'block';
+  if (conflictBanner) conflictBanner.style.display = 'none';
   if (resolvedBanner) resolvedBanner.style.display = 'none';
   if (failedBanner) failedBanner.style.display = 'none';
+  if (crossChip) crossChip.style.display = 'none';
+
+  if (logContent) {
+    logContent.innerHTML = '<div style="color: var(--text-muted); font-style: italic;">Engine initializing Min-Conflicts solver...</div>';
+  }
+  if (logBadge) logBadge.textContent = '0 steps';
 
   const initialVal = runSharedValidation(draftWorkingEntries);
   if (progressCounter) progressCounter.textContent = `${initialVal.errorCount} Conflicts`;
   if (progressStatus) progressStatus.textContent = 'Initializing Min-Conflicts local search heuristics...';
 
+  const speedVal = document.getElementById('resolve-speed-select')?.value || 'normal';
+  let initialStepDelay = 500;
+  if (speedVal === 'slow') initialStepDelay = 850;
+  else if (speedVal === 'fast') initialStepDelay = 150;
+
   // Instantiate deterministic non-blocking solver
   activeResolver = new TimetableResolver(draftWorkingEntries, masterData, {
-    maxDurationMs: 5000,
+    maxDurationMs: 30000,
     maxIterations: 20000,
+    stepDelayMs: initialStepDelay,
+    onStep: (stepData) => {
+      const { step, entries, conflictsCount, iterations, log } = stepData;
+      draftWorkingEntries = entries;
+      runSharedValidation(draftWorkingEntries);
+
+      if (progressCounter) progressCounter.textContent = `${conflictsCount} Conflicts`;
+      const resolveBadge = document.getElementById('resolve-btn-badge');
+      if (resolveBadge) resolveBadge.textContent = conflictsCount;
+      if (progressStatus) progressStatus.textContent = `Iteration ${iterations.toLocaleString()}: ${step.description || 'Interchanging periods'}`;
+
+      if (logContent) {
+        if (log.length === 1) logContent.innerHTML = '';
+        const logLine = document.createElement('div');
+        logLine.style.padding = '0.2rem 0';
+        logLine.style.borderBottom = '1px solid #E5E7EB';
+        logLine.innerHTML = `<strong>Step ${step.stepNo}:</strong> ${escapeHtml(step.description)} &middot; <span style="color: ${conflictsCount < step.conflictsBefore ? 'var(--color-success)' : 'var(--color-warning)'}; font-weight: 700;">Conflicts ${step.conflictsBefore} &rarr; ${conflictsCount}</span>`;
+        logContent.appendChild(logLine);
+        logContent.scrollTop = logContent.scrollHeight;
+      }
+      if (logBadge) logBadge.textContent = `${log.length} steps`;
+
+      if (crossChip) {
+        if (studioMode === 'section' && step.sectionId && step.sectionId !== studioEntityId) {
+          crossChip.textContent = `Changes also happening in ${step.sectionName}`;
+          crossChip.style.display = 'inline-block';
+        } else {
+          crossChip.style.display = 'none';
+        }
+      }
+
+      activeStepHighlight = {
+        sourceDayId: step.sourceDayId,
+        sourceSlotId: step.sourceSlotId,
+        sourceEntryId: step.sourceEntryId,
+        targetDayId: step.targetDayId,
+        targetSlotId: step.targetSlotId,
+        targetEntryId: step.targetEntryId
+      };
+
+      renderStudioGrid();
+    },
     onProgress: (p) => {
       // Live badge countdown (e.g. 13 -> 11 -> 8 -> 4 -> 0)
       if (progressCounter) progressCounter.textContent = `${p.conflictsCount} Conflicts`;
@@ -1746,8 +1810,11 @@ async function startResolveWorkflow() {
       renderStudioGrid();
     },
     onComplete: (res) => {
+      activeStepHighlight = null;
+      const durationSec = activeResolver?.startTime ? ((Date.now() - activeResolver.startTime) / 1000).toFixed(1) : '1.2';
       activeResolver = null;
       if (progressStrip) progressStrip.style.display = 'none';
+      if (crossChip) crossChip.style.display = 'none';
 
       // Compute detailed change diff
       const diffList = [];
@@ -1792,7 +1859,7 @@ async function startResolveWorkflow() {
       // Populate Success State & Diff
       const summaryText = document.getElementById('resolve-summary-text');
       if (summaryText) {
-        summaryText.textContent = `${movedCount} classes moved, ${facCount} faculty reassigned, ${roomCount} rooms changed`;
+        summaryText.textContent = `${movedCount} classes moved/swapped, ${facCount} faculty reassigned, ${roomCount} rooms changed. Time taken ${durationSec}s`;
       }
 
       const diffListContainer = document.getElementById('studio-diff-list');
@@ -1822,8 +1889,10 @@ async function startResolveWorkflow() {
       showToast('0 conflicts found. All disputes resolved.', 'success');
     },
     onError: (err) => {
+      activeStepHighlight = null;
       activeResolver = null;
       if (progressStrip) progressStrip.style.display = 'none';
+      if (crossChip) crossChip.style.display = 'none';
 
       // Populate Diagnostics Banner
       const failedTitle = document.getElementById('resolve-failed-title');
@@ -1879,7 +1948,22 @@ async function loadStudioVersion(versionId) {
   try {
     resetResolvedPreviewState();
     currentVersionData = await apiRequest(`/api/timetable/versions/${versionId}`);
-    runSharedValidation(currentVersionData.entries);
+    const val = runSharedValidation(currentVersionData.entries);
+
+    // Sync draft conflict banner
+    const conflictBanner = document.getElementById('studio-conflict-banner');
+    const conflictText = document.getElementById('draft-conflict-banner-text');
+    if (conflictBanner) {
+      if (val && val.errorCount > 0) {
+        conflictBanner.style.display = 'block';
+        if (conflictText) {
+          conflictText.textContent = `Draft generated with ${val.errorCount} conflicts. Click Regenerate or Resolve to fix them.`;
+        }
+      } else {
+        conflictBanner.style.display = 'none';
+      }
+    }
+
     renderStudioGrid();
   } catch (err) {
     console.error('Failed to load version:', err);
@@ -1946,6 +2030,8 @@ function renderStudioGrid() {
       }
 
       const entry = filteredEntries.find(e => e.day_id === day.id && e.slot_id === slot.id);
+      const isStepSource = Boolean(activeStepHighlight && activeStepHighlight.sourceDayId === day.id && activeStepHighlight.sourceSlotId === slot.id);
+      const isStepTarget = Boolean(activeStepHighlight && activeStepHighlight.targetDayId === day.id && activeStepHighlight.targetSlotId === slot.id);
 
       if (entry) {
         const entryConflicts = conflictsByEntry[entry.id] || [];
@@ -1960,11 +2046,15 @@ function renderStudioGrid() {
           }
         }
 
-        let chipStyle = 'padding: 0.45rem 0.5rem; border-radius: var(--radius-sm); cursor: grab; text-align: left; height: 100%; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.15s, box-shadow 0.15s;';
-        if (hasConflict) {
+        let chipStyle = 'padding: 0.45rem 0.5rem; border-radius: var(--radius-sm); cursor: grab; text-align: left; height: 100%; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.2s ease;';
+        if (isStepSource) {
+          chipStyle += ' background: #FEF3C7; border: 2px solid #D97706; box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.45); transform: scale(1.02);';
+        } else if (isStepTarget) {
+          chipStyle += ' background: #DBEAFE; border: 2px solid #2563EB; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.45); transform: scale(1.02);';
+        } else if (isComparingWithOriginal && isModified) {
+          chipStyle += ' background: #EFF6FF; border: 2px solid #2563EB; outline: 2px solid #93C5FD; box-shadow: 0 0 8px rgba(37, 99, 235, 0.25);';
+        } else if (hasConflict) {
           chipStyle += ' background: #FEF2F2; border: 2px solid var(--color-error); box-shadow: 0 0 0 1px var(--color-error);';
-        } else if (isModified) {
-          chipStyle += ' background: #FEF3C7; border: 2px dashed #D97706;';
         } else {
           chipStyle += ' background: var(--color-brand-blush-soft); border: 1px solid var(--border-strong);';
         }
@@ -1979,7 +2069,9 @@ function renderStudioGrid() {
               <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.25rem;">
                 <span style="font-weight: 700; font-size: 0.85rem; color: ${hasConflict ? 'var(--color-error)' : 'var(--color-brand-primary)'};">${escapeHtml(entry.subject_code)}</span>
                 <div style="display: flex; align-items: center; gap: 0.25rem;">
-                  ${isModified ? '<span style="font-size: 0.65rem; background: #FDE68A; color: #92400E; font-weight: 700; padding: 0.05rem 0.3rem; border-radius: 3px;">MOD</span>' : ''}
+                  ${isStepSource ? '<span style="font-size: 0.65rem; background: #D97706; color: #FFFFFF; font-weight: 700; padding: 0.05rem 0.35rem; border-radius: 3px;">SRC</span>' : ''}
+                  ${isStepTarget ? '<span style="font-size: 0.65rem; background: #2563EB; color: #FFFFFF; font-weight: 700; padding: 0.05rem 0.35rem; border-radius: 3px;">TGT</span>' : ''}
+                  ${!isStepSource && !isStepTarget && isComparingWithOriginal && isModified ? '<span style="font-size: 0.65rem; background: #2563EB; color: #FFFFFF; font-weight: 700; padding: 0.05rem 0.35rem; border-radius: 3px;">MOVED</span>' : ''}
                   ${hasConflict ? '<span style="font-size: 0.72rem; color: var(--color-error); font-weight: 800;" title="Collision">⚠</span>' : ''}
                   ${entry.locked ? '<span style="font-size: 0.72rem;" title="Locked">🔒</span>' : ''}
                 </div>
@@ -1994,11 +2086,25 @@ function renderStudioGrid() {
           </td>
         `;
       } else {
-        html += `
-          <td class="timetable-cell-drop-target timetable-cell-free" data-day-id="${day.id}" data-slot-id="${slot.id}" style="padding: 0.4rem; border: 1px solid var(--border-subtle); vertical-align: middle; height: 75px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer;" title="Click to schedule a class in this open period">
-            <span style="opacity: 0.45; font-weight: 600;">+ Free</span>
-          </td>
-        `;
+        if (isStepTarget) {
+          html += `
+            <td class="timetable-cell-drop-target timetable-cell-free" data-day-id="${day.id}" data-slot-id="${slot.id}" style="padding: 0.4rem; border: 2px solid #2563EB; background: #DBEAFE; box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.3); vertical-align: middle; height: 75px; color: #1D4ED8; font-size: 0.8rem; font-weight: 700; cursor: pointer;" title="Target slot for resolution move">
+              <span>🎯 Target Slot</span>
+            </td>
+          `;
+        } else if (isStepSource) {
+          html += `
+            <td class="timetable-cell-drop-target timetable-cell-free" data-day-id="${day.id}" data-slot-id="${slot.id}" style="padding: 0.4rem; border: 2px solid #D97706; background: #FEF3C7; box-shadow: inset 0 0 0 2px rgba(217, 119, 6, 0.3); vertical-align: middle; height: 75px; color: #B45309; font-size: 0.8rem; font-weight: 700; cursor: pointer;">
+              <span>Vacated</span>
+            </td>
+          `;
+        } else {
+          html += `
+            <td class="timetable-cell-drop-target timetable-cell-free" data-day-id="${day.id}" data-slot-id="${slot.id}" style="padding: 0.4rem; border: 1px solid var(--border-subtle); vertical-align: middle; height: 75px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer;" title="Click to schedule a class in this open period">
+              <span style="opacity: 0.45; font-weight: 600;">+ Free</span>
+            </td>
+          `;
+        }
       }
     }
 
@@ -2329,22 +2435,27 @@ function onGenerationCompleted(data) {
   stopGenerationTimer();
   updateGenerationButtons(false);
 
+  const hasConflicts = Boolean(data.hasConflicts || (data.conflictsCount && data.conflictsCount > 0));
+  const conflictsCount = data.conflictsCount || 0;
+
   const banner = document.getElementById('global-generation-banner');
   if (banner) {
     banner.style.display = 'block';
-    banner.style.borderColor = 'var(--color-success)';
+    banner.style.borderColor = hasConflicts ? '#D97706' : 'var(--color-success)';
+    banner.style.background = hasConflicts ? '#FFFBEB' : 'var(--bg-surface)';
 
     const icon = document.getElementById('gen-banner-icon');
     if (icon) {
-      icon.textContent = '✓';
+      icon.textContent = hasConflicts ? '⚠' : '✓';
+      icon.style.color = hasConflicts ? '#D97706' : 'var(--color-success)';
       icon.style.animation = 'none';
     }
 
     const badge = document.getElementById('gen-banner-badge');
     if (badge) {
-      badge.textContent = 'Generation Complete';
-      badge.style.background = 'var(--color-success-bg)';
-      badge.style.color = 'var(--color-success)';
+      badge.textContent = hasConflicts ? `Draft Generated (${conflictsCount} Conflicts Detected)` : 'Generation Complete';
+      badge.style.background = hasConflicts ? '#FEF3C7' : 'var(--color-success-bg)';
+      badge.style.color = hasConflicts ? '#B45309' : 'var(--color-success)';
     }
 
     const lockBadge = document.getElementById('gen-banner-lock-badge');
@@ -2352,29 +2463,37 @@ function onGenerationCompleted(data) {
 
     const title = document.getElementById('gen-banner-title');
     if (title) {
-      title.textContent = `Timetable Generated: "${data.versionName || data.name || 'Master Timetable'}"`;
+      title.textContent = hasConflicts
+        ? `Timetable Draft Generated: "${data.versionName || data.name || 'Master Timetable'}"`
+        : `Timetable Generated: "${data.versionName || data.name || 'Master Timetable'}"`;
     }
 
     const phaseEl = document.getElementById('gen-banner-phase');
     if (phaseEl) {
-      phaseEl.textContent = `Successfully computed ${data.entriesCount || 0} collision-free periods with zero hard conflicts in ${data.durationMs || 0}ms. Soft constraint score: ${data.score || 100}/100.`;
+      phaseEl.textContent = hasConflicts
+        ? `Draft generated with ${conflictsCount} conflicts. Click Regenerate or Resolve to fix them.`
+        : `Successfully computed ${data.entriesCount || 0} collision-free periods with zero hard conflicts in ${data.durationMs || 0}ms. Soft constraint score: ${data.score || 100}/100.`;
     }
 
     const bar = document.getElementById('gen-banner-progress-bar');
     if (bar) {
       bar.style.width = '100%';
-      bar.style.background = 'var(--color-success)';
+      bar.style.background = hasConflicts ? '#D97706' : 'var(--color-success)';
       bar.style.animation = 'none';
     }
 
     const pct = document.getElementById('gen-banner-percent');
     if (pct) {
-      pct.textContent = '100%';
-      pct.style.color = 'var(--color-success)';
+      pct.textContent = hasConflicts ? `${conflictsCount} Conflicts` : '100%';
+      pct.style.color = hasConflicts ? '#D97706' : 'var(--color-success)';
     }
 
     const stageLabel = document.getElementById('gen-banner-stage-label');
-    if (stageLabel) stageLabel.textContent = 'All constraints satisfied · Saved to database';
+    if (stageLabel) {
+      stageLabel.textContent = hasConflicts
+        ? 'Conflicts present · Ready for resolution or review'
+        : 'All constraints satisfied · Saved to database';
+    }
 
     const dismissBtn = document.getElementById('gen-banner-dismiss-btn');
     if (dismissBtn) {
@@ -2388,6 +2507,20 @@ function onGenerationCompleted(data) {
         banner.style.display = 'none';
       }
     }, 10000);
+  }
+
+  // Also sync studio conflict banner
+  const studioConflictBanner = document.getElementById('studio-conflict-banner');
+  const draftConflictText = document.getElementById('draft-conflict-banner-text');
+  if (studioConflictBanner) {
+    if (hasConflicts) {
+      studioConflictBanner.style.display = 'block';
+      if (draftConflictText) {
+        draftConflictText.textContent = `Draft generated with ${conflictsCount} conflicts. Click Regenerate or Resolve to fix them.`;
+      }
+    } else {
+      studioConflictBanner.style.display = 'none';
+    }
   }
 
   // Update in-modal box if open
@@ -2512,9 +2645,8 @@ function openGenerateModal() {
 window.openGenerateModal = openGenerateModal;
 
 function setupModals() {
-  // Wire both Overview and Studio Generate buttons
+  // Wire Overview Generate button (Studio has its own direct trigger)
   document.getElementById('btn-overview-generate')?.addEventListener('click', openGenerateModal);
-  document.getElementById('btn-studio-generate')?.addEventListener('click', openGenerateModal);
 
   document.getElementById('modal-generate-close')?.addEventListener('click', () => {
     document.getElementById('modal-generate').style.display = 'none';
@@ -2535,6 +2667,8 @@ function setupModals() {
     const scopeSectionVal = document.getElementById('gen-scope-section')?.value;
     const sectionId = scopeSectionVal ? parseInt(scopeSectionVal, 10) : undefined;
     const publishNow = document.getElementById('gen-publish-now')?.checked || false;
+    const conflictLevelVal = document.getElementById('gen-conflict-level')?.value;
+    const conflictLevel = conflictLevelVal === 'none' ? null : (conflictLevelVal || 'medium');
 
     const btn = document.getElementById('btn-submit-generate');
     if (btn) {
@@ -2554,7 +2688,7 @@ function setupModals() {
     try {
       const res = await apiRequest('/api/timetable/generate', {
         method: 'POST',
-        body: { name, sectionId, publishNow },
+        body: { name, sectionId, publishNow, conflictLevel },
         showErrorToast: false
       });
 

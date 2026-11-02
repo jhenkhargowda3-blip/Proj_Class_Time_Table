@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert';
 import { getDatabase } from '../src/db/connection.js';
+import { seedDatabase } from '../src/db/seed.js';
 import {
   reportAbsence,
   findEligibleSubstitutes,
@@ -12,10 +13,7 @@ import {
 
 test('Phase 8: Absence, Lateness, and Substitution Flow (Core Feature)', async (t) => {
   const db = getDatabase();
-
-  // Clean slate for substitutions and absences
-  db.prepare('DELETE FROM substitutions').run();
-  db.prepare('DELETE FROM absences').run();
+  seedDatabase(db);
 
   // Get active timetable version
   const activeVersion = db.prepare("SELECT id FROM timetable_versions WHERE status = 'active' LIMIT 1").get();

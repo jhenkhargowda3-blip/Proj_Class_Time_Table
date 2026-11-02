@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { getDatabase } from '../db/connection.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
-import { generateTimetable, isGenerationInProgress, getGenerationState } from '../services/scheduler.js';
+import { generateTimetable, generateDraftWithConflicts, isGenerationInProgress, getGenerationState } from '../services/scheduler.js';
 import { validateTimetable, validateMove } from '../services/validator.js';
 import { broadcast } from '../services/sse.js';
 
@@ -23,16 +23,24 @@ router.post('/generate', requireAuth, requireRole('admin'), (req, res) => {
       });
     }
 
-    const result = generateTimetable({
-      createdBy: req.user.id,
-      name: req.body.name,
-      sectionId: req.body.sectionId ? parseInt(req.body.sectionId, 10) : null,
-      conflictLevel: req.body.conflictLevel || null,
-      currentVersionId: req.body.currentVersionId ? parseInt(req.body.currentVersionId, 10) : null,
-      regenerate: Boolean(req.body.regenerate),
-      maxDurationMs: req.body.maxDurationMs || 20000,
-      maxAttempts: req.body.maxAttempts || 5
-    });
+    let result;
+    if (req.body.regenerate) {
+      result = generateTimetable({
+        createdBy: req.user.id,
+        name: req.body.name,
+        sectionId: req.body.sectionId ? parseInt(req.body.sectionId, 10) : null,
+        currentVersionId: req.body.currentVersionId ? parseInt(req.body.currentVersionId, 10) : null,
+        regenerate: true,
+        maxDurationMs: req.body.maxDurationMs || 20000,
+        maxAttempts: req.body.maxAttempts || 5
+      });
+    } else {
+      result = generateDraftWithConflicts({
+        createdBy: req.user.id,
+        name: req.body.name,
+        sectionId: req.body.sectionId ? parseInt(req.body.sectionId, 10) : null
+      });
+    }
 
     if (!result.success) {
       if (result.alreadyRunning) {

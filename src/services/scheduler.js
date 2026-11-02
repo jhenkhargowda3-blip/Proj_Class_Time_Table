@@ -36,8 +36,8 @@ export function generateTimetable(options = {}) {
   const db = getDatabase();
   const startTime = Date.now();
 
-  // If conflictLevel is specified, route to generateDraftWithConflicts
-  if (options.conflictLevel) {
+  // If initial draft is requested, route to fast first-pass allocator
+  if (options.initialDraft || options.withConflicts) {
     return generateDraftWithConflicts(options);
   }
 
@@ -473,17 +473,28 @@ export function generateTimetable(options = {}) {
       const shuffledDays = [...days].sort((d1, d2) => {
         const count1 = currentPlacements.filter(p => p.sectionId === task.sectionId && p.dayId === d1.id).length;
         const count2 = currentPlacements.filter(p => p.sectionId === task.sectionId && p.dayId === d2.id).length;
-        return count1 - count2;
+        if (count1 !== count2) return count1 - count2;
+        if (options.regenerate || attempt > 1) return Math.random() - 0.5;
+        return d1.id - d2.id;
       });
 
       for (const d of shuffledDays) {
         // For labs: only test starting slot of contiguous pairs
-        const candidateSlotIds = task.isLab
+        let candidateSlotIds = task.isLab
           ? contiguousSlotPairs.map(p => p[0])
           : teachingSlots.map(s => s.id);
 
+        if (options.regenerate || attempt > 1) {
+          candidateSlotIds = [...candidateSlotIds].sort(() => Math.random() - 0.5);
+        }
+
+        let roomsToTry = [...eligibleRooms];
+        if (options.regenerate || attempt > 1) {
+          roomsToTry = roomsToTry.sort(() => Math.random() - 0.5);
+        }
+
         for (const slotId of candidateSlotIds) {
-          for (const room of eligibleRooms) {
+          for (const room of roomsToTry) {
             if (canPlace(task, d.id, slotId, room.id)) {
               applyPlacement(task, d.id, slotId, room.id);
 
@@ -626,23 +637,16 @@ export function generateTimetable(options = {}) {
 /**
  * Generates an initial draft with realistic, genuine conflicts for demonstration.
  * Low: 5-8 conflicts
- * Medium: 10-15 conflicts (default ~13)
- * High: 20+ conflicts
+/**
+ * Fast First-Pass Allocator (Demonstration Workflow)
+ * Naturally produces realistic conflicts by filling each section's required hours
+ * using only section-local occupancy checks without cross-section coordination.
+ * Faculty double-bookings, room double-bookings, faculty placed when unavailable,
+ * daily-limit overruns and broken lab continuity occur purely organically.
  */
 export function generateDraftWithConflicts(options = {}) {
   const db = getDatabase();
   const startTime = Date.now();
-  const level = (options.conflictLevel || 'medium').toLowerCase();
-
-  let targetMin = 10;
-  let targetMax = 15;
-  if (level === 'low') {
-    targetMin = 5;
-    targetMax = 8;
-  } else if (level === 'high') {
-    targetMin = 20;
-    targetMax = 28;
-  }
 
   const days = db.prepare('SELECT * FROM working_days WHERE is_active = 1 ORDER BY day_index ASC').all();
   const slots = db.prepare('SELECT * FROM time_slots ORDER BY slot_no ASC').all();
@@ -651,13 +655,12 @@ export function generateDraftWithConflicts(options = {}) {
   const rooms = db.prepare('SELECT * FROM rooms WHERE is_active = 1 ORDER BY capacity ASC').all();
   const facultyList = db.prepare('SELECT * FROM faculty WHERE is_active = 1 ORDER BY id ASC').all();
   const sectionSubjects = db.prepare(`
-    SELECT ss.*, s.weekly_periods, s.type as subject_type, s.code as subject_code, s.name as subject_name
+    SELECT ss.*, s.weekly_periods, s.type as subject_type, s.code as subject_code, s.name as subject_name, s.lab_block_length
     FROM section_subjects ss
     JOIN subjects s ON ss.subject_id = s.id
   `).all();
-  const facultyAvailability = db.prepare('SELECT * FROM faculty_availability').all();
 
-  // Feasibility verification
+  // 1. Upfront Master Data Feasibility Verification
   if (!days.length || !teachingSlots.length || !sections.length || !rooms.length || !facultyList.length) {
     return {
       success: false,
@@ -666,7 +669,6 @@ export function generateDraftWithConflicts(options = {}) {
     };
   }
 
-  // Pre-check section teaching hours
   const totalSlotsPerSec = days.length * teachingSlots.length;
   for (const sec of sections) {
     const required = sectionSubjects.filter(ss => ss.section_id === sec.id).reduce((s, ss) => s + ss.weekly_periods, 0);
@@ -674,108 +676,187 @@ export function generateDraftWithConflicts(options = {}) {
       return {
         success: false,
         infeasible: true,
-        reason: `Section ${sec.name} requires ${required} periods, but only ${totalSlotsPerSec} slots exist in the week.`
+        reason: `Section ${sec.name} requires ${required} periods, but only ${totalSlotsPerSec} teaching slots exist in the week.`
       };
     }
   }
 
-  // Generate a valid baseline schedule to guarantee solvability
-  const baseResult = generateTimetable({ name: 'Internal Baseline', maxAttempts: 5, skipLock: true });
-  if (!baseResult || !baseResult.success) {
+  // Solvability check: Verify required subjects have faculty and rooms fit capacity
+  const maxSecStrength = Math.max(...sections.map(s => s.strength || 40));
+  const maxRoomCap = Math.max(...rooms.map(r => r.capacity || 0));
+  if (maxRoomCap < maxSecStrength) {
     return {
       success: false,
       infeasible: true,
-      reason: 'Master data constraints make timetable infeasible: insufficient faculty availability, room capacity, or weekly slots.'
+      reason: `Largest section strength (${maxSecStrength}) exceeds highest room capacity (${maxRoomCap}). Master data infeasible.`
     };
   }
 
-  const rawBaseEntries = db.prepare(`
-    SELECT te.*, s.code as subject_code, s.name as subject_name, s.type as subject_type,
-           sec.name as section_name, sec.strength as section_strength,
-           f.name as faculty_name, r.name as room_name, r.type as room_type, r.capacity as room_capacity
-    FROM timetable_entries te
-    JOIN subjects s ON te.subject_id = s.id
-    JOIN sections sec ON te.section_id = sec.id
-    JOIN faculty f ON te.faculty_id = f.id
-    JOIN rooms r ON te.room_id = r.id
-    WHERE te.version_id = ?
-  `).all(baseResult.versionId);
+  const labRooms = rooms.filter(r => r.type === 'lab');
+  const classRooms = rooms.filter(r => r.type === 'classroom');
+  const hasLabSubjects = sectionSubjects.some(ss => ss.subject_type === 'lab');
+  if (hasLabSubjects && labRooms.length === 0) {
+    return {
+      success: false,
+      infeasible: true,
+      reason: 'Curriculum contains lab subjects but no active laboratory rooms exist in Master Data.'
+    };
+  }
 
-  // Clean up internal baseline version
-  db.prepare('DELETE FROM timetable_versions WHERE id = ?').run(baseResult.versionId);
+  // Helper shuffle
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
 
-  // Clone entries to inject realistic conflicts
-  const draft = rawBaseEntries.map(e => ({
-    section_id: e.section_id,
-    subject_id: e.subject_id,
-    faculty_id: e.faculty_id,
-    room_id: e.room_id,
-    day_id: e.day_id,
-    slot_id: e.slot_id,
-    is_lab_block: e.is_lab_block,
-    locked: 0,
-    is_draft: 1
-  }));
+  // 2. Fast First-Pass Allocator Execution
+  // Runs section by section using basic local occupancy checks.
+  // Re-runs with fresh seed if conflicts === 0 or conflicts > 40 (up to 20 attempts).
+  let bestDraft = [];
+  let bestVal = null;
+  let attempts = 0;
+  const maxAttempts = 20;
 
-  const unavList = facultyAvailability.filter(a => a.is_available === 0);
+  while (attempts < maxAttempts) {
+    attempts++;
+    const draft = [];
 
-  let currentVal = validateTimetable(draft);
-  let injectAttempts = 0;
+    for (const sec of sections) {
+      const secSubs = sectionSubjects.filter(ss => ss.section_id === sec.id);
+      const occupiedSlots = new Set();
 
-  while (currentVal.violations.length < targetMin && injectAttempts < 120) {
-    injectAttempts++;
-    const r = Math.random();
-
-    if (r < 0.38) {
-      // 1. Faculty double-booking across sections in same slot
-      const e1 = draft[Math.floor(Math.random() * draft.length)];
-      const e2 = draft.find(e => e.section_id !== e1.section_id && e.day_id === e1.day_id && e.slot_id === e1.slot_id && e.faculty_id !== e1.faculty_id);
-      if (e2) {
-        e2.faculty_id = e1.faculty_id;
-      }
-    } else if (r < 0.72) {
-      // 2. Room double-booking across sections in same slot
-      const e1 = draft[Math.floor(Math.random() * draft.length)];
-      const e2 = draft.find(e => e.section_id !== e1.section_id && e.day_id === e1.day_id && e.slot_id === e1.slot_id && e.room_id !== e1.room_id);
-      if (e2) {
-        e2.room_id = e1.room_id;
-      }
-    } else if (r < 0.88 && unavList.length > 0) {
-      // 3. Faculty unavailable placement
-      const un = unavList[Math.floor(Math.random() * unavList.length)];
-      const facEntry = draft.find(e => e.faculty_id === un.faculty_id && (e.day_id !== un.day_id || e.slot_id !== un.slot_id));
-      if (facEntry) {
-        const swapTarget = draft.find(e => e.section_id === facEntry.section_id && e.day_id === un.day_id && e.slot_id === un.slot_id);
-        if (swapTarget) {
-          const oldD = facEntry.day_id, oldS = facEntry.slot_id;
-          facEntry.day_id = swapTarget.day_id; facEntry.slot_id = swapTarget.slot_id;
-          swapTarget.day_id = oldD; swapTarget.slot_id = oldS;
+      // Collect all slot coordinate objects for this section
+      const allSecSlots = [];
+      for (const d of days) {
+        for (const s of teachingSlots) {
+          allSecSlots.push({ day: d, slot: s });
         }
       }
-    } else {
-      // 4. Lab block split (break continuity)
-      const labEntries = draft.filter(e => e.is_lab_block === 1);
-      if (labEntries.length > 0) {
-        const l1 = labEntries[Math.floor(Math.random() * labEntries.length)];
-        const nonLab = draft.find(e => e.section_id === l1.section_id && e.is_lab_block === 0);
-        if (nonLab) {
-          const oldD = l1.day_id, oldS = l1.slot_id;
-          l1.day_id = nonLab.day_id; l1.slot_id = nonLab.slot_id;
-          nonLab.day_id = oldD; nonLab.slot_id = oldS;
+      shuffle(allSecSlots);
+
+      // Prepare periods to place for this section
+      const itemsToPlace = [];
+      for (const ss of secSubs) {
+        if (ss.subject_type === 'lab') {
+          const len = ss.lab_block_length || 2;
+          let rem = ss.weekly_periods;
+          while (rem > 0) {
+            const b = Math.min(rem, len);
+            itemsToPlace.push({ ss, isLab: true, blockLength: b });
+            rem -= b;
+          }
+        } else {
+          for (let i = 0; i < ss.weekly_periods; i++) {
+            itemsToPlace.push({ ss, isLab: false, blockLength: 1 });
+          }
+        }
+      }
+      shuffle(itemsToPlace);
+
+      for (const item of itemsToPlace) {
+        const { ss, isLab, blockLength } = item;
+        let room = isLab
+          ? (labRooms[Math.floor(Math.random() * labRooms.length)] || rooms[0])
+          : (classRooms[Math.floor(Math.random() * classRooms.length)] || rooms[0]);
+
+        const fac = facultyList.find(f => f.id === ss.faculty_id) || facultyList[0];
+
+        if (isLab && blockLength > 1) {
+          let placed = false;
+          // 70% natural attempt at consecutive placement, 30% uncoordinated split
+          if (Math.random() < 0.7) {
+            for (const d of days) {
+              const daySlots = teachingSlots.slice().sort((a, b) => a.slot_no - b.slot_no);
+              for (let i = 0; i <= daySlots.length - blockLength; i++) {
+                const slice = daySlots.slice(i, i + blockLength);
+                if (slice.every(s => !occupiedSlots.has(`${d.id}_${s.id}`))) {
+                  for (const s of slice) {
+                    occupiedSlots.add(`${d.id}_${s.id}`);
+                    draft.push({
+                      section_id: sec.id, section_name: sec.name, section_strength: sec.strength,
+                      subject_id: ss.subject_id, subject_code: ss.subject_code, subject_name: ss.subject_name, subject_type: ss.subject_type,
+                      faculty_id: ss.faculty_id, faculty_name: fac?.name, max_periods_per_day: fac?.max_periods_per_day || 4,
+                      room_id: room.id, room_name: room.name, room_type: room.type, room_capacity: room.capacity,
+                      day_id: d.id, day_name: d.day_name, day_index: d.day_index,
+                      slot_id: s.id, slot_no: s.slot_no, slot_label: s.label, is_break: s.is_break, start_time: s.start_time, end_time: s.end_time,
+                      is_lab_block: 1, locked: 0, is_draft: 1
+                    });
+                  }
+                  placed = true;
+                  break;
+                }
+              }
+              if (placed) break;
+            }
+          }
+
+          if (!placed) {
+            let count = 0;
+            for (const cand of allSecSlots) {
+              const key = `${cand.day.id}_${cand.slot.id}`;
+              if (!occupiedSlots.has(key)) {
+                occupiedSlots.add(key);
+                draft.push({
+                  section_id: sec.id, section_name: sec.name, section_strength: sec.strength,
+                  subject_id: ss.subject_id, subject_code: ss.subject_code, subject_name: ss.subject_name, subject_type: ss.subject_type,
+                  faculty_id: ss.faculty_id, faculty_name: fac?.name, max_periods_per_day: fac?.max_periods_per_day || 4,
+                  room_id: room.id, room_name: room.name, room_type: room.type, room_capacity: room.capacity,
+                  day_id: cand.day.id, day_name: cand.day.day_name, day_index: cand.day.day_index,
+                  slot_id: cand.slot.id, slot_no: cand.slot.slot_no, slot_label: cand.slot.label, is_break: cand.slot.is_break, start_time: cand.slot.start_time, end_time: cand.slot.end_time,
+                  is_lab_block: 1, locked: 0, is_draft: 1
+                });
+                count++;
+                if (count >= blockLength) break;
+              }
+            }
+          }
+        } else {
+          // Theory or 1-period lab: pick next available slot for this section
+          const cand = allSecSlots.find(c => !occupiedSlots.has(`${c.day.id}_${c.slot.id}`));
+          if (cand) {
+            occupiedSlots.add(`${cand.day.id}_${cand.slot.id}`);
+            draft.push({
+              section_id: sec.id, section_name: sec.name, section_strength: sec.strength,
+              subject_id: ss.subject_id, subject_code: ss.subject_code, subject_name: ss.subject_name, subject_type: ss.subject_type,
+              faculty_id: ss.faculty_id, faculty_name: fac?.name, max_periods_per_day: fac?.max_periods_per_day || 4,
+              room_id: room.id, room_name: room.name, room_type: room.type, room_capacity: room.capacity,
+              day_id: cand.day.id, day_name: cand.day.day_name, day_index: cand.day.day_index,
+              slot_id: cand.slot.id, slot_no: cand.slot.slot_no, slot_label: cand.slot.label, is_break: cand.slot.is_break, start_time: cand.slot.start_time, end_time: cand.slot.end_time,
+              is_lab_block: isLab ? 1 : 0, locked: 0, is_draft: 1
+            });
+          }
         }
       }
     }
-    currentVal = validateTimetable(draft);
+
+    const val = validateTimetable(draft);
+    bestDraft = draft;
+    bestVal = val;
+
+    // Check if natural conflicts fall into realistic demo range (1 to 40)
+    if (val.errorCount > 0 && val.errorCount <= 40) {
+      break;
+    }
   }
 
-  const finalConflictCount = currentVal.violations.length;
-  const versionName = options.name || `Initial Draft (${finalConflictCount} conflicts)`;
+  const conflictCount = bestVal?.errorCount || 0;
+  const now = new Date();
+  const timeFormatted = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const dateFormatted = now.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  const versionName = options.name || `Draft – ${dateFormatted} ${timeFormatted}`;
 
   const saveTx = db.transaction(() => {
     const ver = db.prepare(`
       INSERT INTO timetable_versions (name, status, created_by, notes)
       VALUES (?, 'draft', ?, ?)
-    `).run(versionName, options.createdBy || null, `Generated initial draft with ${finalConflictCount} realistic conflicts for demonstration.`);
+    `).run(
+      versionName,
+      options.createdBy || null,
+      `Generated initial draft via first-pass allocator with ${conflictCount} naturally occurring conflicts for demonstration.`
+    );
 
     const versionId = ver.lastInsertRowid;
     const insertEntry = db.prepare(`
@@ -784,7 +865,7 @@ export function generateDraftWithConflicts(options = {}) {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     `);
 
-    for (const e of draft) {
+    for (const e of bestDraft) {
       insertEntry.run(
         versionId,
         e.section_id,
@@ -808,10 +889,9 @@ export function generateDraftWithConflicts(options = {}) {
     success: true,
     versionId,
     versionName,
-    entriesCount: draft.length,
-    conflictsCount: savedVal.violations.length,
-    hasConflicts: savedVal.violations.length > 0,
-    conflictLevel: level,
+    entriesCount: bestDraft.length,
+    conflictsCount: savedVal.errorCount,
+    hasConflicts: savedVal.errorCount > 0,
     durationMs: Date.now() - startTime,
     validation: savedVal
   };

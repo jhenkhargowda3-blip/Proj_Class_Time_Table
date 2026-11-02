@@ -36,7 +36,7 @@ export class TimetableResolver {
 
     this.maxDurationMs = options.maxDurationMs || 30000;
     this.maxIterations = options.maxIterations || 20000;
-    this.stepDelayMs = options.stepDelayMs || 500; // Normal default: ~500ms
+    this.stepDelayMs = options.stepDelayMs !== undefined ? options.stepDelayMs : (typeof window !== 'undefined' ? 500 : 0);
 
     this.isCancelled = false;
     this.isRunning = false;

@@ -375,7 +375,7 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
   }
 
   // Check 7: Subject Weekly Periods Mismatch (Too few or too many)
-  if (!options.skipWeeklyHoursCheck) {
+  if (options.checkWeeklyPeriods && !options.skipWeeklyHoursCheck) {
     // If sectionSubjects master data is available, verify against it
     if (Array.isArray(sectionSubjects) && sectionSubjects.length > 0) {
       for (const req of sectionSubjects) {

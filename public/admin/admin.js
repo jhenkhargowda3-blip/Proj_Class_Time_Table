@@ -1139,18 +1139,26 @@ function renderMasterDataTables() {
 }
 
 // 3. Timetable Studio
-async function loadStudio() {
+let studioControlsInitialized = false;
+
+async function loadStudio(preferredVersionId = null) {
   await loadMasterData();
   const versionsData = await apiRequest('/api/timetable/versions');
   const selector = document.getElementById('studio-version-selector');
   if (selector && versionsData.versions?.length) {
+    let selectedId = preferredVersionId ? parseInt(preferredVersionId, 10) : null;
+    if (!selectedId || !versionsData.versions.some(v => v.id === selectedId)) {
+      const activeVer = versionsData.versions.find(v => v.status === 'active');
+      selectedId = activeVer ? activeVer.id : versionsData.versions[0].id;
+    }
+
     selector.innerHTML = versionsData.versions.map(v => `
-      <option value="${v.id}" ${v.status === 'active' ? 'selected' : ''}>
+      <option value="${v.id}" ${v.id === selectedId ? 'selected' : ''}>
         ${v.name} [${v.status.toUpperCase()}] (${v.entries_count} classes)
       </option>
     `).join('');
 
-    activeVersionId = parseInt(selector.value, 10);
+    activeVersionId = selectedId;
   }
 
   setupStudioControls();
@@ -1160,6 +1168,9 @@ async function loadStudio() {
 }
 
 function setupStudioControls() {
+  if (studioControlsInitialized) return;
+  studioControlsInitialized = true;
+
   const versionSelector = document.getElementById('studio-version-selector');
   versionSelector?.addEventListener('change', () => {
     activeVersionId = parseInt(versionSelector.value, 10);
@@ -1192,7 +1203,37 @@ function setupStudioControls() {
 
   // Studio actions
   document.getElementById('btn-studio-generate')?.addEventListener('click', () => {
-    document.getElementById('modal-generate').style.display = 'flex';
+    openGenerateModal();
+  });
+
+  document.getElementById('btn-studio-regenerate')?.addEventListener('click', async () => {
+    if (isGenerationRunning) {
+      showToast('A timetable generation computation is active in the background.', 'warning');
+      return;
+    }
+    const currentName = currentVersionData?.version?.name || 'Academic Master';
+    const altName = `${currentName} (Variant ${Math.floor(Math.random() * 900 + 100)})`;
+
+    updateGenerationProgress({
+      isRunning: true,
+      progress: 5,
+      phase: 'Phase 1: Validating Master Data Feasibility...',
+      name: altName,
+      startedAt: Date.now()
+    });
+
+    try {
+      const res = await apiRequest('/api/timetable/generate', {
+        method: 'POST',
+        body: { name: altName, regenerate: true },
+        showErrorToast: false
+      });
+      showToast(res.message, 'success');
+      onGenerationCompleted(res);
+    } catch (err) {
+      onGenerationFailed({ reason: err.message || 'Regeneration failed' });
+      showToast(err.message || 'Failed to regenerate timetable', 'error');
+    }
   });
 
   document.getElementById('btn-studio-activate')?.addEventListener('click', async () => {
@@ -1200,8 +1241,11 @@ function setupStudioControls() {
     try {
       const res = await apiRequest(`/api/timetable/versions/${activeVersionId}/activate`, { method: 'POST' });
       showToast(res.message, 'success');
-      loadStudio();
-    } catch (err) {}
+      await loadStudio(activeVersionId);
+      await loadOverview();
+    } catch (err) {
+      showToast(err.message || 'Failed to activate timetable', 'error');
+    }
   });
 
   document.getElementById('btn-studio-duplicate')?.addEventListener('click', async () => {
@@ -1209,7 +1253,7 @@ function setupStudioControls() {
     try {
       const res = await apiRequest(`/api/timetable/versions/${activeVersionId}/duplicate`, { method: 'POST' });
       showToast(res.message, 'success');
-      loadStudio();
+      await loadStudio(res.versionId);
     } catch (err) {}
   });
 
@@ -1787,9 +1831,10 @@ function onGenerationCompleted(data) {
     }, 1500);
   }
 
-  // Reload studio and overview
-  loadStudio();
+  // Reload studio with the new version and overview
+  loadStudio(data.versionId);
   loadOverview();
+  switchTab('studio');
 }
 
 function onGenerationFailed(data) {
@@ -1862,7 +1907,36 @@ async function checkGenerationStatus() {
   }
 }
 
+function openGenerateModal() {
+  const modal = document.getElementById('modal-generate');
+  if (!modal) return;
+  const nameInput = document.getElementById('gen-name');
+  if (nameInput) {
+    const d = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    nameInput.value = `Master Schedule ${d}`;
+  }
+  const scopeSelect = document.getElementById('gen-scope-section');
+  if (scopeSelect && masterData?.sections) {
+    scopeSelect.innerHTML = `
+      <option value="">All Sections (Master Schedule)</option>
+      ${masterData.sections.map(s => `<option value="${s.id}">${s.name} (${s.department_name || s.department_code || 'Dept'})</option>`).join('')}
+    `;
+  }
+  const publishCheck = document.getElementById('gen-publish-now');
+  if (publishCheck) publishCheck.checked = false;
+
+  const modalBox = document.getElementById('modal-gen-progress-box');
+  if (modalBox) modalBox.style.display = 'none';
+
+  modal.style.display = 'flex';
+}
+window.openGenerateModal = openGenerateModal;
+
 function setupModals() {
+  // Wire both Overview and Studio Generate buttons
+  document.getElementById('btn-overview-generate')?.addEventListener('click', openGenerateModal);
+  document.getElementById('btn-studio-generate')?.addEventListener('click', openGenerateModal);
+
   document.getElementById('modal-generate-close')?.addEventListener('click', () => {
     document.getElementById('modal-generate').style.display = 'none';
   });
@@ -1878,7 +1952,11 @@ function setupModals() {
       return;
     }
 
-    const name = document.getElementById('gen-name').value;
+    const name = document.getElementById('gen-name')?.value || 'Master Timetable';
+    const scopeSectionVal = document.getElementById('gen-scope-section')?.value;
+    const sectionId = scopeSectionVal ? parseInt(scopeSectionVal, 10) : undefined;
+    const publishNow = document.getElementById('gen-publish-now')?.checked || false;
+
     const btn = document.getElementById('btn-submit-generate');
     if (btn) {
       btn.disabled = true;
@@ -1897,7 +1975,7 @@ function setupModals() {
     try {
       const res = await apiRequest('/api/timetable/generate', {
         method: 'POST',
-        body: { name },
+        body: { name, sectionId, publishNow },
         showErrorToast: false
       });
 
@@ -1907,7 +1985,7 @@ function setupModals() {
         return;
       }
 
-      showToast(res.message, 'success');
+      showToast(res.message || 'Timetable generated successfully', 'success');
       onGenerationCompleted(res);
       switchTab('studio');
     } catch (err) {
@@ -1923,6 +2001,35 @@ function setupModals() {
         btn.disabled = false;
         btn.textContent = 'Start CSP Generator';
       }
+    }
+  });
+
+  // Edit Timetable Entry Modal handlers
+  document.getElementById('modal-edit-entry-close')?.addEventListener('click', () => {
+    document.getElementById('modal-edit-entry').style.display = 'none';
+  });
+  document.getElementById('modal-edit-entry-x')?.addEventListener('click', () => {
+    document.getElementById('modal-edit-entry').style.display = 'none';
+  });
+  document.getElementById('form-edit-entry')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const entryId = document.getElementById('edit-entry-id')?.value;
+    const facultyId = parseInt(document.getElementById('edit-entry-faculty')?.value, 10);
+    const roomId = parseInt(document.getElementById('edit-entry-room')?.value, 10);
+    if (!entryId) return;
+
+    try {
+      await apiRequest(`/api/timetable/entries/${entryId}`, {
+        method: 'PUT',
+        body: { facultyId, roomId }
+      });
+      showToast('Timetable slot updated successfully', 'success');
+      document.getElementById('modal-edit-entry').style.display = 'none';
+      if (activeVersionId) {
+        await loadStudioVersion(activeVersionId);
+      }
+    } catch (err) {
+      showToast(err.message || 'Failed to update slot', 'error');
     }
   });
 
@@ -2062,20 +2169,37 @@ function setupModals() {
 }
 
 function openEditEntryModal(entryId) {
-  const entry = currentVersionData.entries.find(e => e.id === entryId);
+  const entry = currentVersionData?.entries?.find(e => e.id === entryId);
   if (!entry) return;
 
-  const newFaculty = prompt(`Reassign Faculty (Current: ${entry.faculty_name}):\nEnter Faculty ID or Cancel:`, entry.faculty_id);
-  if (newFaculty !== null && newFaculty !== '') {
-    apiRequest(`/api/timetable/entries/${entryId}`, {
-      method: 'PUT',
-      body: { facultyId: parseInt(newFaculty, 10) }
-    }).then(() => {
-      showToast('Entry updated', 'success');
-      loadStudioVersion(activeVersionId);
-    });
+  const modal = document.getElementById('modal-edit-entry');
+  if (!modal) return;
+
+  const idInput = document.getElementById('edit-entry-id');
+  if (idInput) idInput.value = entry.id;
+
+  const infoEl = document.getElementById('edit-entry-info');
+  if (infoEl) {
+    infoEl.textContent = `${entry.subject_name} (${entry.subject_code}) · ${entry.day_name} · ${entry.slot_label || 'Period ' + entry.slot_no} (${entry.start_time} - ${entry.end_time}) · Section ${entry.section_name}`;
   }
+
+  const facSelect = document.getElementById('edit-entry-faculty');
+  if (facSelect && masterData?.faculty) {
+    facSelect.innerHTML = masterData.faculty.map(f =>
+      `<option value="${f.id}" ${f.id === entry.faculty_id ? 'selected' : ''}>${f.name} (${f.department_code || f.department_name || 'Dept'})</option>`
+    ).join('');
+  }
+
+  const roomSelect = document.getElementById('edit-entry-room');
+  if (roomSelect && masterData?.rooms) {
+    roomSelect.innerHTML = masterData.rooms.map(r =>
+      `<option value="${r.id}" ${r.id === entry.room_id ? 'selected' : ''}>${r.name} (${r.type}, Cap: ${r.capacity})</option>`
+    ).join('');
+  }
+
+  modal.style.display = 'flex';
 }
+window.openEditEntryModal = openEditEntryModal;
 
 // 5. Faculty Availability Editor
 async function loadAvailabilityEditor() {
@@ -2166,9 +2290,25 @@ async function renderFacultyAvailabilityGrid(facId) {
 }
 
 // 6. Absence Monitor & Substitute Assignment (Mode B: Admin Assignment)
+let absenceControlsInitialized = false;
+
 async function loadAbsenceMonitor() {
   const container = document.getElementById('absence-list-container');
   if (!container) return;
+
+  if (!absenceControlsInitialized) {
+    document.getElementById('btn-admin-auto-assign-all')?.addEventListener('click', () => {
+      window.autoAssignAllPending();
+    });
+    document.getElementById('btn-admin-refresh-absences')?.addEventListener('click', () => {
+      loadAbsenceMonitor();
+      showToast('Absence board refreshed', 'info');
+    });
+    document.getElementById('btn-refresh-history')?.addEventListener('click', () => {
+      loadSubstitutionHistory();
+    });
+    absenceControlsInitialized = true;
+  }
 
   try {
     const data = await apiRequest('/api/absence/board');
@@ -2182,6 +2322,7 @@ async function loadAbsenceMonitor() {
           <p style="font-size: 0.85rem;">All faculty members are scheduled normally with zero disruptions.</p>
         </div>
       `;
+      await loadSubstitutionHistory();
       return;
     }
 
@@ -2202,15 +2343,15 @@ async function loadAbsenceMonitor() {
           <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;">
             <div>
               <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
-                <span style="font-size: 1.25rem; font-weight: 700; color: var(--color-brand-primary);">${a.faculty_name}</span>
-                <span style="font-size: 0.8rem; color: var(--text-muted);">${a.department_name}</span>
+                <span style="font-size: 1.25rem; font-weight: 700; color: var(--color-brand-primary);">${escapeHtml(a.faculty_name)}</span>
+                <span style="font-size: 0.8rem; color: var(--text-muted);">${escapeHtml(a.department_name)}</span>
                 <span style="font-size: 0.75rem; background: ${isAbsent ? 'var(--color-error-bg)' : 'var(--color-warning-bg)'}; color: ${isAbsent ? 'var(--color-error)' : 'var(--color-warning)'}; padding: 0.2rem 0.55rem; border-radius: 4px; font-weight: 600;">
                   ${isAbsent ? 'Full-day Absence' : `Running Late (Arrival: ${a.expected_arrival})`}
                 </span>
                 ${statusBadge}
               </div>
               <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.35rem;">
-                <strong>Date:</strong> ${a.date} · <strong>Reason:</strong> ${a.reason}
+                <strong>Date:</strong> ${a.date} · <strong>Reason:</strong> ${escapeHtml(a.reason || 'None specified')}
               </div>
             </div>
 
@@ -2234,25 +2375,37 @@ async function loadAbsenceMonitor() {
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem;">
               ${a.affectedClasses.map(ac => {
                 const isClaimedOrAssigned = ac.sub_status === 'accepted' || ac.sub_status === 'assigned';
+                const safeSubName = (ac.substitute_faculty_name || '').replace(/'/g, "\\'");
+                const safeSubjName = (ac.subject_name || '').replace(/'/g, "\\'");
+                const safeSlotLabel = (ac.slot_label || '').replace(/'/g, "\\'");
+
                 return `
-                  <div style="padding: 0.75rem 1rem; background: var(--bg-surface-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+                  <div style="padding: 0.75rem 1rem; background: var(--bg-surface-subtle); border: 1px solid ${isClaimedOrAssigned ? 'var(--color-success)' : 'var(--color-warning)'}; border-radius: var(--radius-md);">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.4rem;">
-                      <span style="font-weight: 700; font-size: 0.95rem; color: var(--color-brand-primary);">${ac.subject_name}</span>
-                      <span style="font-size: 0.75rem; color: var(--text-muted);">${ac.slot_label} (${ac.start_time})</span>
+                      <span style="font-weight: 700; font-size: 0.95rem; color: var(--color-brand-primary);">${escapeHtml(ac.subject_name)}</span>
+                      <span style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(ac.slot_label)} (${ac.start_time})</span>
                     </div>
                     <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.6rem;">
-                      Sec ${ac.section_name} · Room: ${ac.room_name}
+                      Sec ${escapeHtml(ac.section_name)} · Room: ${escapeHtml(ac.room_name)}
                     </div>
 
-                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle); padding-top: 0.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle); padding-top: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
                       ${isClaimedOrAssigned ? `
                         <div style="font-size: 0.8rem; color: var(--color-success); font-weight: 600;">
-                          ✓ Covered by: <strong>${ac.substitute_faculty_name}</strong>
+                          ✓ Covered by: <strong>${escapeHtml(ac.substitute_faculty_name || 'Assigned')}</strong>
                           <span style="font-size: 0.7rem; color: var(--text-muted);">(${ac.sub_status})</span>
                         </div>
+                        <div style="display: flex; gap: 0.35rem;">
+                          <button class="btn-secondary" style="font-size: 0.72rem; padding: 0.2rem 0.5rem;" onclick="openAssignModal(${ac.timetable_entry_id}, '${a.date}', '${safeSubjName}', '${safeSlotLabel}', ${ac.substitution_id})">
+                            Reassign
+                          </button>
+                          <button class="btn-secondary" style="font-size: 0.72rem; padding: 0.2rem 0.5rem; color: var(--color-error); border-color: var(--color-error);" onclick="cancelSubstituteAssignment(${ac.substitution_id})">
+                            Cancel Cover
+                          </button>
+                        </div>
                       ` : `
-                        <span style="font-size: 0.8rem; color: var(--color-warning); font-weight: 600;">Pending Substitute</span>
-                        <button class="btn-primary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;" onclick="openAssignModal(${ac.timetable_entry_id}, '${a.date}', '${ac.subject_name.replace(/'/g, "\\'")}', '${ac.slot_label}')">
+                        <span style="font-size: 0.78rem; color: var(--color-warning); font-weight: 700; background: var(--color-warning-bg); padding: 0.2rem 0.45rem; border-radius: var(--radius-sm);">⚠️ Pending Substitute</span>
+                        <button class="btn-primary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;" onclick="openAssignModal(${ac.timetable_entry_id}, '${a.date}', '${safeSubjName}', '${safeSlotLabel}')">
                           Assign Substitute
                         </button>
                       `}
@@ -2265,20 +2418,104 @@ async function loadAbsenceMonitor() {
         </div>
       `;
     }).join('');
+
+    await loadSubstitutionHistory();
   } catch (err) {
     console.error('Failed to load absence monitor:', err);
   }
 }
 
-// Open Assign Substitute Modal with Ranked Candidates
-window.openAssignModal = async (timetableEntryId, date, subjectName, slotLabel) => {
+// Load Substitution History Log
+async function loadSubstitutionHistory() {
+  const container = document.getElementById('substitution-history-container');
+  if (!container) return;
+
+  try {
+    const data = await apiRequest('/api/absence/history?limit=30');
+    const history = data.history || [];
+
+    if (!history.length) {
+      container.innerHTML = `
+        <div style="padding: 1.5rem; text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+          No substitution actions recorded yet.
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="overflow-x: auto;">
+        <table class="table-admin" style="width: 100%; font-size: 0.8rem; border-collapse: collapse;">
+          <thead>
+            <tr style="background: var(--bg-surface-subtle); border-bottom: 2px solid var(--border-subtle); text-align: left;">
+              <th style="padding: 0.5rem 0.6rem;">Date</th>
+              <th style="padding: 0.5rem 0.6rem;">Period</th>
+              <th style="padding: 0.5rem 0.6rem;">Class / Subject</th>
+              <th style="padding: 0.5rem 0.6rem;">Absent Faculty</th>
+              <th style="padding: 0.5rem 0.6rem;">Substitute Faculty</th>
+              <th style="padding: 0.5rem 0.6rem; text-align: center;">Status</th>
+              <th style="padding: 0.5rem 0.6rem;">Assigned By</th>
+              <th style="padding: 0.5rem 0.6rem;">Action Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${history.map(h => {
+              let badgeBg = 'var(--bg-surface-subtle)';
+              let badgeColor = 'var(--text-secondary)';
+              if (h.status === 'assigned' || h.status === 'accepted') {
+                badgeBg = 'var(--color-success-bg)';
+                badgeColor = 'var(--color-success)';
+              } else if (h.status === 'cancelled') {
+                badgeBg = 'var(--color-error-bg)';
+                badgeColor = 'var(--color-error)';
+              } else if (h.status === 'requested') {
+                badgeBg = 'var(--color-warning-bg)';
+                badgeColor = 'var(--color-warning)';
+              }
+
+              return `
+                <tr style="border-bottom: 1px solid var(--border-subtle);">
+                  <td style="padding: 0.5rem 0.6rem; font-weight: 600;">${h.date}</td>
+                  <td style="padding: 0.5rem 0.6rem;">${h.slot_label || ('P' + h.slot_no)}</td>
+                  <td style="padding: 0.5rem 0.6rem;">
+                    <strong>${escapeHtml(h.subject_name)}</strong>
+                    <div style="font-size: 0.72rem; color: var(--text-muted);">Sec ${escapeHtml(h.section_name)} · ${escapeHtml(h.room_name)}</div>
+                  </td>
+                  <td style="padding: 0.5rem 0.6rem;">${escapeHtml(h.absent_faculty_name || 'N/A')}</td>
+                  <td style="padding: 0.5rem 0.6rem; font-weight: 600; color: var(--color-brand-primary);">
+                    ${h.substitute_faculty_name ? escapeHtml(h.substitute_faculty_name) : '<span style="color: var(--text-muted);">None</span>'}
+                  </td>
+                  <td style="padding: 0.5rem 0.6rem; text-align: center;">
+                    <span style="font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700; background: ${badgeBg}; color: ${badgeColor};">
+                      ${h.status}
+                    </span>
+                  </td>
+                  <td style="padding: 0.5rem 0.6rem; color: var(--text-muted); font-size: 0.75rem;">${escapeHtml(h.assigned_by_username || (h.assigned_by_user_id ? 'User #' + h.assigned_by_user_id : 'System'))}</td>
+                  <td style="padding: 0.5rem 0.6rem; color: var(--text-muted); font-size: 0.72rem;">${new Date(h.updated_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<div style="color: var(--color-error); font-size: 0.8rem; padding: 1rem;">Failed to load history: ${escapeHtml(err.message)}</div>`;
+  }
+}
+window.loadSubstitutionHistory = loadSubstitutionHistory;
+
+// Open Assign / Reassign Substitute Modal with Ranked Candidates
+window.openAssignModal = async (timetableEntryId, date, subjectName, slotLabel, substitutionId = null) => {
   const modal = document.getElementById('modal-assign-sub');
+  const title = document.getElementById('assign-sub-title');
   const subtitle = document.getElementById('assign-sub-subtitle');
   const list = document.getElementById('assign-candidates-list');
   if (!modal || !list) return;
 
+  if (title) title.textContent = substitutionId ? 'Reassign Substitute Faculty' : 'Assign Substitute Faculty';
   subtitle.textContent = `Ranking eligible substitutes for ${subjectName} (${slotLabel}) on ${date}:`;
-  list.innerHTML = `<div style="color: var(--text-muted); font-size: 0.85rem;">Evaluating hard constraints and scoring qualified colleagues...</div>`;
+  list.innerHTML = `<div style="color: var(--text-muted); font-size: 0.85rem; padding: 1.5rem; text-align: center;">Evaluating hard constraints and scoring qualified colleagues...</div>`;
   modal.style.display = 'flex';
 
   // Modal close handlers
@@ -2302,8 +2539,8 @@ window.openAssignModal = async (timetableEntryId, date, subjectName, slotLabel) 
       <div style="padding: 0.85rem 1rem; background: var(--bg-surface-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
         <div>
           <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.25rem;">
-            <span style="font-weight: 700; font-size: 1rem; color: var(--color-brand-primary);">${c.name}</span>
-            <span style="font-size: 0.75rem; color: var(--text-muted);">${c.departmentName}</span>
+            <span style="font-weight: 700; font-size: 1rem; color: var(--color-brand-primary);">${escapeHtml(c.name)}</span>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(c.departmentName)}</span>
             <span style="font-size: 0.75rem; font-weight: 700; background: var(--color-brand-blush-soft); color: var(--color-brand-primary); padding: 0.15rem 0.45rem; border-radius: 4px;">
               Score: ${c.score}
             </span>
@@ -2314,36 +2551,88 @@ window.openAssignModal = async (timetableEntryId, date, subjectName, slotLabel) 
             Today: ${c.currentDailyPeriods} / ${c.maxPeriodsPerDay} periods · Weekly: ${c.weeklyPeriods} periods
           </div>
           <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">
-            Reasons: ${c.reasons.join(' · ')}
+            Reasons: ${(c.reasons || []).map(escapeHtml).join(' · ')}
           </div>
         </div>
 
         <div>
-          <button class="btn-primary" style="font-size: 0.85rem;" onclick="assignSubstitute(${timetableEntryId}, '${date}', ${c.facultyId}, '${c.name.replace(/'/g, "\\'")}')">
-            Assign Duty
+          <button class="btn-primary" style="font-size: 0.85rem;" onclick="assignSubstitute(${timetableEntryId}, '${date}', ${c.facultyId}, '${escapeHtml(c.name).replace(/'/g, "\\'")}', ${substitutionId || 'null'})">
+            ${substitutionId ? 'Reassign Duty' : 'Assign Duty'}
           </button>
         </div>
       </div>
     `).join('');
 
   } catch (err) {
-    list.innerHTML = `<div style="color: var(--color-error); font-size: 0.85rem;">Failed to load candidates: ${err.message}</div>`;
+    list.innerHTML = `<div style="color: var(--color-error); font-size: 0.85rem; padding: 1rem;">Failed to load candidates: ${escapeHtml(err.message)}</div>`;
   }
 };
 
-window.assignSubstitute = async (timetableEntryId, date, substituteFacultyId, facultyName) => {
-  if (!confirm(`Confirm assignment of ${facultyName} as substitute for this class?`)) return;
+window.assignSubstitute = async (timetableEntryId, date, substituteFacultyId, facultyName, substitutionId = null) => {
   try {
-    const res = await apiRequest('/api/absence/substitute/assign', {
-      method: 'POST',
-      body: { timetableEntryId, date, substituteFacultyId }
-    });
-    showToast(res.message || 'Substitute assigned successfully!', 'success');
-    document.getElementById('modal-assign-sub').style.display = 'none';
+    let res;
+    if (substitutionId) {
+      res = await apiRequest('/api/absence/substitute/reassign', {
+        method: 'POST',
+        body: { substitutionId, substituteFacultyId }
+      });
+      showToast(res.message || `Substitute reassigned to ${facultyName}`, 'success');
+    } else {
+      res = await apiRequest('/api/absence/substitute/assign', {
+        method: 'POST',
+        body: { timetableEntryId, date, substituteFacultyId }
+      });
+      showToast(res.message || `Substitute assigned to ${facultyName}`, 'success');
+    }
+    const modal = document.getElementById('modal-assign-sub');
+    if (modal) modal.style.display = 'none';
     await loadAbsenceMonitor();
     await loadOverview();
   } catch (err) {
-    // Handled by apiRequest toast
+    showToast(err.message || 'Failed to assign substitute', 'error');
+  }
+};
+
+window.cancelSubstituteAssignment = async (substitutionId) => {
+  try {
+    const res = await apiRequest(`/api/absence/substitute/${substitutionId}/cancel`, {
+      method: 'POST'
+    });
+    showToast(res.message || 'Substitution cancelled', 'info');
+    await loadAbsenceMonitor();
+    await loadOverview();
+  } catch (err) {
+    showToast(err.message || 'Failed to cancel substitution', 'error');
+  }
+};
+
+window.autoAssignAllPending = async () => {
+  const btn = document.getElementById('btn-admin-auto-assign-all');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Auto-assigning...';
+  }
+  try {
+    const res = await apiRequest('/api/absence/substitute/auto-assign', {
+      method: 'POST',
+      body: {}
+    });
+    if (res.assignedCount > 0) {
+      showToast(`Auto-assigned ${res.assignedCount} substitute(s) successfully!`, 'success');
+    } else if (res.unassignedCount > 0) {
+      showToast(`No conflict-free substitutes found for ${res.unassignedCount} pending class(es).`, 'warning');
+    } else {
+      showToast('No pending substitutions to auto-assign.', 'info');
+    }
+    await loadAbsenceMonitor();
+    await loadOverview();
+  } catch (err) {
+    showToast(err.message || 'Auto-assignment failed', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '⚡ Auto-Assign All';
+    }
   }
 };
 

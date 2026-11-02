@@ -362,7 +362,8 @@
 
           <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
             <button class="btn-primary" id="btn-studio-generate">Generate New</button>
-            <button class="btn-secondary" id="btn-studio-activate">Activate Version</button>
+            <button class="btn-secondary" id="btn-studio-regenerate" title="Regenerate alternative timetable with randomized ordering">Regenerate</button>
+            <button class="btn-secondary" id="btn-studio-activate" title="Publish and activate timetable so Faculty and Students see it immediately">Publish (Activate)</button>
             <button class="btn-secondary" id="btn-studio-duplicate">Duplicate</button>
             <button class="btn-secondary" id="btn-studio-export">Export CSV</button>
             <button class="btn-secondary" id="btn-studio-export-pdf">Export PDF</button>
@@ -572,11 +573,41 @@
     <!-- 5. PANEL: ABSENCE MONITOR -->
     <div id="panel-absence" class="admin-panel animate-fade-in" style="display: none;">
       <div class="card" style="margin-bottom: 1.5rem;">
-        <h2 style="font-size: 2rem; color: var(--color-brand-primary); margin-bottom: 0.5rem;">Campus Absence &amp; Substitution Monitor</h2>
-        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem;">
-          Real-time visibility into faculty leaves, late arrivals, affected periods, and active substitute coverage.
-        </p>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h2 style="font-size: 2rem; color: var(--color-brand-primary); margin-bottom: 0.25rem;">Campus Absence &amp; Substitution Monitor</h2>
+            <p style="color: var(--text-secondary); font-size: 0.9rem;">
+              Real-time visibility into faculty leaves, late arrivals, affected periods, and active substitute coverage.
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button class="btn-primary" id="btn-admin-auto-assign-all" title="Auto-assign highest ranked certified substitutes to all pending classes">
+              ⚡ Auto-assign All Pending
+            </button>
+            <button class="btn-secondary" id="btn-admin-refresh-absences" title="Refresh absence board">
+              🔄 Refresh
+            </button>
+          </div>
+        </div>
         <div id="absence-list-container"></div>
+      </div>
+
+      <!-- Substitution History Log Card -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+          <div>
+            <h3 style="font-size: 1.35rem; color: var(--color-brand-primary); margin-bottom: 0.2rem;">
+              Substitution Assignment History Log
+            </h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary);">
+              Audit trail of all claimed, assigned, reassigned, and cancelled substitutions.
+            </p>
+          </div>
+          <button class="btn-secondary" id="btn-refresh-history" style="font-size: 0.8rem; padding: 0.3rem 0.65rem;">
+            🔄 Refresh Log
+          </button>
+        </div>
+        <div id="substitution-history-container" style="max-height: 320px; overflow-y: auto;"></div>
       </div>
     </div>
 
@@ -781,6 +812,38 @@
     </div>
   </main>
 
+  <!-- MODAL: Edit Timetable Entry (Reassign Faculty / Room / Lock) -->
+  <div id="modal-edit-entry" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div class="card" style="max-width: 440px; width: 90%; background: var(--bg-surface);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+        <h3 style="font-size: 1.4rem; color: var(--color-brand-primary); margin: 0;">Edit Class Assignment</h3>
+        <button type="button" id="modal-edit-entry-close-btn" style="background: none; border: none; font-size: 1.4rem; color: var(--text-muted); cursor: pointer;" aria-label="Close modal">&times;</button>
+      </div>
+      <div id="modal-edit-entry-details" style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem; padding: 0.5rem; background: var(--bg-surface-subtle); border-radius: var(--radius-sm);"></div>
+      <form id="form-edit-entry">
+        <input type="hidden" id="edit-entry-id">
+        <div class="form-group">
+          <label class="form-label" for="edit-entry-faculty">Assigned Instructor</label>
+          <select id="edit-entry-faculty" class="form-input" required></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-entry-room">Assigned Room / Venue</label>
+          <select id="edit-entry-room" class="form-input" required></select>
+        </div>
+        <div class="form-group">
+          <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
+            <input type="checkbox" id="edit-entry-lock">
+            <span>Lock this entry (prevent manual drag or re-scheduling)</span>
+          </label>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem;">
+          <button type="button" class="btn-secondary" id="modal-edit-entry-close">Cancel</button>
+          <button type="submit" class="btn-primary" id="btn-save-edit-entry">Save Assignment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- MODAL: Assign Substitute (Ranked Candidates) -->
   <div id="modal-assign-sub" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
     <div class="card" style="max-width: 620px; width: 90%; max-height: 85vh; overflow-y: auto; background: var(--bg-surface);">
@@ -838,6 +901,21 @@
         <div class="form-group">
           <label class="form-label" for="gen-name">Timetable Version Name</label>
           <input type="text" id="gen-name" class="form-input" value="Spring 2026 Optimized Master" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="gen-scope-section">Target Class / Section</label>
+          <select id="gen-scope-section" class="form-input">
+            <option value="">All Cohorts &amp; Sections (Full College Timetable)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Publishing Policy</label>
+          <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
+            <input type="checkbox" id="gen-publish-now">
+            <span>Publish immediately (Make active for Faculty &amp; Students upon generation)</span>
+          </label>
         </div>
 
         <div class="form-group">

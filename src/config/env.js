@@ -33,7 +33,7 @@ function sanitizeGrokKey(key) {
 
 export const config = {
   env: process.env.NODE_ENV || 'development',
-  port: 3000,
+  port: process.env.PORT ? parseInt(process.env.PORT, 10) : 3000,
   jwtSecret: process.env.JWT_SECRET || 'ctas_default_super_secret_key_change_in_production',
   dbPath: path.resolve(rootDir, process.env.DB_PATH || './data/timetable.db'),
   uploadsDir: path.resolve(rootDir, './uploads'),

@@ -26,6 +26,8 @@ router.post('/generate', requireAuth, requireRole('admin'), (req, res) => {
     const result = generateTimetable({
       createdBy: req.user.id,
       name: req.body.name,
+      sectionId: req.body.sectionId ? parseInt(req.body.sectionId, 10) : null,
+      regenerate: Boolean(req.body.regenerate),
       maxDurationMs: req.body.maxDurationMs || 20000,
       maxAttempts: req.body.maxAttempts || 5
     });
@@ -43,12 +45,25 @@ router.post('/generate', requireAuth, requireRole('admin'), (req, res) => {
       });
     }
 
-    // Broadcast real-time update
-    broadcast('timetable.updated', {
-      type: 'version_generated',
-      versionId: result.versionId,
-      versionName: result.versionName
-    });
+    if (req.body.publishNow && result.versionId) {
+      const db = getDatabase();
+      db.prepare("UPDATE timetable_versions SET status = 'archived' WHERE status = 'active'").run();
+      db.prepare("UPDATE timetable_versions SET status = 'active' WHERE id = ?").run(result.versionId);
+      result.status = 'active';
+
+      broadcast('timetable.updated', {
+        type: 'version_activated',
+        versionId: result.versionId,
+        versionName: result.versionName
+      });
+    } else {
+      // Broadcast real-time update
+      broadcast('timetable.updated', {
+        type: 'version_generated',
+        versionId: result.versionId,
+        versionName: result.versionName
+      });
+    }
 
     res.status(201).json(result);
   } catch (err) {

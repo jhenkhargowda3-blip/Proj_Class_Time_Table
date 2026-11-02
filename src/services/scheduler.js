@@ -66,12 +66,56 @@ export function generateTimetable(options = {}) {
   const teachingSlots = slots.filter(s => s.is_break === 0);
   const breakSlots = slots.filter(s => s.is_break === 1);
 
-  const sections = db.prepare('SELECT * FROM sections ORDER BY id ASC').all();
+  let sections = db.prepare('SELECT * FROM sections ORDER BY id ASC').all();
   const subjects = db.prepare('SELECT * FROM subjects ORDER BY id ASC').all();
   const rooms = db.prepare('SELECT * FROM rooms WHERE is_active = 1 ORDER BY capacity ASC').all();
   const facultyList = db.prepare('SELECT * FROM faculty WHERE is_active = 1 ORDER BY id ASC').all();
 
-  const sectionSubjects = db.prepare(`
+  // Pre-flight Master Data Existence Checks
+  if (!days.length) {
+    const reason = 'No active working days found. Please activate working days in Master Data.';
+    activeGenerationState.isRunning = false;
+    broadcast('timetable.generation_failed', { reason });
+    return { success: false, infeasible: true, reason };
+  }
+  if (!teachingSlots.length) {
+    const reason = 'No teaching time slots found. Please configure time slots in Master Data.';
+    activeGenerationState.isRunning = false;
+    broadcast('timetable.generation_failed', { reason });
+    return { success: false, infeasible: true, reason };
+  }
+  if (!sections.length) {
+    const reason = 'No student sections found. Please add at least one section in Master Data.';
+    activeGenerationState.isRunning = false;
+    broadcast('timetable.generation_failed', { reason });
+    return { success: false, infeasible: true, reason };
+  }
+  if (!facultyList.length) {
+    const reason = 'No active faculty found. Please add teaching faculty in Master Data.';
+    activeGenerationState.isRunning = false;
+    broadcast('timetable.generation_failed', { reason });
+    return { success: false, infeasible: true, reason };
+  }
+  if (!rooms.length) {
+    const reason = 'No active classrooms or labs found. Please add campus rooms in Master Data.';
+    activeGenerationState.isRunning = false;
+    broadcast('timetable.generation_failed', { reason });
+    return { success: false, infeasible: true, reason };
+  }
+
+  // Filter sections if sectionId is specified
+  if (options.sectionId) {
+    const targetSection = sections.find(s => s.id === Number(options.sectionId));
+    if (!targetSection) {
+      const reason = `Section #${options.sectionId} not found in master data.`;
+      activeGenerationState.isRunning = false;
+      broadcast('timetable.generation_failed', { reason });
+      return { success: false, infeasible: true, reason };
+    }
+    sections = [targetSection];
+  }
+
+  let sectionSubjectsQuery = `
     SELECT ss.section_id, ss.subject_id, ss.faculty_id,
            s.code as subject_code, s.name as subject_name, s.type as subject_type,
            s.weekly_periods, s.lab_block_length,
@@ -81,7 +125,50 @@ export function generateTimetable(options = {}) {
     JOIN subjects s ON ss.subject_id = s.id
     JOIN sections sec ON ss.section_id = sec.id
     JOIN faculty f ON ss.faculty_id = f.id
-  `).all();
+  `;
+  const queryParams = [];
+  if (options.sectionId) {
+    sectionSubjectsQuery += ' WHERE ss.section_id = ?';
+    queryParams.push(Number(options.sectionId));
+  }
+  const sectionSubjects = db.prepare(sectionSubjectsQuery).all(...queryParams);
+
+  if (!sectionSubjects.length) {
+    const reason = options.sectionId
+      ? `Section ${sections[0]?.name || ''} has no course subjects or faculty assigned. Please assign subjects in Curriculum Master Data.`
+      : 'No curriculum course assignments found. Sections must have subjects and faculty assigned in Master Data.';
+    activeGenerationState.isRunning = false;
+    broadcast('timetable.generation_failed', { reason });
+    return { success: false, infeasible: true, reason };
+  }
+
+  // Validate zero weekly periods or room capacity mismatches
+  for (const ss of sectionSubjects) {
+    if (!ss.weekly_periods || ss.weekly_periods <= 0) {
+      const reason = `Subject ${ss.subject_name} (${ss.subject_code}) assigned to section ${ss.section_name} has invalid weekly periods (0). Must be at least 1 period.`;
+      activeGenerationState.isRunning = false;
+      broadcast('timetable.generation_failed', { reason });
+      return { success: false, infeasible: true, reason };
+    }
+
+    if (ss.subject_type === 'lab') {
+      const suitableLabs = rooms.filter(r => r.type === 'lab' && r.capacity >= ss.section_strength);
+      if (!suitableLabs.length) {
+        const reason = `No lab room with sufficient capacity (${ss.section_strength} seats) available for practical course ${ss.subject_name} (${ss.subject_code}) in section ${ss.section_name}.`;
+        activeGenerationState.isRunning = false;
+        broadcast('timetable.generation_failed', { reason });
+        return { success: false, infeasible: true, reason };
+      }
+    } else {
+      const suitableClassrooms = rooms.filter(r => r.type === 'classroom' && r.capacity >= ss.section_strength);
+      if (!suitableClassrooms.length) {
+        const reason = `No classroom with sufficient capacity (${ss.section_strength} seats) available for lecture course ${ss.subject_name} (${ss.subject_code}) in section ${ss.section_name}.`;
+        activeGenerationState.isRunning = false;
+        broadcast('timetable.generation_failed', { reason });
+        return { success: false, infeasible: true, reason };
+      }
+    }
+  }
 
   const availabilityRows = db.prepare('SELECT * FROM faculty_availability').all();
   const availabilityMap = new Set();
@@ -224,7 +311,7 @@ export function generateTimetable(options = {}) {
     activeGenerationState.phase = `Phase 3: Backtracking CSP search (Attempt ${attempt}/${maxAttempts})...`;
     broadcast('timetable.generation_progress', getGenerationState());
 
-    const orderedTasks = sortTasks(placementTasks, attempt > 1);
+    const orderedTasks = sortTasks(placementTasks, attempt > 1 || Boolean(options.regenerate));
 
     // Conflict Tracking Grids
     const sectionOccupied = new Set(); // key: `sectionId_dayId_slotId`

@@ -510,7 +510,6 @@ async function loadOpenSubstitutions() {
 }
 
 window.claimSub = async (timetableEntryId, date) => {
-  if (!confirm(`Confirm you want to claim substitution for this class on ${date}?`)) return;
   try {
     const res = await apiRequest('/api/absence/substitute/claim', {
       method: 'POST',
@@ -520,6 +519,7 @@ window.claimSub = async (timetableEntryId, date) => {
     await loadOpenSubstitutions();
     await loadCalendar(currentYear, currentMonth);
   } catch (err) {
+    showToast(err.message || 'Failed to claim substitution', 'error');
     loadOpenSubstitutions();
   }
 };

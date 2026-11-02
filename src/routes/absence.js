@@ -6,6 +6,10 @@ import {
   findEligibleSubstitutes,
   claimSubstitution,
   assignSubstitution,
+  autoAssignAllSubstitutions,
+  reassignSubstitution,
+  cancelSubstitution,
+  getSubstitutionHistory,
   getOpenSubstitutions,
   getAbsenceBoard
 } from '../services/substitution.js';
@@ -154,7 +158,91 @@ router.post('/substitute/assign', requireAuth, requireRole('admin'), (req, res) 
 
     res.json({ success: true, message: 'Substitute faculty assigned successfully', result });
   } catch (err) {
+    if (err.message && err.message.includes('not eligible')) {
+      return res.status(409).json({ error: err.message });
+    }
     res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/absence/substitute/auto-assign
+ * Mode B: Admin Auto-assign all pending substitutions
+ */
+router.post('/substitute/auto-assign', requireAuth, requireRole('admin'), (req, res) => {
+  try {
+    const { absenceId, date } = req.body;
+    const result = autoAssignAllSubstitutions({
+      absenceId: absenceId ? Number(absenceId) : null,
+      dateStr: date || null,
+      adminUserId: req.user.id
+    });
+
+    res.json({
+      success: true,
+      message: `Auto-assigned ${result.assignedCount} class(es). ${result.unassignedCount} remaining unassigned.`,
+      result
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/absence/substitute/reassign
+ * Mode B: Admin Reassign an existing substitution
+ */
+router.post('/substitute/reassign', requireAuth, requireRole('admin'), (req, res) => {
+  try {
+    const { substitutionId, substituteFacultyId } = req.body;
+    if (!substitutionId || !substituteFacultyId) {
+      return res.status(400).json({ error: 'substitutionId and substituteFacultyId are required' });
+    }
+
+    const result = reassignSubstitution({
+      substitutionId: Number(substitutionId),
+      substituteFacultyId: Number(substituteFacultyId),
+      adminUserId: req.user.id
+    });
+
+    res.json({ success: true, message: 'Substitution reassigned successfully', result });
+  } catch (err) {
+    if (err.message && err.message.includes('not eligible')) {
+      return res.status(409).json({ error: err.message });
+    }
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/absence/substitute/:id/cancel
+ * Mode B: Cancel an individual substitution assignment (revert to requested)
+ */
+router.post('/substitute/:id/cancel', requireAuth, requireRole('admin'), (req, res) => {
+  try {
+    const substitutionId = Number(req.params.id);
+    const result = cancelSubstitution({
+      substitutionId,
+      adminUserId: req.user.id
+    });
+
+    res.json({ success: true, message: 'Substitution assignment cancelled; class reverted to unassigned.', result });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/absence/history
+ * Get audit history of all substitution assignments, claims, reassignments, and cancellations
+ */
+router.get('/history', requireAuth, (req, res) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
+    const history = getSubstitutionHistory(limit);
+    res.json({ history });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

@@ -681,11 +681,253 @@ export function getAbsenceBoard(dateStr = null) {
   });
 }
 
+/**
+ * Auto-assign top ranked eligible substitutes to all pending/unassigned substitutions.
+ */
+export function autoAssignAllSubstitutions({ absenceId = null, dateStr = null, adminUserId }) {
+  const db = getDatabase();
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  let query = "SELECT * FROM substitutions WHERE status = 'requested'";
+  const params = [];
+
+  if (absenceId) {
+    query += ' AND absence_id = ?';
+    params.push(absenceId);
+  } else if (dateStr) {
+    query += ' AND date = ?';
+    params.push(dateStr);
+  } else {
+    query += ' AND date >= ?';
+    params.push(todayStr);
+  }
+
+  query += ' ORDER BY date ASC, timetable_entry_id ASC';
+  const openSubs = db.prepare(query).all(...params);
+
+  let assignedCount = 0;
+  const assignments = [];
+  const unassigned = [];
+
+  for (const sub of openSubs) {
+    const candidates = findEligibleSubstitutes(sub.timetable_entry_id, sub.date);
+    if (candidates.length > 0) {
+      const topCand = candidates[0];
+      try {
+        const res = assignSubstitution({
+          timetableEntryId: sub.timetable_entry_id,
+          dateStr: sub.date,
+          substituteFacultyId: topCand.facultyId,
+          adminUserId
+        });
+        assignedCount++;
+        assignments.push({
+          substitutionId: sub.id,
+          timetableEntryId: sub.timetable_entry_id,
+          date: sub.date,
+          substituteFacultyId: topCand.facultyId,
+          substituteFacultyName: topCand.name,
+          subjectName: res.subjectName,
+          slotNo: res.slotNo
+        });
+      } catch (err) {
+        unassigned.push({ substitutionId: sub.id, reason: err.message });
+      }
+    } else {
+      unassigned.push({ substitutionId: sub.id, reason: 'No eligible candidates available' });
+    }
+  }
+
+  return {
+    totalEvaluated: openSubs.length,
+    assignedCount,
+    unassignedCount: unassigned.length,
+    assignments,
+    unassigned
+  };
+}
+
+/**
+ * Reassign an already assigned or accepted substitution to a different faculty member.
+ */
+export function reassignSubstitution({ substitutionId, substituteFacultyId, adminUserId }) {
+  const db = getDatabase();
+
+  const sub = db.prepare(`
+    SELECT sub.*, a.faculty_id as absent_faculty_id,
+           te.slot_id, te.day_id, te.subject_id, te.version_id,
+           s.name as subject_name, ts.slot_no,
+           orig_f.name as absent_faculty_name,
+           prev_sub.name as prev_substitute_name
+    FROM substitutions sub
+    JOIN absences a ON sub.absence_id = a.id
+    JOIN timetable_entries te ON sub.timetable_entry_id = te.id
+    JOIN subjects s ON te.subject_id = s.id
+    JOIN time_slots ts ON te.slot_id = ts.id
+    JOIN faculty orig_f ON a.faculty_id = orig_f.id
+    LEFT JOIN faculty prev_sub ON sub.substitute_faculty_id = prev_sub.id
+    WHERE sub.id = ?
+  `).get(substitutionId);
+
+  if (!sub) {
+    throw new Error(`Substitution #${substitutionId} not found`);
+  }
+
+  const subFaculty = db.prepare('SELECT * FROM faculty WHERE id = ? AND is_active = 1').get(substituteFacultyId);
+  if (!subFaculty) {
+    throw new Error('Selected substitute faculty not found or inactive');
+  }
+
+  // Verify candidate eligibility
+  const eligibleList = findEligibleSubstitutes(sub.timetable_entry_id, sub.date);
+  const eligible = eligibleList.find(c => c.facultyId === substituteFacultyId);
+  if (!eligible) {
+    throw new Error(`Faculty ${subFaculty.name} is not eligible for this slot due to a clash, absence, or daily load limit.`);
+  }
+
+  const reassignTx = db.transaction(() => {
+    db.prepare(`
+      UPDATE substitutions
+      SET substitute_faculty_id = ?, status = 'assigned', requested_by = ?
+      WHERE id = ?
+    `).run(substituteFacultyId, adminUserId, substitutionId);
+
+    // Audit log
+    db.prepare(`
+      INSERT INTO audit_log (user_id, action, details_json)
+      VALUES (?, 'REASSIGN_SUBSTITUTION', ?)
+    `).run(adminUserId, JSON.stringify({
+      substitutionId,
+      timetableEntryId: sub.timetable_entry_id,
+      date: sub.date,
+      previousSubstituteFacultyName: sub.prev_substitute_name || 'None',
+      newSubstituteFacultyId: substituteFacultyId,
+      newSubstituteFacultyName: subFaculty.name
+    }));
+
+    return {
+      substitutionId,
+      substituteFacultyId,
+      date: sub.date,
+      subjectName: sub.subject_name,
+      slotNo: sub.slot_no,
+      substituteFacultyName: subFaculty.name,
+      absentFacultyName: sub.absent_faculty_name
+    };
+  });
+
+  const result = reassignTx();
+  broadcast('substitution:assigned', result);
+  return result;
+}
+
+/**
+ * Cancel an individual substitution assignment (reverting it to requested status).
+ */
+export function cancelSubstitution({ substitutionId, adminUserId }) {
+  const db = getDatabase();
+
+  const sub = db.prepare(`
+    SELECT sub.*, a.faculty_id as absent_faculty_id,
+           te.slot_id, te.day_id, te.subject_id,
+           s.name as subject_name, ts.slot_no,
+           orig_f.name as absent_faculty_name,
+           prev_sub.name as prev_substitute_name
+    FROM substitutions sub
+    JOIN absences a ON sub.absence_id = a.id
+    JOIN timetable_entries te ON sub.timetable_entry_id = te.id
+    JOIN subjects s ON te.subject_id = s.id
+    JOIN time_slots ts ON te.slot_id = ts.id
+    JOIN faculty orig_f ON a.faculty_id = orig_f.id
+    LEFT JOIN faculty prev_sub ON sub.substitute_faculty_id = prev_sub.id
+    WHERE sub.id = ?
+  `).get(substitutionId);
+
+  if (!sub) {
+    throw new Error(`Substitution #${substitutionId} not found`);
+  }
+
+  const cancelTx = db.transaction(() => {
+    db.prepare(`
+      UPDATE substitutions
+      SET substitute_faculty_id = NULL, status = 'requested'
+      WHERE id = ?
+    `).run(substitutionId);
+
+    // Re-open absence if it was marked covered
+    db.prepare("UPDATE absences SET status = 'open' WHERE id = ?").run(sub.absence_id);
+
+    // Audit log
+    db.prepare(`
+      INSERT INTO audit_log (user_id, action, details_json)
+      VALUES (?, 'CANCEL_SUBSTITUTION', ?)
+    `).run(adminUserId, JSON.stringify({
+      substitutionId,
+      timetableEntryId: sub.timetable_entry_id,
+      date: sub.date,
+      previousSubstituteFacultyName: sub.prev_substitute_name || 'None',
+      absentFacultyName: sub.absent_faculty_name
+    }));
+
+    return {
+      substitutionId,
+      date: sub.date,
+      subjectName: sub.subject_name,
+      slotNo: sub.slot_no,
+      status: 'requested',
+      absentFacultyName: sub.absent_faculty_name
+    };
+  });
+
+  const result = cancelTx();
+  broadcast('substitution:cancelled', result);
+  return result;
+}
+
+/**
+ * Get comprehensive substitution history log.
+ */
+export function getSubstitutionHistory(limit = 50) {
+  const db = getDatabase();
+
+  const logs = db.prepare(`
+    SELECT al.id, al.action, al.details_json, al.created_at,
+           u.full_name as actor_name, u.role as actor_role
+    FROM audit_log al
+    LEFT JOIN users u ON al.user_id = u.id
+    WHERE al.action IN ('ASSIGN_SUBSTITUTION', 'CLAIM_SUBSTITUTION', 'REASSIGN_SUBSTITUTION', 'CANCEL_SUBSTITUTION')
+    ORDER BY al.created_at DESC
+    LIMIT ?
+  `).all(limit);
+
+  return logs.map(l => {
+    let details = {};
+    try {
+      details = JSON.parse(l.details_json || '{}');
+    } catch {
+      details = {};
+    }
+
+    return {
+      id: l.id,
+      action: l.action,
+      createdAt: l.created_at,
+      actorName: l.actor_name || 'System / Admin',
+      actorRole: l.actor_role || 'admin',
+      ...details
+    };
+  });
+}
+
 export default {
   reportAbsence,
   findEligibleSubstitutes,
   claimSubstitution,
   assignSubstitution,
+  autoAssignAllSubstitutions,
+  reassignSubstitution,
+  cancelSubstitution,
+  getSubstitutionHistory,
   getOpenSubstitutions,
   getAbsenceBoard
 };

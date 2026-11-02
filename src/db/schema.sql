@@ -230,3 +230,13 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_reset_token ON password_reset_tokens(token);
+
+-- 21. Student Notice Reads Table (Persistent Read Status Tracking)
+CREATE TABLE IF NOT EXISTS student_notice_reads (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  notice_id TEXT NOT NULL,
+  read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, notice_id)
+);
+CREATE INDEX IF NOT EXISTS idx_student_notice_reads_user ON student_notice_reads(user_id);
+

@@ -25,13 +25,66 @@
     </div>
 
     <div class="top-actions">
-      <div style="display: flex; align-items: center; gap: 0.65rem; font-size: 0.85rem; margin-right: 0.5rem;">
-        <div class="user-avatar-badge" title="Student Profile">
-          <img src="/assets/aistudio/Student_480b4c5d.png" alt="Student" class="user-avatar-img" />
+      <div style="display: flex; align-items: center; gap: 0.65rem; font-size: 0.85rem; margin-right: 0.5rem; position: relative;" id="student-profile-badge-container">
+        <!-- Clean Student Profile Avatar & Info Merged Together -->
+        <div class="student-profile-group" id="student-profile-group" style="display: flex; align-items: center; gap: 0.65rem;">
+          <div class="user-avatar-badge" title="Student Profile" id="student-avatar-btn">
+            <img src="/assets/aistudio/Student_480b4c5d.png" alt="Student Profile" class="user-avatar-img" />
+          </div>
+          <div>
+            <div id="user-display-name" style="font-weight: 600; line-height: 1.2;">Student</div>
+            <div id="user-role-badge" style="font-size: 0.72rem; color: var(--color-brand-primary); font-weight: 700; text-transform: uppercase;">STUDENT</div>
+          </div>
         </div>
-        <div>
-          <div id="user-display-name" style="font-weight: 600; line-height: 1.2;">Student</div>
-          <div id="user-role-badge" style="font-size: 0.72rem; color: var(--color-brand-primary); font-weight: 700; text-transform: uppercase;">STUDENT</div>
+
+        <!-- Separate Standalone Real-Time Notification Bell Action Button -->
+        <button type="button" id="btn-student-notices" class="student-nav-bell-btn" title="Class Notices & Substitute Alerts (Click to view)" aria-label="Class Notices and Substitute Alerts" aria-haspopup="dialog" aria-expanded="false">
+          <span class="bell-pulse-ring" id="bell-pulse-ring" aria-hidden="true"></span>
+          <svg class="student-nav-bell-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+          <span class="student-nav-bell-counter counter-zero" id="student-nav-bell-counter">0</span>
+        </button>
+
+        <!-- Real-Time Interactive Class Changes & Substitute Notices Popover Drawer -->
+        <div id="student-notices-popover" class="student-notices-popover" style="display: none;" role="dialog" aria-modal="false" aria-label="Class Changes and Substitute Notices">
+          <div class="notices-popover-header">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="font-size: 1.1rem;">🔔</span>
+              <div>
+                <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary); line-height: 1.2;">Class Updates &amp; Notices</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Real-time substitute &amp; schedule alerts</div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <button type="button" id="btn-mark-all-read" class="btn-notices-mark-all" title="Mark all notices as read">
+                ✓ Mark all read
+              </button>
+              <span class="notices-live-indicator" title="Connected to Real-time SSE updates">
+                <span class="notices-live-dot"></span> LIVE
+              </span>
+              <button type="button" id="btn-close-notices-popover" class="notices-close-btn" aria-label="Close notices popover">×</button>
+            </div>
+          </div>
+          
+          <div id="student-notices-list" class="notices-popover-body">
+            <!-- Dynamically populated notice cards or empty state -->
+          </div>
+
+          <div class="notices-popover-footer">
+            <div style="display: flex; gap: 0.35rem;">
+              <button type="button" class="btn-secondary" id="btn-refresh-notices" style="font-size: 0.78rem; padding: 0.3rem 0.65rem;" title="Refresh notices">
+                🔄 Refresh
+              </button>
+              <button type="button" class="btn-secondary" id="btn-toggle-demo-notice" style="font-size: 0.78rem; padding: 0.3rem 0.65rem;" title="Test substitute alert notification">
+                ⚡ Test Notice
+              </button>
+            </div>
+            <button type="button" class="btn-primary" id="btn-view-today-notices" style="font-size: 0.78rem; padding: 0.3rem 0.75rem;" title="Jump directly to today's schedule">
+              Jump to Today's Classes
+            </button>
+          </div>
         </div>
       </div>
       <button id="theme-toggle-btn" class="theme-toggle-btn" title="Toggle Light/Dark Theme" aria-label="Toggle Theme">
@@ -84,21 +137,30 @@
       <div style="display: grid; grid-template-columns: 1.4fr 0.8fr; gap: 1.5rem;">
         <!-- Today's Schedule Breakdown -->
         <div class="card">
-          <!-- Date Navigator Controls -->
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+          <!-- Date Navigator Controls & Date-Picker Shortcut Bar -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.75rem;">
             <div>
-              <h3 style="font-size: 1.5rem; color: var(--color-brand-primary);" id="selected-date-heading">
+              <h3 style="font-size: 1.5rem; color: var(--color-brand-primary); margin-bottom: 0.15rem; transition: all 0.3s ease;" id="selected-date-heading">
                 Today's Classes
               </h3>
-              <div style="font-size: 0.8rem; color: var(--text-muted);">Real-time substitute coverage &amp; attendance status</div>
+              <div style="font-size: 0.8rem; color: var(--text-muted);" id="selected-date-subtext">Real-time substitute coverage &amp; attendance status</div>
             </div>
 
-            <div style="display: flex; align-items: center; gap: 0.4rem;">
-              <button class="btn-secondary" id="btn-date-prev" style="padding: 0.35rem 0.65rem;">&larr;</button>
-              <button class="btn-secondary" id="btn-date-today" style="padding: 0.35rem 0.75rem;">Today</button>
-              <button class="btn-secondary" id="btn-date-next" style="padding: 0.35rem 0.65rem;">&rarr;</button>
-              <input type="date" id="student-date-picker" style="font-size: 0.85rem; padding: 0.35rem 0.6rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--bg-surface);">
+            <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+              <button class="btn-secondary" id="btn-date-prev" data-shortcut="prev-day" style="padding: 0.35rem 0.65rem;" title="Previous day schedule">&larr;</button>
+              <button class="btn-primary" id="btn-date-today" data-shortcut="today-btn" style="padding: 0.35rem 0.75rem;" title="Jump directly to Today's classes">Today</button>
+              <button class="btn-secondary" id="btn-date-tomorrow" data-shortcut="tomorrow-btn" style="padding: 0.35rem 0.75rem;" title="Jump directly to Tomorrow's classes">Tomorrow</button>
+              <button class="btn-secondary" id="btn-date-next" data-shortcut="next-day" style="padding: 0.35rem 0.65rem;" title="Next day schedule">&rarr;</button>
+              <div style="display: inline-flex; align-items: center; gap: 0.35rem; position: relative;" title="Select any date to jump immediately to its classes">
+                <input type="date" id="student-date-picker" name="date-picker" title="Quick date jump: Click to pick date" aria-label="Select Date Shortcut" style="font-size: 0.85rem; padding: 0.35rem 0.6rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--bg-surface); cursor: pointer;">
+              </div>
             </div>
+          </div>
+
+          <!-- Quick Weekday Shortcut Chips (Current Week) -->
+          <div id="student-quick-day-shortcuts" style="display: flex; gap: 0.35rem; margin-bottom: 1.15rem; flex-wrap: wrap; align-items: center;">
+            <span style="font-size: 0.73rem; color: var(--text-muted); font-weight: 600; margin-right: 0.2rem;">Quick Jump:</span>
+            <!-- Dynamically populated: Mon..Sat shortcut buttons -->
           </div>
 
           <!-- Color Status Legend -->
@@ -117,7 +179,7 @@
             </span>
           </div>
 
-          <div id="today-classes-container" style="display: flex; flex-direction: column; gap: 0.6rem;">
+          <div id="today-classes-container" class="today-classes-container fade-slide-left" style="display: flex; flex-direction: column; gap: 0.6rem;">
             <div style="color: var(--text-muted); font-size: 0.85rem;">Loading today's classes...</div>
           </div>
         </div>

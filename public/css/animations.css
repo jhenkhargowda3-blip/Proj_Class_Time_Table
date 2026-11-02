@@ -135,3 +135,88 @@
   }
 }
 
+/* Student Notification Badge & Popover Animations */
+@keyframes badgePulseRadiate {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.85;
+  }
+  60% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+}
+
+@keyframes badgeBounceAlert {
+  0% {
+    transform: scale(0.7);
+  }
+  30% {
+    transform: scale(1.35) rotate(-6deg);
+  }
+  50% {
+    transform: scale(0.9) rotate(3deg);
+  }
+  75% {
+    transform: scale(1.15) rotate(-2deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes popoverSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Subtle Fade-in and Slide-Left Transition Animation for Today's Classes Navigation */
+@keyframes fadeSlideLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.fade-slide-left,
+.animate-fade-slide-left,
+.fade-in-slide-left,
+.slide-left-fade,
+.today-classes-transition {
+  animation: fadeSlideLeft 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
+#today-classes-container {
+  transition: opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1), transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-slide-left,
+  .animate-fade-slide-left,
+  .fade-in-slide-left,
+  .slide-left-fade,
+  .today-classes-transition {
+    animation: fadeIn 0.15s ease-out both;
+    transform: none !important;
+  }
+  #today-classes-container {
+    transition: opacity 0.15s ease-out;
+    transform: none !important;
+  }
+}
+

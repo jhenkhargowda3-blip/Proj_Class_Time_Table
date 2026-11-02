@@ -147,6 +147,226 @@ router.get('/schedule', (req, res) => {
 });
 
 /**
+ * GET /api/student/notices
+ * Real-time substitute notices & upcoming class changes for the student's section
+ * Query params: ?date=YYYY-MM-DD (defaults to today)
+ */
+router.get('/notices', (req, res) => {
+  const db = getDatabase();
+  const sectionId = req.user.role === 'admin' && req.query.sectionId
+    ? parseInt(req.query.sectionId, 10)
+    : (req.user.studentId || 1);
+
+  if (!sectionId) {
+    return res.status(400).json({ error: 'Section not linked to this student account' });
+  }
+
+  const fromDate = req.query.date || new Date().toISOString().slice(0, 10);
+
+  // Active timetable entries for section with substitutions and absences
+  const substitutions = db.prepare(`
+    SELECT sub.id as substitution_id, sub.date, sub.status as sub_status,
+           te.id as timetable_entry_id, te.section_id, te.room_id,
+           s.name as subject_name, s.code as subject_code,
+           orig_f.name as original_faculty_name, orig_f.email as original_faculty_email,
+           sub_f.name as substitute_faculty_name, sub_f.email as substitute_faculty_email,
+           r.name as room_name,
+           ts.slot_no, ts.start_time, ts.end_time, ts.label as slot_label,
+           a.type as absence_type, a.reason as absence_reason, a.expected_arrival
+    FROM substitutions sub
+    JOIN timetable_entries te ON sub.timetable_entry_id = te.id
+    JOIN timetable_versions tv ON te.version_id = tv.id AND tv.status = 'active'
+    JOIN subjects s ON te.subject_id = s.id
+    JOIN faculty orig_f ON te.faculty_id = orig_f.id
+    LEFT JOIN faculty sub_f ON sub.substitute_faculty_id = sub_f.id
+    JOIN rooms r ON te.room_id = r.id
+    JOIN time_slots ts ON te.slot_id = ts.id
+    JOIN absences a ON sub.absence_id = a.id
+    WHERE te.section_id = ?
+      AND sub.date >= ?
+      AND a.status != 'cancelled'
+    ORDER BY sub.date ASC, ts.slot_no ASC
+  `).all(sectionId, fromDate);
+
+  // Also check upcoming holidays within the next 14 days
+  const holidays = db.prepare(`
+    SELECT * FROM holidays
+    WHERE date >= ?
+    ORDER BY date ASC
+    LIMIT 3
+  `).all(fromDate);
+
+  const formattedNotices = [];
+
+  for (const sub of substitutions) {
+    const isSubstituted = (sub.sub_status === 'accepted' || sub.sub_status === 'assigned') && sub.substitute_faculty_name;
+    const isPending = sub.sub_status === 'requested';
+
+    formattedNotices.push({
+      id: `sub-${sub.substitution_id}`,
+      substitutionId: sub.substitution_id,
+      timetableEntryId: sub.timetable_entry_id,
+      date: sub.date,
+      slotNo: sub.slot_no,
+      startTime: sub.start_time,
+      endTime: sub.end_time,
+      slotLabel: sub.slot_label,
+      roomName: sub.room_name,
+      subjectName: sub.subject_name,
+      subjectCode: sub.subject_code,
+      originalFacultyName: sub.original_faculty_name,
+      substituteFacultyName: sub.substitute_faculty_name || null,
+      status: sub.sub_status,
+      type: isSubstituted ? 'substitute' : (isPending ? 'absence' : 'change'),
+      severity: isSubstituted ? 'amber' : 'rose',
+      title: isSubstituted
+        ? `Substitute: ${sub.substitute_faculty_name}`
+        : `Faculty Absent: ${sub.original_faculty_name}`,
+      subtitle: `${sub.subject_code ? sub.subject_code + ' · ' : ''}${sub.subject_name}`,
+      message: isSubstituted
+        ? `Prof. ${sub.substitute_faculty_name} will conduct ${sub.subject_name} on ${sub.date} (Period ${sub.slot_no}, ${sub.start_time}-${sub.end_time}) in ${sub.room_name}, covering for Prof. ${sub.original_faculty_name}.`
+        : `Prof. ${sub.original_faculty_name} is ${sub.absence_type === 'late' ? 'arriving late' : 'absent'} on ${sub.date}. Period ${sub.slot_no} (${sub.start_time}-${sub.end_time}) coverage is pending.`,
+      badgeLabel: isSubstituted ? 'Substitute Confirmed' : 'Coverage Pending'
+    });
+  }
+
+  for (const hol of holidays) {
+    formattedNotices.push({
+      id: `holiday-${hol.id}`,
+      date: hol.date,
+      type: 'holiday',
+      severity: 'blue',
+      title: `College Holiday: ${hol.description}`,
+      subtitle: hol.description,
+      message: `No classes scheduled on ${hol.date} due to ${hol.description}.`,
+      badgeLabel: 'Holiday'
+    });
+  }
+
+  // Ensure student_notice_reads table is present
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS student_notice_reads (
+      user_id INTEGER NOT NULL,
+      notice_id TEXT NOT NULL,
+      read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, notice_id)
+    );
+  `);
+
+  // Lookup notices marked as read by this student
+  const effectiveUserId = req.user?.id || (req.user?.studentId ? 1000 + req.user.studentId : 1);
+  const readRows = db.prepare('SELECT notice_id FROM student_notice_reads WHERE user_id = ?').all(effectiveUserId);
+  const readNoticeIds = new Set(readRows.map(r => r.notice_id));
+
+  formattedNotices.forEach(n => {
+    n.isRead = readNoticeIds.has(n.id);
+  });
+
+  const unreadCount = formattedNotices.filter(n => !n.isRead).length;
+
+  res.json({
+    sectionId,
+    fromDate,
+    count: formattedNotices.length,
+    unreadCount,
+    notices: formattedNotices
+  });
+});
+
+/**
+ * POST /api/student/notices/:id/read
+ * Mark an individual notice as read for the authenticated student
+ */
+router.post('/notices/:id/read', (req, res) => {
+  const db = getDatabase();
+  const effectiveUserId = req.user?.id || (req.user?.studentId ? 1000 + req.user.studentId : 1);
+  const noticeId = req.params.id;
+
+  if (!noticeId) {
+    return res.status(400).json({ error: 'Notice ID is required' });
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS student_notice_reads (
+      user_id INTEGER NOT NULL,
+      notice_id TEXT NOT NULL,
+      read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, notice_id)
+    );
+  `);
+
+  db.prepare(`
+    INSERT INTO student_notice_reads (user_id, notice_id, read_at)
+    VALUES (?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(user_id, notice_id) DO UPDATE SET read_at = CURRENT_TIMESTAMP
+  `).run(effectiveUserId, noticeId);
+
+  res.json({
+    success: true,
+    noticeId,
+    isRead: true
+  });
+});
+
+/**
+ * POST /api/student/notices/:id/unread
+ * Mark an individual notice as unread
+ */
+router.post('/notices/:id/unread', (req, res) => {
+  const db = getDatabase();
+  const effectiveUserId = req.user?.id || (req.user?.studentId ? 1000 + req.user.studentId : 1);
+  const noticeId = req.params.id;
+
+  db.prepare(`
+    DELETE FROM student_notice_reads WHERE user_id = ? AND notice_id = ?
+  `).run(effectiveUserId, noticeId);
+
+  res.json({
+    success: true,
+    noticeId,
+    isRead: false
+  });
+});
+
+/**
+ * POST /api/student/notices/read-all
+ * Mark all current notices as read
+ */
+router.post('/notices/read-all', (req, res) => {
+  const db = getDatabase();
+  const effectiveUserId = req.user?.id || (req.user?.studentId ? 1000 + req.user.studentId : 1);
+  const { noticeIds } = req.body || {};
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS student_notice_reads (
+      user_id INTEGER NOT NULL,
+      notice_id TEXT NOT NULL,
+      read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, notice_id)
+    );
+  `);
+
+  if (Array.isArray(noticeIds) && noticeIds.length > 0) {
+    const insertStmt = db.prepare(`
+      INSERT INTO student_notice_reads (user_id, notice_id, read_at)
+      VALUES (?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(user_id, notice_id) DO UPDATE SET read_at = CURRENT_TIMESTAMP
+    `);
+    const transaction = db.transaction((ids) => {
+      for (const id of ids) {
+        insertStmt.run(effectiveUserId, String(id));
+      }
+    });
+    transaction(noticeIds);
+  }
+
+  res.json({
+    success: true,
+    allRead: true
+  });
+});
+
+/**
  * GET /api/student/department-timetable
  * Read-only department timetable across all sections
  */

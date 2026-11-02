@@ -135,24 +135,29 @@ CREATE TABLE IF NOT EXISTS timetable_entries (
   day_id INTEGER NOT NULL REFERENCES working_days(id) ON DELETE RESTRICT,
   slot_id INTEGER NOT NULL REFERENCES time_slots(id) ON DELETE RESTRICT,
   is_lab_block INTEGER NOT NULL DEFAULT 0 CHECK (is_lab_block IN (0, 1)),
-  locked INTEGER NOT NULL DEFAULT 0 CHECK (locked IN (0, 1))
+  locked INTEGER NOT NULL DEFAULT 0 CHECK (locked IN (0, 1)),
+  is_draft INTEGER NOT NULL DEFAULT 0 CHECK (is_draft IN (0, 1))
 );
 
 -- ============================================================================
 -- MANDATORY HARD-CONSTRAINT UNIQUE INDEXES (Database-Level Conflict Prevention)
+-- Enforced for committed/active timetables (is_draft = 0).
 -- ============================================================================
 
 -- A. A section cannot have two classes at the same time in the same version
 CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_section_slot 
-ON timetable_entries(version_id, section_id, day_id, slot_id);
+ON timetable_entries(version_id, section_id, day_id, slot_id)
+WHERE is_draft = 0;
 
 -- B. A faculty cannot teach two classes at the same time in the same version
 CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_faculty_slot 
-ON timetable_entries(version_id, faculty_id, day_id, slot_id);
+ON timetable_entries(version_id, faculty_id, day_id, slot_id)
+WHERE is_draft = 0;
 
 -- C. A room cannot host two classes at the same time in the same version
 CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_room_slot 
-ON timetable_entries(version_id, room_id, day_id, slot_id);
+ON timetable_entries(version_id, room_id, day_id, slot_id)
+WHERE is_draft = 0;
 
 -- 14. Absences Table
 CREATE TABLE IF NOT EXISTS absences (

@@ -27,6 +27,8 @@ router.post('/generate', requireAuth, requireRole('admin'), (req, res) => {
       createdBy: req.user.id,
       name: req.body.name,
       sectionId: req.body.sectionId ? parseInt(req.body.sectionId, 10) : null,
+      conflictLevel: req.body.conflictLevel || null,
+      currentVersionId: req.body.currentVersionId ? parseInt(req.body.currentVersionId, 10) : null,
       regenerate: Boolean(req.body.regenerate),
       maxDurationMs: req.body.maxDurationMs || 20000,
       maxAttempts: req.body.maxAttempts || 5
@@ -154,7 +156,8 @@ router.post('/versions/:id/activate', requireAuth, requireRole('admin'), (req, r
   const activateTx = db.transaction(() => {
     // Archive currently active version
     db.prepare("UPDATE timetable_versions SET status = 'archived' WHERE status = 'active'").run();
-    // Activate target version
+    // Activate target version and ensure is_draft = 0
+    db.prepare("UPDATE timetable_entries SET is_draft = 0 WHERE version_id = ?").run(versionId);
     db.prepare("UPDATE timetable_versions SET status = 'active' WHERE id = ?").run(versionId);
 
     db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)').run(
@@ -216,9 +219,10 @@ router.post('/versions', requireAuth, requireRole('admin'), (req, res) => {
     const newVersionId = newVersion.lastInsertRowid;
 
     if (Array.isArray(entries) && entries.length > 0) {
+      const isDraftVal = (activateNow || status === 'active') ? 0 : 1;
       const insertEntry = db.prepare(`
-        INSERT INTO timetable_entries (version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO timetable_entries (version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, is_draft)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       for (const e of entries) {
@@ -231,7 +235,8 @@ router.post('/versions', requireAuth, requireRole('admin'), (req, res) => {
           e.day_id,
           e.slot_id,
           e.is_lab_block || 0,
-          e.locked || 0
+          e.locked || 0,
+          isDraftVal
         );
       }
     }
@@ -382,6 +387,61 @@ router.delete('/versions/:id', requireAuth, requireRole('admin'), (req, res) => 
   res.json({ success: true, message: 'Version deleted successfully' });
 });
 
+// 9.5 Create New Timetable Entry (Admin Only - Unrestricted Manual Edit Authority)
+router.post('/entries', requireAuth, requireRole('admin'), (req, res) => {
+  const { versionId, sectionId, subjectId, facultyId, roomId, dayId, slotId, isLabBlock, locked } = req.body;
+  const db = getDatabase();
+
+  if (!versionId || !sectionId || !subjectId || !facultyId || !roomId || !dayId || !slotId) {
+    return res.status(400).json({ error: 'Missing required entry fields (versionId, sectionId, subjectId, facultyId, roomId, dayId, slotId)' });
+  }
+
+  const result = db.prepare(`
+    INSERT INTO timetable_entries (
+      version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    versionId,
+    sectionId,
+    subjectId,
+    facultyId,
+    roomId,
+    dayId,
+    slotId,
+    isLabBlock ? 1 : 0,
+    locked ? 1 : 0
+  );
+
+  const newEntry = db.prepare(`
+    SELECT te.*, s.name as subject_name, s.code as subject_code, s.type as subject_type,
+           sec.name as section_name, sec.semester,
+           f.name as faculty_name, f.email as faculty_email,
+           r.name as room_name, r.type as room_type, r.capacity as room_capacity,
+           wd.day_name, wd.day_index,
+           ts.slot_no, ts.start_time, ts.end_time, ts.is_break, ts.label as slot_label
+    FROM timetable_entries te
+    JOIN subjects s ON te.subject_id = s.id
+    JOIN sections sec ON te.section_id = sec.id
+    JOIN faculty f ON te.faculty_id = f.id
+    JOIN rooms r ON te.room_id = r.id
+    JOIN working_days wd ON te.day_id = wd.id
+    JOIN time_slots ts ON te.slot_id = ts.id
+    WHERE te.id = ?
+  `).get(result.lastInsertRowid);
+
+  broadcast('timetable.updated', {
+    type: 'entry_created',
+    entryId: result.lastInsertRowid,
+    versionId
+  });
+
+  res.status(201).json({
+    success: true,
+    message: 'Timetable entry added successfully',
+    entry: newEntry
+  });
+});
+
 // 10. Update or Lock Single Entry
 router.put('/entries/:id', requireAuth, requireRole('admin'), (req, res) => {
   const entryId = parseInt(req.params.id, 10);
@@ -400,6 +460,12 @@ router.put('/entries/:id', requireAuth, requireRole('admin'), (req, res) => {
     WHERE id = ?
   `).run(facultyId ?? null, roomId ?? null, subjectId ?? null, locked ?? null, entryId);
 
+  broadcast('timetable.updated', {
+    type: 'entry_updated',
+    entryId,
+    versionId: entry.version_id
+  });
+
   res.json({ success: true, message: 'Entry updated successfully' });
 });
 
@@ -408,7 +474,17 @@ router.delete('/entries/:id', requireAuth, requireRole('admin'), (req, res) => {
   const entryId = parseInt(req.params.id, 10);
   const db = getDatabase();
 
+  const entry = db.prepare('SELECT * FROM timetable_entries WHERE id = ?').get(entryId);
+  if (!entry) return res.status(404).json({ error: 'Entry not found' });
+
   db.prepare('DELETE FROM timetable_entries WHERE id = ?').run(entryId);
+
+  broadcast('timetable.updated', {
+    type: 'entry_deleted',
+    entryId,
+    versionId: entry.version_id
+  });
+
   res.json({ success: true, message: 'Timetable entry removed' });
 });
 
@@ -443,6 +519,80 @@ router.get('/versions/:id/export.csv', requireAuth, (req, res) => {
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', `attachment; filename="timetable_v${versionId}_export.csv"`);
   res.send(csv);
+});
+
+// 13. Export Version to iCalendar (ICS)
+router.get('/versions/:id/export.ics', requireAuth, (req, res) => {
+  const versionId = parseInt(req.params.id, 10);
+  const db = getDatabase();
+
+  const version = db.prepare('SELECT * FROM timetable_versions WHERE id = ?').get(versionId);
+  if (!version) return res.status(404).send('Version not found');
+
+  const entries = db.prepare(`
+    SELECT te.*, s.name as subject_name, s.code as subject_code,
+           f.name as faculty_name, r.name as room_name,
+           sec.name as section_name,
+           wd.day_name, wd.day_index,
+           ts.slot_no, ts.start_time, ts.end_time
+    FROM timetable_entries te
+    JOIN subjects s ON te.subject_id = s.id
+    JOIN faculty f ON te.faculty_id = f.id
+    JOIN rooms r ON te.room_id = r.id
+    JOIN sections sec ON te.section_id = sec.id
+    JOIN working_days wd ON te.day_id = wd.id
+    JOIN time_slots ts ON te.slot_id = ts.id
+    WHERE te.version_id = ?
+    ORDER BY wd.day_index, ts.slot_no
+  `).all(versionId);
+
+  const dayCodeMap = { 0: 'SU', 1: 'MO', 2: 'TU', 3: 'WE', 4: 'TH', 5: 'FR', 6: 'SA' };
+  const now = new Date();
+  const currentDay = now.getDay();
+  const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday);
+
+  const icsLines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//CTAS//Class Timetable Automation System//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    `X-WR-CALNAME:${version.name} Timetable`,
+    'X-WR-TIMEZONE:UTC'
+  ];
+
+  entries.forEach((e, idx) => {
+    const dayCode = dayCodeMap[e.day_index] || 'MO';
+    const targetDate = new Date(monday);
+    const offset = e.day_index === 0 ? 6 : e.day_index - 1;
+    targetDate.setDate(monday.getDate() + offset);
+
+    const dateStr = targetDate.toISOString().slice(0, 10).replace(/-/g, '');
+    const startTimeClean = (e.start_time || '09:00').replace(/[^0-9]/g, '').slice(0, 4) + '00';
+    const endTimeClean = (e.end_time || '10:00').replace(/[^0-9]/g, '').slice(0, 4) + '00';
+
+    icsLines.push(
+      'BEGIN:VEVENT',
+      `UID:ctas-v${versionId}-${idx}-${Date.now()}@ctas.college.edu`,
+      `DTSTAMP:${dateStr}T000000Z`,
+      `DTSTART:${dateStr}T${startTimeClean}`,
+      `DTEND:${dateStr}T${endTimeClean}`,
+      `RRULE:FREQ=WEEKLY;BYDAY=${dayCode}`,
+      `SUMMARY:${(e.subject_code ? e.subject_code + ': ' : '') + e.subject_name}`.replace(/[,;\\]/g, ''),
+      `LOCATION:${e.room_name}`.replace(/[,;\\]/g, ''),
+      `DESCRIPTION:Instructor: ${e.faculty_name}\\nSection: ${e.section_name}\\nSubject: ${e.subject_name}`.replace(/[,;\\]/g, ''),
+      'STATUS:CONFIRMED',
+      'END:VEVENT'
+    );
+  });
+
+  icsLines.push('END:VCALENDAR');
+
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="timetable_v${versionId}.ics"`);
+  res.send(icsLines.join('\r\n'));
 });
 
 export default router;

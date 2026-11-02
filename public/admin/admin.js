@@ -3,8 +3,10 @@ import { checkSession, logout } from '/js/auth.js';
 import { showToast } from '/js/toast.js';
 import { initSSE, onEvent } from '/js/sse.js';
 import { exportTimetableToPdf, printOrExportPdf, downloadFile } from '/js/exportUtils.js';
-import { evaluateTimetableConflicts } from '/js/timetableValidator.js';
+import { evaluateTimetableConflicts, validateTimetableConflict } from '/js/timetableValidator.js';
 import { TimetableResolver } from '/js/timetableResolver.js';
+
+window.validateTimetableConflict = validateTimetableConflict;
 
 let currentTab = 'overview';
 let activeVersionId = null;
@@ -39,7 +41,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initialize SSE for real-time live sync
   initSSE('/api/events');
   onEvent('timetable.updated', (data) => {
-    showToast(`Timetable event: ${data.type}`, 'info');
     if (currentTab === 'studio') loadStudioVersion(activeVersionId);
     if (currentTab === 'overview') loadOverview();
   });
@@ -1214,11 +1215,37 @@ function setupStudioControls() {
   populateStudioEntitySelector();
 
   // Studio actions
-  document.getElementById('btn-studio-generate')?.addEventListener('click', () => {
-    openGenerateModal();
+  // Studio actions
+  document.getElementById('btn-studio-generate')?.addEventListener('click', async () => {
+    if (isGenerationRunning) {
+      showToast('A timetable generation computation is active in the background.', 'warning');
+      return;
+    }
+    const conflictLevel = document.getElementById('select-conflict-level')?.value || 'medium';
+    const targetName = `Initial Draft (${conflictLevel} conflicts)`;
+
+    updateGenerationProgress({
+      isRunning: true,
+      progress: 15,
+      phase: 'Generating initial draft with realistic conflicts...',
+      name: targetName,
+      startedAt: Date.now()
+    });
+
+    try {
+      const res = await apiRequest('/api/timetable/generate', {
+        method: 'POST',
+        body: { name: targetName, conflictLevel },
+        showErrorToast: false
+      });
+      onGenerationCompleted(res);
+    } catch (err) {
+      onGenerationFailed({ reason: err.message || 'Generation failed' });
+      showToast(err.message || 'Failed to generate timetable', 'error');
+    }
   });
 
-  // Task 5: "Regenerate" becomes "Generate" when in resolved draft preview state
+  // Task 4: "Regenerate" becomes "Generate" when in resolved draft preview state
   const regenBtn = document.getElementById('btn-studio-regenerate');
   regenBtn?.addEventListener('click', async () => {
     if (isGenerationRunning) {
@@ -1230,12 +1257,13 @@ function setupStudioControls() {
     if (isResolvedDraftPreview && draftWorkingEntries) {
       try {
         const baseName = currentVersionData?.version?.name || 'Academic Master';
-        const newVersionName = `${baseName} (Resolved)`;
+        const cleanBase = baseName.replace(/\s*\(Resolved\)/gi, '').replace(/\s*\(.*conflicts\)/gi, '');
+        const newVersionName = `${cleanBase} (Resolved Schedule)`;
         const saveRes = await apiRequest('/api/timetable/versions', {
           method: 'POST',
           body: {
             name: newVersionName,
-            notes: 'Created via automated 0-conflict resolution studio engine',
+            notes: 'Created via automated conflict resolution engine with 0 conflicts',
             entries: draftWorkingEntries,
             status: 'draft'
           }
@@ -1250,14 +1278,22 @@ function setupStudioControls() {
       return;
     }
 
-    // Normal state: Regenerate alternative timetable
+    // Normal state: check if current version has conflicts
+    const val = runSharedValidation();
+    if (val.errorCount > 0) {
+      // Current version has conflicts: start min-conflicts resolver visibly!
+      startResolveWorkflow();
+      return;
+    }
+
+    // Current version already has 0 conflicts: produce genuinely DIFFERENT valid arrangement
     const currentName = currentVersionData?.version?.name || 'Academic Master';
     const altName = `${currentName} (Variant ${Math.floor(Math.random() * 900 + 100)})`;
 
     updateGenerationProgress({
       isRunning: true,
-      progress: 5,
-      phase: 'Phase 1: Validating Master Data Feasibility...',
+      progress: 15,
+      phase: 'Re-shuffling timetable to produce alternative 0-conflict arrangement...',
       name: altName,
       startedAt: Date.now()
     });
@@ -1265,10 +1301,14 @@ function setupStudioControls() {
     try {
       const res = await apiRequest('/api/timetable/generate', {
         method: 'POST',
-        body: { name: altName, regenerate: true },
+        body: { name: altName, regenerate: true, currentVersionId: activeVersionId },
         showErrorToast: false
       });
-      showToast(res.message, 'success');
+      if (res.cellsChanged === 0) {
+        showToast('No better arrangement found', 'info');
+      } else if (res.cellsChanged > 0) {
+        showToast(`Alternative timetable generated: ${res.cellsChanged} classes rearranged.`, 'success');
+      }
       onGenerationCompleted(res);
     } catch (err) {
       onGenerationFailed({ reason: err.message || 'Regeneration failed' });
@@ -1360,12 +1400,11 @@ function setupStudioControls() {
     }
   });
 
-  // Task 6: Undo / Redo Toolbar buttons & Keyboard shortcuts
+  // Undo / Redo Toolbar buttons & Keyboard shortcuts
   document.getElementById('btn-studio-undo')?.addEventListener('click', () => executeUndo());
   document.getElementById('btn-studio-redo')?.addEventListener('click', () => executeRedo());
 
   window.addEventListener('keydown', (e) => {
-    // Only intercept when studio panel is active and not typing in an input
     if (currentTab !== 'studio') return;
     const tag = e.target?.tagName?.toLowerCase();
     if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
@@ -1393,6 +1432,44 @@ function setupStudioControls() {
     startResolveWorkflow();
   });
 
+  // Amber Banner quick resolve trigger
+  document.getElementById('btn-banner-trigger-resolve')?.addEventListener('click', () => {
+    startResolveWorkflow();
+  });
+
+  // Resolution Progress Controls: Speed, Pause/Resume, Step, Skip, Cancel
+  document.getElementById('resolve-speed-select')?.addEventListener('change', (e) => {
+    if (activeResolver) activeResolver.setSpeed(e.target.value);
+  });
+
+  const pauseBtn = document.getElementById('btn-resolve-pause');
+  pauseBtn?.addEventListener('click', () => {
+    if (!activeResolver) return;
+    if (activeResolver.isPaused) {
+      activeResolver.resume();
+      pauseBtn.textContent = '⏸ Pause';
+      const stepBtn = document.getElementById('btn-resolve-step');
+      if (stepBtn) stepBtn.disabled = true;
+    } else {
+      activeResolver.pause();
+      pauseBtn.textContent = '▶ Resume';
+      const stepBtn = document.getElementById('btn-resolve-step');
+      if (stepBtn) stepBtn.disabled = false;
+    }
+  });
+
+  document.getElementById('btn-resolve-step')?.addEventListener('click', () => {
+    if (activeResolver && activeResolver.isPaused) {
+      activeResolver.singleStep();
+    }
+  });
+
+  document.getElementById('btn-resolve-skip')?.addEventListener('click', () => {
+    if (activeResolver) {
+      activeResolver.skipToEnd();
+    }
+  });
+
   // Resolution Progress Cancel button
   document.getElementById('btn-cancel-resolve')?.addEventListener('click', () => {
     if (activeResolver) {
@@ -1400,12 +1477,24 @@ function setupStudioControls() {
       activeResolver = null;
     }
     document.getElementById('studio-resolve-progress-strip').style.display = 'none';
+    document.getElementById('studio-resolve-log-panel').style.display = 'none';
     if (originalVersionEntries) {
       draftWorkingEntries = JSON.parse(JSON.stringify(originalVersionEntries));
     }
     runSharedValidation();
     renderStudioGrid();
     showToast('Conflict resolution cancelled. Working draft restored.', 'info');
+  });
+
+  // Live Resolution Log Collapsible Header
+  document.getElementById('resolve-log-header')?.addEventListener('click', () => {
+    const content = document.getElementById('resolve-log-content');
+    const icon = document.getElementById('resolve-log-toggle-icon');
+    if (content && icon) {
+      const isHidden = content.style.display === 'none';
+      content.style.display = isHidden ? 'flex' : 'none';
+      icon.textContent = isHidden ? 'Collapse ▲' : 'Expand ▼';
+    }
   });
 
   // Diff toggle button
@@ -1556,7 +1645,7 @@ async function syncRestoredEntriesToDb(entriesList) {
 // Single Shared Validator Function for Header Badge, Resolve Button, Grid Cells, and Resolver
 function runSharedValidation(targetEntries = null) {
   const entriesToValidate = targetEntries || draftWorkingEntries || currentVersionData?.entries || [];
-  lastSharedValidation = evaluateTimetableConflicts(entriesToValidate, masterData);
+  lastSharedValidation = validateTimetableConflict(entriesToValidate, masterData);
 
   // 1. Sync Studio Header Validation Badge
   const statusBadge = document.getElementById('studio-validation-badge');
@@ -1906,8 +1995,8 @@ function renderStudioGrid() {
         `;
       } else {
         html += `
-          <td class="timetable-cell-drop-target" data-day-id="${day.id}" data-slot-id="${slot.id}" style="padding: 0.4rem; border: 1px solid var(--border-subtle); vertical-align: middle; height: 75px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer;">
-            <span style="opacity: 0.35;">+ Free</span>
+          <td class="timetable-cell-drop-target timetable-cell-free" data-day-id="${day.id}" data-slot-id="${slot.id}" style="padding: 0.4rem; border: 1px solid var(--border-subtle); vertical-align: middle; height: 75px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer;" title="Click to schedule a class in this open period">
+            <span style="opacity: 0.45; font-weight: 600;">+ Free</span>
           </td>
         `;
       }
@@ -1929,6 +2018,16 @@ function renderStudioGrid() {
 function attachDragAndDropHandlers() {
   const chips = document.querySelectorAll('.studio-entry-chip');
   const cells = document.querySelectorAll('.timetable-cell-drop-target');
+  const freeCells = document.querySelectorAll('.timetable-cell-free');
+
+  freeCells.forEach(cell => {
+    cell.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const dayId = parseInt(cell.getAttribute('data-day-id'), 10);
+      const slotId = parseInt(cell.getAttribute('data-slot-id'), 10);
+      openAddEntryModal(dayId, slotId);
+    });
+  });
 
   chips.forEach(chip => {
     chip.addEventListener('dragstart', (e) => {
@@ -2484,7 +2583,7 @@ function setupModals() {
     }
   });
 
-  // Edit Timetable Entry Modal handlers (Task 6: Unrestricted Manual Edit Authority)
+  // Edit / Add Timetable Entry Modal handlers (Task 6: Unrestricted Manual Edit Authority)
   document.getElementById('modal-edit-entry-close')?.addEventListener('click', () => {
     document.getElementById('modal-edit-entry').style.display = 'none';
   });
@@ -2495,34 +2594,176 @@ function setupModals() {
     document.getElementById('modal-edit-entry').style.display = 'none';
   });
 
-  document.getElementById('form-edit-entry')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
+  // Delete Timetable Entry
+  document.getElementById('btn-delete-edit-entry')?.addEventListener('click', async () => {
     const entryId = parseInt(document.getElementById('edit-entry-id')?.value, 10);
-    const subjectId = parseInt(document.getElementById('edit-entry-subject')?.value, 10);
-    const facultyId = parseInt(document.getElementById('edit-entry-faculty')?.value, 10);
-    const roomId = parseInt(document.getElementById('edit-entry-room')?.value, 10);
-    const locked = document.getElementById('edit-entry-lock')?.checked ? 1 : 0;
     if (!entryId) return;
+
+    if (!confirm('Are you sure you want to remove this class from the schedule?')) return;
 
     // Record undo state
     pushUndoSnapshot();
 
-    const activeList = draftWorkingEntries || currentVersionData?.entries || [];
-    const entry = activeList.find(ent => ent.id === entryId);
-
     if (draftWorkingEntries) {
-      if (entry) {
-        if (!isNaN(subjectId)) entry.subject_id = subjectId;
-        if (!isNaN(facultyId)) entry.faculty_id = facultyId;
-        if (!isNaN(roomId)) entry.room_id = roomId;
-        entry.locked = locked;
-        entry.is_locked = locked;
-      }
+      const idx = draftWorkingEntries.findIndex(e => e.id === entryId);
+      if (idx !== -1) draftWorkingEntries.splice(idx, 1);
       document.getElementById('modal-edit-entry').style.display = 'none';
       const val = runSharedValidation(draftWorkingEntries);
       renderStudioGrid();
+      showToast('Class removed from working draft', 'info');
+      return;
+    }
+
+    try {
+      await apiRequest(`/api/timetable/entries/${entryId}`, { method: 'DELETE' });
+      if (currentVersionData?.entries) {
+        const idx = currentVersionData.entries.findIndex(e => e.id === entryId);
+        if (idx !== -1) currentVersionData.entries.splice(idx, 1);
+      }
+      document.getElementById('modal-edit-entry').style.display = 'none';
+      const val = runSharedValidation();
+      renderStudioGrid();
+      showToast('Class removed from timetable', 'success');
+    } catch (err) {
+      showToast(err.message || 'Failed to remove class', 'error');
+    }
+  });
+
+  document.getElementById('form-edit-entry')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const entryId = parseInt(document.getElementById('edit-entry-id')?.value, 10);
+    const dayId = parseInt(document.getElementById('edit-entry-day-id')?.value, 10);
+    const slotId = parseInt(document.getElementById('edit-entry-slot-id')?.value, 10);
+    const subjectId = parseInt(document.getElementById('edit-entry-subject')?.value, 10);
+    const facultyId = parseInt(document.getElementById('edit-entry-faculty')?.value, 10);
+    const roomId = parseInt(document.getElementById('edit-entry-room')?.value, 10);
+    const locked = document.getElementById('edit-entry-lock')?.checked ? 1 : 0;
+
+    const sub = masterData?.subjects?.find(s => s.id === subjectId);
+    const fac = masterData?.faculty?.find(f => f.id === facultyId);
+    const rm = masterData?.rooms?.find(r => r.id === roomId);
+
+    // Record undo state
+    pushUndoSnapshot();
+
+    // CASE 1: ADD NEW ENTRY (when entryId is falsy)
+    if (!entryId) {
+      const sectionSelect = document.getElementById('edit-entry-section');
+      const sectionId = parseInt(sectionSelect?.value || (studioMode === 'section' ? studioEntityId : masterData?.sections?.[0]?.id), 10);
+      const sec = masterData?.sections?.find(s => s.id === sectionId);
+      const day = masterData?.workingDays?.find(d => d.id === dayId);
+      const slot = masterData?.timeSlots?.find(s => s.id === slotId);
+
+      if (draftWorkingEntries) {
+        const newEntry = {
+          id: Date.now(),
+          version_id: activeVersionId,
+          section_id: sectionId,
+          subject_id: subjectId,
+          faculty_id: facultyId,
+          room_id: roomId,
+          day_id: dayId,
+          slot_id: slotId,
+          is_lab_block: sub?.type === 'lab' ? 1 : 0,
+          locked,
+          is_locked: locked,
+          section_name: sec?.name || `Section ${sectionId}`,
+          section_strength: sec?.strength || 40,
+          subject_code: sub?.code || 'SUB',
+          subject_name: sub?.name || 'Subject',
+          subject_type: sub?.type || 'theory',
+          faculty_name: fac?.name || 'Instructor',
+          room_name: rm?.name || 'Room',
+          room_type: rm?.type || 'classroom',
+          room_capacity: rm?.capacity || 40,
+          day_name: day?.day_name || 'Day',
+          day_index: day?.day_index || 1,
+          slot_label: slot?.label || 'Period',
+          slot_no: slot?.slot_no || 1,
+          start_time: slot?.start_time || '09:00',
+          end_time: slot?.end_time || '10:00'
+        };
+
+        draftWorkingEntries.push(newEntry);
+        document.getElementById('modal-edit-entry').style.display = 'none';
+        const val = runSharedValidation(draftWorkingEntries);
+        renderStudioGrid();
+        if (!val.isValid) {
+          showToast(`Class added to draft. Notice: ${val.errorCount} conflict(s) detected. Click Resolve to fix.`, 'warning');
+        } else {
+          showToast('Class added to working draft', 'success');
+        }
+        return;
+      }
+
+      try {
+        const res = await apiRequest('/api/timetable/entries', {
+          method: 'POST',
+          body: {
+            versionId: activeVersionId,
+            sectionId,
+            subjectId,
+            facultyId,
+            roomId,
+            dayId,
+            slotId,
+            isLabBlock: sub?.type === 'lab' ? 1 : 0,
+            locked
+          }
+        });
+
+        if (res.entry && currentVersionData?.entries) {
+          currentVersionData.entries.push(res.entry);
+        }
+
+        document.getElementById('modal-edit-entry').style.display = 'none';
+        const val = runSharedValidation();
+        renderStudioGrid();
+
+        if (!val.isValid) {
+          showToast(`Class scheduled. Notice: created ${val.errorCount} conflict(s). Click Resolve to auto-fix.`, 'warning');
+        } else {
+          showToast('Class scheduled successfully', 'success');
+        }
+      } catch (err) {
+        showToast(err.message || 'Failed to add class', 'error');
+      }
+      return;
+    }
+
+    // CASE 2: EDIT EXISTING ENTRY
+    const activeList = draftWorkingEntries || currentVersionData?.entries || [];
+    const entry = activeList.find(ent => ent.id === entryId);
+
+    if (entry) {
+      if (!isNaN(subjectId) && sub) {
+        entry.subject_id = subjectId;
+        entry.subject_name = sub.name;
+        entry.subject_code = sub.code;
+        entry.subject_type = sub.type;
+        entry.is_lab_block = sub.type === 'lab' ? 1 : 0;
+      }
+      if (!isNaN(facultyId) && fac) {
+        entry.faculty_id = facultyId;
+        entry.faculty_name = fac.name;
+      }
+      if (!isNaN(roomId) && rm) {
+        entry.room_id = roomId;
+        entry.room_name = rm.name;
+        entry.room_type = rm.type;
+        entry.room_capacity = rm.capacity;
+      }
+      entry.locked = locked;
+      entry.is_locked = locked;
+    }
+
+    document.getElementById('modal-edit-entry').style.display = 'none';
+
+    if (draftWorkingEntries) {
+      const val = runSharedValidation(draftWorkingEntries);
+      renderStudioGrid();
       if (!val.isValid) {
-        showToast(`Assignment saved. Notice: ${val.errorCount} conflict(s) detected.`, 'warning');
+        showToast(`Assignment saved. Notice: ${val.errorCount} conflict(s) detected. Click Resolve to fix.`, 'warning');
       } else {
         showToast('Assignment updated in working draft', 'success');
       }
@@ -2535,16 +2776,6 @@ function setupModals() {
         body: { subjectId, facultyId, roomId, locked }
       });
 
-      // Update in memory
-      if (entry) {
-        if (!isNaN(subjectId)) entry.subject_id = subjectId;
-        if (!isNaN(facultyId)) entry.faculty_id = facultyId;
-        if (!isNaN(roomId)) entry.room_id = roomId;
-        entry.locked = locked;
-        entry.is_locked = locked;
-      }
-
-      document.getElementById('modal-edit-entry').style.display = 'none';
       const val = runSharedValidation();
       renderStudioGrid();
 
@@ -2694,24 +2925,44 @@ function setupModals() {
 }
 
 function openEditEntryModal(entryId) {
-  const entry = currentVersionData?.entries?.find(e => e.id === entryId);
+  const activeList = draftWorkingEntries || currentVersionData?.entries || [];
+  const entry = activeList.find(e => e.id === entryId);
   if (!entry) return;
 
   const modal = document.getElementById('modal-edit-entry');
   if (!modal) return;
 
+  const titleEl = document.getElementById('modal-edit-entry-title');
+  if (titleEl) titleEl.textContent = 'Edit Class Assignment';
+
   const idInput = document.getElementById('edit-entry-id');
   if (idInput) idInput.value = entry.id;
 
-  const infoEl = document.getElementById('edit-entry-info');
-  if (infoEl) {
-    infoEl.textContent = `${entry.subject_name} (${entry.subject_code}) · ${entry.day_name} · ${entry.slot_label || 'Period ' + entry.slot_no} (${entry.start_time} - ${entry.end_time}) · Section ${entry.section_name}`;
+  const dayInput = document.getElementById('edit-entry-day-id');
+  if (dayInput) dayInput.value = entry.day_id;
+
+  const slotInput = document.getElementById('edit-entry-slot-id');
+  if (slotInput) slotInput.value = entry.slot_id;
+
+  const secGroup = document.getElementById('edit-entry-section-group');
+  if (secGroup) secGroup.style.display = 'none';
+
+  const detailsEl = document.getElementById('modal-edit-entry-details');
+  if (detailsEl) {
+    detailsEl.textContent = `${entry.subject_name || 'Class'} (${entry.subject_code || 'SUB'}) · ${entry.day_name || 'Day'} · ${entry.slot_label || 'Period ' + entry.slot_no} (${entry.start_time || '09:00'} - ${entry.end_time || '10:00'}) · Section ${entry.section_name || ''}`;
+  }
+
+  const subSelect = document.getElementById('edit-entry-subject');
+  if (subSelect && masterData?.subjects) {
+    subSelect.innerHTML = masterData.subjects.map(s =>
+      `<option value="${s.id}" ${s.id === entry.subject_id ? 'selected' : ''}>${s.code} - ${s.name} (${s.type === 'lab' ? 'Lab' : 'Theory'}, ${s.weekly_periods} hrs)</option>`
+    ).join('');
   }
 
   const facSelect = document.getElementById('edit-entry-faculty');
   if (facSelect && masterData?.faculty) {
     facSelect.innerHTML = masterData.faculty.map(f =>
-      `<option value="${f.id}" ${f.id === entry.faculty_id ? 'selected' : ''}>${f.name} (${f.department_code || f.department_name || 'Dept'})</option>`
+      `<option value="${f.id}" ${f.id === entry.faculty_id ? 'selected' : ''}>${f.name} (${f.department_code || 'Dept'}) - Max: ${f.max_periods_per_day || 4}/day</option>`
     ).join('');
   }
 
@@ -2722,9 +2973,87 @@ function openEditEntryModal(entryId) {
     ).join('');
   }
 
+  const lockCheck = document.getElementById('edit-entry-lock');
+  if (lockCheck) {
+    lockCheck.checked = Boolean(entry.locked || entry.is_locked);
+  }
+
+  const deleteBtn = document.getElementById('btn-delete-edit-entry');
+  if (deleteBtn) deleteBtn.style.display = 'inline-block';
+
+  const saveBtn = document.getElementById('btn-save-edit-entry');
+  if (saveBtn) saveBtn.textContent = 'Save Assignment';
+
   modal.style.display = 'flex';
 }
 window.openEditEntryModal = openEditEntryModal;
+
+function openAddEntryModal(dayId, slotId) {
+  const modal = document.getElementById('modal-edit-entry');
+  if (!modal || !masterData) return;
+
+  const day = masterData.workingDays?.find(d => d.id === dayId) || { day_name: `Day ${dayId}` };
+  const slot = masterData.timeSlots?.find(s => s.id === slotId) || { label: `Period ${slotId}`, start_time: '09:00', end_time: '10:00' };
+
+  const titleEl = document.getElementById('modal-edit-entry-title');
+  if (titleEl) titleEl.textContent = 'Schedule Class in Period';
+
+  const idInput = document.getElementById('edit-entry-id');
+  if (idInput) idInput.value = '';
+
+  const dayInput = document.getElementById('edit-entry-day-id');
+  if (dayInput) dayInput.value = dayId;
+
+  const slotInput = document.getElementById('edit-entry-slot-id');
+  if (slotInput) slotInput.value = slotId;
+
+  const secGroup = document.getElementById('edit-entry-section-group');
+  const secSelect = document.getElementById('edit-entry-section');
+  if (secGroup && secSelect && masterData.sections) {
+    secGroup.style.display = 'block';
+    secSelect.innerHTML = masterData.sections.map(s =>
+      `<option value="${s.id}" ${(studioMode === 'section' && s.id === studioEntityId) ? 'selected' : ''}>Section: ${s.name} (Semester ${s.semester})</option>`
+    ).join('');
+  }
+
+  const detailsEl = document.getElementById('modal-edit-entry-details');
+  if (detailsEl) {
+    detailsEl.textContent = `Scheduling into ${day.day_name} · ${slot.label} (${slot.start_time} - ${slot.end_time})`;
+  }
+
+  const subSelect = document.getElementById('edit-entry-subject');
+  if (subSelect && masterData.subjects) {
+    subSelect.innerHTML = masterData.subjects.map(s =>
+      `<option value="${s.id}">${s.code} - ${s.name} (${s.type === 'lab' ? 'Lab' : 'Theory'}, ${s.weekly_periods} hrs)</option>`
+    ).join('');
+  }
+
+  const facSelect = document.getElementById('edit-entry-faculty');
+  if (facSelect && masterData.faculty) {
+    facSelect.innerHTML = masterData.faculty.map(f =>
+      `<option value="${f.id}" ${(studioMode === 'faculty' && f.id === studioEntityId) ? 'selected' : ''}>${f.name} (${f.department_code || 'Dept'}) - Max: ${f.max_periods_per_day || 4}/day</option>`
+    ).join('');
+  }
+
+  const roomSelect = document.getElementById('edit-entry-room');
+  if (roomSelect && masterData.rooms) {
+    roomSelect.innerHTML = masterData.rooms.map(r =>
+      `<option value="${r.id}" ${(studioMode === 'room' && r.id === studioEntityId) ? 'selected' : ''}>${r.name} (${r.type}, Cap: ${r.capacity})</option>`
+    ).join('');
+  }
+
+  const lockCheck = document.getElementById('edit-entry-lock');
+  if (lockCheck) lockCheck.checked = false;
+
+  const deleteBtn = document.getElementById('btn-delete-edit-entry');
+  if (deleteBtn) deleteBtn.style.display = 'none';
+
+  const saveBtn = document.getElementById('btn-save-edit-entry');
+  if (saveBtn) saveBtn.textContent = 'Add Class';
+
+  modal.style.display = 'flex';
+}
+window.openAddEntryModal = openAddEntryModal;
 
 // 5. Faculty Availability Editor
 async function loadAvailabilityEditor() {

@@ -416,3 +416,9 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
     conflictsByCellKey
   };
 }
+
+export const validateTimetableConflict = evaluateTimetableConflicts;
+export default {
+  evaluateTimetableConflicts,
+  validateTimetableConflict
+};

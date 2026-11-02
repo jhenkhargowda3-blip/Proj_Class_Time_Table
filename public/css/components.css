@@ -153,6 +153,41 @@
   border-color: var(--border-strong);
 }
 
+/* Studio Resolve Button */
+#btn-studio-resolve, .btn-resolve {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1.15rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+#btn-studio-resolve.has-conflicts {
+  color: var(--color-error);
+  border-color: var(--color-error);
+  background: var(--bg-surface);
+}
+
+#btn-studio-resolve.has-conflicts:hover {
+  background: var(--color-error-bg, #FEF2F2);
+  border-color: var(--color-error);
+}
+
+#btn-studio-resolve.zero-conflicts {
+  color: #15803D;
+  border-color: #86EFAC;
+  background: #DCFCE7;
+}
+
+#btn-studio-resolve.zero-conflicts:hover {
+  background: #BBF7D0;
+}
+
 /* Theme Toggle Button */
 .theme-toggle-btn {
   width: 38px;

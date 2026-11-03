@@ -66,6 +66,58 @@ test('Phase 3: Authentication and Role-Based Access Control (RBAC)', async (t) =
     facultyToken = data.token;
   });
 
+  await t.test('2b. Faculty login with alan/alan2112 succeeds and links to Dr. Alan Turing', async () => {
+    const res = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: 'alan',
+        password: 'alan2112',
+        role: 'faculty'
+      })
+    });
+
+    const data = await res.json();
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(data.success, true);
+    assert.strictEqual(data.user.role, 'faculty');
+    assert.strictEqual(data.user.fullName, 'Dr. Alan Turing');
+    assert.strictEqual(data.user.facultyId, 1);
+  });
+
+  await t.test('2c. Faculty login with donald/donald@123$ succeeds and links to Prof. Donald Knuth', async () => {
+    const res = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: 'donald',
+        password: 'donald@123$',
+        role: 'faculty'
+      })
+    });
+
+    const data = await res.json();
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(data.success, true);
+    assert.strictEqual(data.user.role, 'faculty');
+    assert.strictEqual(data.user.fullName, 'Prof. Donald Knuth');
+    assert.strictEqual(data.user.facultyId, 3);
+  });
+
+  await t.test('2d. Old faculty credential raj/rajiv2112 fails with 401', async () => {
+    const res = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: 'raj',
+        password: 'rajiv2112',
+        role: 'faculty'
+      })
+    });
+
+    assert.strictEqual(res.status, 401);
+  });
+
   await t.test('3. Student login succeeds with secure student password', async () => {
     const res = await fetch(`${baseUrl}/api/auth/login`, {
       method: 'POST',

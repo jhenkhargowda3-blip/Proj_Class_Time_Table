@@ -4,7 +4,7 @@ import { getDatabase, initSchema } from './connection.js';
 // Configured credentials for admin, faculty, and student roles
 export const SEED_PASSWORDS = {
   admin: 'sharmajii',
-  faculty: 'rajiv2112',
+  faculty: 'alan2112',
   student: 'rocky(Jg)'
 };
 
@@ -225,24 +225,37 @@ export function seedDatabase(customDb) {
     facultyIds[f.username] = facId;
   }
 
-  // Insert primary faculty account: raj (mapped to primary faculty profile)
-  const rajUserId = insertUser.run(
-    'raj',
+  // Insert primary faculty account: alan (mapped to Dr. Alan Turing)
+  const alanUserId = insertUser.run(
+    'alan',
     facultyHash,
     'faculty',
-    'Prof. Raj',
-    'raj@college.edu',
+    'Dr. Alan Turing',
+    'turing@college.edu',
     facultyIds['faculty1'],
     null
   ).lastInsertRowid;
-  updateUserFacultyId.run(facultyIds['faculty1'], rajUserId);
+  updateUserFacultyId.run(facultyIds['faculty1'], alanUserId);
+
+  // Insert faculty account: donald (mapped to Prof. Donald Knuth)
+  const donaldHash = bcrypt.hashSync('donald@123$', passwordSaltRounds);
+  const donaldUserId = insertUser.run(
+    'donald',
+    donaldHash,
+    'faculty',
+    'Prof. Donald Knuth',
+    'knuth@college.edu',
+    facultyIds['faculty3'],
+    null
+  ).lastInsertRowid;
+  updateUserFacultyId.run(facultyIds['faculty3'], donaldUserId);
 
   // Also insert alias 'faculty'
   insertUser.run(
     'faculty',
     facultyHash,
     'faculty',
-    'Faculty Member (Alan Turing)',
+    'Dr. Alan Turing',
     'faculty@college.edu',
     facultyIds['faculty1'],
     null
@@ -473,9 +486,9 @@ export function seedDatabase(customDb) {
   console.log(`    Password: ${SEED_PASSWORDS.admin}`);
   console.log('');
   console.log(' 2. Faculty:');
-  console.log('    Username: raj (aliases: faculty, faculty1..faculty10)');
-  console.log(`    Password: ${SEED_PASSWORDS.faculty}`);
-  console.log('    Profile:  Prof. Raj');
+  console.log('    Username: alan (aliases: faculty, donald, faculty1..faculty10)');
+  console.log(`    Password: ${SEED_PASSWORDS.faculty} (alan) / donald@123$ (donald)`);
+  console.log('    Profile:  Dr. Alan Turing / Prof. Donald Knuth');
   console.log('');
   console.log(' 3. Student:');
   console.log('    Username: jhenkhar (aliases: student, student1..student4)');

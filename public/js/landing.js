@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (usernameInput) {
     usernameInput.addEventListener('input', () => {
       const val = usernameInput.value.trim().toLowerCase();
-      if (val.startsWith('faculty') && selectedRole !== 'faculty') {
+      if ((val.startsWith('faculty') || val === 'alan' || val === 'donald') && selectedRole !== 'faculty') {
         setRole('faculty');
       } else if (val.startsWith('student') && selectedRole !== 'student') {
         setRole('student');
@@ -179,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Auto-adjust selectedRole to match username if clearly indicated
       const val = username.toLowerCase();
       let roleToUse = selectedRole;
-      if ((val.startsWith('faculty') || val === 'raj') && roleToUse !== 'faculty') {
+      if ((val.startsWith('faculty') || val === 'alan' || val === 'donald') && roleToUse !== 'faculty') {
         roleToUse = 'faculty';
         setRole('faculty');
       } else if ((val.startsWith('student') || val === 'jhenkhar') && roleToUse !== 'student') {

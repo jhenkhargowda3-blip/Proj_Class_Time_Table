@@ -154,6 +154,10 @@ async function loadProfile() {
       document.getElementById('faculty-name-header').textContent = data.faculty.name;
       document.getElementById('faculty-dept-line').textContent = `${data.faculty.department_name} · Email: ${data.faculty.email} · Phone: ${data.faculty.phone}`;
       document.getElementById('stat-weekly-load').textContent = `${data.weeklySchedule?.length || 0} Periods`;
+      const headerChip = document.getElementById('user-display-name');
+      if (headerChip) {
+        headerChip.textContent = data.faculty.name;
+      }
     }
 
     const subList = document.getElementById('assigned-subjects-list');

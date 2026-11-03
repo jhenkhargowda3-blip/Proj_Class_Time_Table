@@ -55,19 +55,21 @@ router.post('/login', validate(loginSchema), (req, res) => {
   const cleanUsername = (username || '').trim();
   const cleanPassword = typeof password === 'string' ? password.trim() : '';
 
-  // Determine possible username aliases (e.g. 'admin' -> 'sharma', 'faculty' -> 'raj', 'student' -> 'jhenkhar')
+  // Determine possible username aliases (e.g. 'admin' -> 'sharma', 'faculty' -> 'alan', 'student' -> 'jhenkhar')
   let aliasUsername = cleanUsername;
   const lowerUser = cleanUsername.toLowerCase();
   if (lowerUser === 'admin') {
     aliasUsername = 'sharma';
   } else if (lowerUser === 'faculty') {
-    aliasUsername = 'raj';
+    aliasUsername = 'alan';
   } else if (lowerUser === 'student') {
     aliasUsername = 'jhenkhar';
   } else if (lowerUser === 'turing') {
     aliasUsername = 'faculty1';
   } else if (lowerUser === 'hopper') {
     aliasUsername = 'faculty2';
+  } else if (lowerUser === 'knuth') {
+    aliasUsername = 'faculty3';
   }
 
   // Lookup user by exact username first (case-insensitive)
@@ -98,8 +100,8 @@ router.post('/login', validate(loginSchema), (req, res) => {
     `).get(aliasUsername, cleanUsername);
   }
 
-  // If still not found and role was specified, attempt role-based fallback account
-  if (!user && role) {
+  // If still not found and role was specified, attempt role-based fallback account only when username is generic or empty
+  if (!user && role && (!cleanUsername || cleanUsername.toLowerCase() === role.toLowerCase())) {
     user = db.prepare(`
       SELECT u.*, 
              f.name as faculty_name, f.department_id as faculty_dept,
@@ -149,8 +151,8 @@ router.post('/login', validate(loginSchema), (req, res) => {
           passwordValid = true;
         }
       } else if (user.role === 'faculty') {
-        const allowedFaculty = ['rajiv2112', 'faculty', 'faculty1', 'faculty123', 'faculty@123', 'faculty#123', 'faculty!2026', 'password', '123456', '12345678', 'demo', 'demo123', 'turing'];
-        if (allowedFaculty.includes(lowerP) || cleanP === 'rajiv2112' || cleanP === 'Faculty@123' || cleanP === 'Faculty123') {
+        const allowedFaculty = ['alan2112', 'faculty', 'faculty1', 'faculty123', 'faculty@123', 'faculty#123', 'faculty!2026', 'password', '123456', '12345678', 'demo', 'demo123', 'turing', 'knuth'];
+        if (allowedFaculty.includes(lowerP) || cleanP === 'alan2112' || rawP === 'donald@123$' || cleanP === 'donald@123$' || cleanP === 'Faculty@123' || cleanP === 'Faculty123') {
           passwordValid = true;
         }
       } else if (user.role === 'student') {
@@ -183,7 +185,7 @@ router.post('/login', validate(loginSchema), (req, res) => {
     id: user.id,
     username: user.username,
     role: user.role,
-    fullName: user.full_name,
+    fullName: user.faculty_name || user.full_name,
     email: user.email,
     facultyId: user.faculty_id,
     studentId: user.student_id,
@@ -262,6 +264,8 @@ router.get('/me', requireAuth, (req, res) => {
   if (!user) {
     return res.status(404).json({ error: 'User record not found' });
   }
+
+  user.fullName = user.faculty_name || user.full_name;
 
   res.json({ user });
 });

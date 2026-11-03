@@ -42,6 +42,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initialize SSE for real-time live sync
   initSSE('/api/events');
   onEvent('timetable.updated', (data) => {
+    if (isGenerationRunning || (activeResolver && activeResolver.isRunning) || isResolvedDraftPreview) {
+      return;
+    }
     if (currentTab === 'studio') loadStudioVersion(activeVersionId);
     if (currentTab === 'overview') loadOverview();
   });
@@ -102,7 +105,7 @@ function setupNavigation() {
   setupMasterDataTools();
 }
 
-export function switchTab(tab) {
+export function switchTab(tab, preferredVersionId = null) {
   currentTab = tab;
   document.querySelectorAll('[data-admin-tab]').forEach(b => {
     if (b.getAttribute('data-admin-tab') === tab) {
@@ -119,7 +122,7 @@ export function switchTab(tab) {
   if (targetPanel) targetPanel.style.display = 'block';
 
   if (tab === 'overview') loadOverview();
-  if (tab === 'studio') loadStudio();
+  if (tab === 'studio') loadStudio(preferredVersionId || activeVersionId);
   if (tab === 'master-data') renderMasterDataTables();
   if (tab === 'availability') loadAvailabilityEditor();
   if (tab === 'assignments') loadAssignments();
@@ -1262,7 +1265,7 @@ function setupStudioControls() {
         body: { name: targetName },
         showErrorToast: false
       });
-      onGenerationCompleted(res);
+      await onGenerationCompleted(res);
     } catch (err) {
       onGenerationFailed({ reason: err.message || 'Generation failed' });
       showToast(err.message || 'Failed to generate timetable', 'error');
@@ -1333,7 +1336,7 @@ function setupStudioControls() {
       } else if (res.cellsChanged > 0) {
         showToast(`Alternative timetable generated: ${res.cellsChanged} classes rearranged.`, 'success');
       }
-      onGenerationCompleted(res);
+      await onGenerationCompleted(res);
     } catch (err) {
       onGenerationFailed({ reason: err.message || 'Regeneration failed' });
       showToast(err.message || 'Failed to regenerate timetable', 'error');
@@ -1675,18 +1678,55 @@ async function syncRestoredEntriesToDb(entriesList) {
   }
 }
 
-// Single Shared Validator Function for Header Badge, Resolve Button, Grid Cells, and Resolver
-function runSharedValidation(targetEntries = null) {
+// Unified Timetable Validation Function for CTAS
+// Calculates conflicts for faculty, rooms, and sections consistently across Header Counter, Toolbar Button, Grid, and Resolver
+export function calculateTimetableConflicts(targetEntries = null, targetMasterData = null) {
+  const mData = targetMasterData || masterData;
   const entriesToValidate = targetEntries || draftWorkingEntries || currentVersionData?.entries || [];
-  lastSharedValidation = validateTimetableConflict(entriesToValidate, masterData);
+  const rawValidation = validateTimetableConflict(entriesToValidate, mData || {});
 
-  // 1. Sync Studio Header Validation Badge
+  // Categorize conflicts consistently across Faculty, Rooms, and Sections
+  const facultyConflicts = (rawValidation.conflicts || []).filter(v =>
+    v.type === 'FACULTY_DOUBLE_BOOKED' || v.type === 'FACULTY_UNAVAILABLE' || v.type === 'FACULTY_DAILY_LIMIT_EXCEEDED'
+  );
+  const roomConflicts = (rawValidation.conflicts || []).filter(v =>
+    v.type === 'ROOM_DOUBLE_BOOKED' || v.type === 'ROOM_CAPACITY_EXCEEDED' || v.type === 'ROOM_TYPE_MISMATCH' || v.type === 'LAB_ROOM_REQUIRED'
+  );
+  const sectionConflicts = (rawValidation.conflicts || []).filter(v =>
+    v.type === 'SECTION_DOUBLE_BOOKED' || v.type === 'SUBJECT_PERIODS_MISMATCH' || v.type === 'LAB_NON_CONSECUTIVE'
+  );
+
+  const validationResult = {
+    isValid: rawValidation.isValid,
+    errorCount: rawValidation.errorCount,
+    totalConflicts: rawValidation.errorCount,
+    conflicts: rawValidation.conflicts,
+    conflictsByEntryId: rawValidation.conflictsByEntryId,
+    byEntryId: rawValidation.conflictsByEntryId,
+    conflictsByCellKey: rawValidation.conflictsByCellKey,
+    facultyConflicts,
+    roomConflicts,
+    sectionConflicts
+  };
+
+  lastSharedValidation = validationResult;
+
+  // 1. Sync Studio Header Validation Badge & Conflict Counter
   const statusBadge = document.getElementById('studio-validation-badge');
-  if (statusBadge) {
-    if (lastSharedValidation.isValid) {
-      statusBadge.innerHTML = `<span style="color: var(--color-success); font-weight: 700;">✓ 0 Conflicts · Fully Verified</span>`;
-    } else {
-      statusBadge.innerHTML = `<span style="color: var(--color-error); font-weight: 700;">⚠ ${lastSharedValidation.errorCount} Conflicts Detected</span>`;
+  const conflictCounter = document.getElementById('studio-conflict-counter');
+  if (validationResult.isValid) {
+    if (statusBadge) {
+      statusBadge.innerHTML = `<span id="studio-conflict-counter" style="color: var(--color-success); font-weight: 700;">✓ 0 Conflicts · Fully Verified</span>`;
+    } else if (conflictCounter) {
+      conflictCounter.textContent = '✓ 0 Conflicts · Fully Verified';
+      conflictCounter.style.color = 'var(--color-success)';
+    }
+  } else {
+    if (statusBadge) {
+      statusBadge.innerHTML = `<span id="studio-conflict-counter" style="color: var(--color-error); font-weight: 700;">⚠ ${validationResult.errorCount} Conflicts Detected</span>`;
+    } else if (conflictCounter) {
+      conflictCounter.textContent = `⚠ ${validationResult.errorCount} Conflicts Detected`;
+      conflictCounter.style.color = 'var(--color-error)';
     }
   }
 
@@ -1695,18 +1735,24 @@ function runSharedValidation(targetEntries = null) {
   const resolveBtnText = document.getElementById('resolve-btn-text');
   const resolveBtnBadge = document.getElementById('resolve-btn-badge');
 
-  if (resolveBtn && resolveBtnText && resolveBtnBadge) {
-    if (lastSharedValidation.errorCount > 0) {
-      resolveBtnText.textContent = `Resolve ${lastSharedValidation.errorCount}`;
-      resolveBtnBadge.style.display = 'none';
+  if (resolveBtn && resolveBtnText) {
+    if (validationResult.errorCount > 0) {
+      resolveBtnText.textContent = `Resolve ${validationResult.errorCount}`;
+      if (resolveBtnBadge) {
+        resolveBtnBadge.textContent = validationResult.errorCount;
+        resolveBtnBadge.style.display = 'none';
+      }
       resolveBtn.style.color = 'var(--color-error)';
       resolveBtn.style.borderColor = 'var(--color-error)';
       resolveBtn.style.background = 'var(--bg-surface)';
       resolveBtn.style.cursor = 'pointer';
-      resolveBtn.title = `Click to resolve all ${lastSharedValidation.errorCount} conflicts with min-conflicts heuristic search`;
+      resolveBtn.title = `Click to resolve all ${validationResult.errorCount} conflicts with min-conflicts heuristic search`;
     } else {
       resolveBtnText.textContent = '0 Conflicts ✓ Done';
-      resolveBtnBadge.style.display = 'none';
+      if (resolveBtnBadge) {
+        resolveBtnBadge.textContent = '0';
+        resolveBtnBadge.style.display = 'none';
+      }
       resolveBtn.style.color = '#15803D';
       resolveBtn.style.borderColor = '#86EFAC';
       resolveBtn.style.background = '#DCFCE7';
@@ -1715,8 +1761,28 @@ function runSharedValidation(targetEntries = null) {
     }
   }
 
-  return lastSharedValidation;
+  // 3. Sync Studio Draft Conflict Banner
+  const studioConflictBanner = document.getElementById('studio-draft-conflict-banner') || document.getElementById('studio-conflict-banner');
+  const draftConflictText = document.getElementById('draft-conflict-banner-text');
+  if (studioConflictBanner) {
+    if (validationResult.errorCount > 0) {
+      studioConflictBanner.style.display = 'block';
+      if (draftConflictText) {
+        draftConflictText.textContent = `Draft generated with ${validationResult.errorCount} conflicts. Click Regenerate to resolve them.`;
+      }
+    } else {
+      studioConflictBanner.style.display = 'none';
+    }
+  }
+
+  return validationResult;
 }
+
+export const runSharedValidation = calculateTimetableConflicts;
+export const validateConflicts = calculateTimetableConflicts;
+window.calculateTimetableConflicts = calculateTimetableConflicts;
+window.runSharedValidation = calculateTimetableConflicts;
+window.validateConflicts = calculateTimetableConflicts;
 
 // Task 3: The Resolve Workflow (Min-Conflicts Local Search on Working Draft)
 async function startResolveWorkflow() {
@@ -1780,11 +1846,17 @@ async function startResolveWorkflow() {
 
   // Instantiate deterministic non-blocking solver
   activeResolver = new TimetableResolver(draftWorkingEntries, masterData, {
+    validator: calculateTimetableConflicts,
     maxDurationMs: 30000,
     maxIterations: 20000,
     stepDelayMs: initialStepDelay,
     onStep: (stepData) => {
-      const { step, entries, conflictsCount, iterations, log } = stepData;
+      const step = stepData.step || {};
+      const entries = stepData.entries || [];
+      const conflictsCount = stepData.conflictsCount ?? stepData.conflictsRemaining ?? 0;
+      const iterations = stepData.iterations || 0;
+      const log = stepData.log || (activeResolver ? activeResolver.resolutionLog : []) || [];
+
       pushUndoSnapshot();
       draftWorkingEntries = entries;
       runSharedValidation(draftWorkingEntries);
@@ -1797,11 +1869,11 @@ async function startResolveWorkflow() {
       if (progressStatus) progressStatus.textContent = `Iteration ${iterations.toLocaleString()}: ${step.description || 'Interchanging periods'}`;
 
       if (logContent) {
-        if (log.length === 1) logContent.innerHTML = '';
+        if (!log || log.length <= 1) logContent.innerHTML = '';
         const logLine = document.createElement('div');
         logLine.style.padding = '0.2rem 0';
         logLine.style.borderBottom = '1px solid #E5E7EB';
-        logLine.innerHTML = `<strong>Step ${step.stepNo}:</strong> ${escapeHtml(step.description)} &middot; <span style="color: ${conflictsCount < step.conflictsBefore ? 'var(--color-success)' : 'var(--color-warning)'}; font-weight: 700;">Conflicts ${step.conflictsBefore} &rarr; ${conflictsCount}</span>`;
+        logLine.innerHTML = `<strong>Step ${step.stepNo || 1}:</strong> ${escapeHtml(step.description || 'Period move')} &middot; <span style="color: ${conflictsCount < (step.conflictsBefore ?? conflictsCount) ? 'var(--color-success)' : 'var(--color-warning)'}; font-weight: 700;">Conflicts ${step.conflictsBefore ?? conflictsCount} &rarr; ${conflictsCount}</span>`;
         logContent.appendChild(logLine);
         logContent.scrollTop = logContent.scrollHeight;
       }
@@ -1848,6 +1920,8 @@ async function startResolveWorkflow() {
       if (progressStrip) progressStrip.style.display = 'none';
       if (crossChip) crossChip.style.display = 'none';
 
+      draftWorkingEntries = res.entries;
+
       // Compute detailed change diff
       const diffList = [];
       let movedCount = 0;
@@ -1857,9 +1931,9 @@ async function startResolveWorkflow() {
       for (const draft of res.entries) {
         const orig = originalVersionEntries.find(o => o.id === draft.id);
         if (!orig) continue;
-        const slotChanged = orig.day_id !== draft.day_id || orig.slot_id !== draft.slot_id;
-        const facChanged = orig.faculty_id !== draft.faculty_id;
-        const roomChanged = orig.room_id !== draft.room_id;
+        const slotChanged = Number(orig.day_id) !== Number(draft.day_id) || Number(orig.slot_id) !== Number(draft.slot_id);
+        const facChanged = Number(orig.faculty_id) !== Number(draft.faculty_id);
+        const roomChanged = Number(orig.room_id) !== Number(draft.room_id);
 
         if (slotChanged) movedCount++;
         if (facChanged) facCount++;
@@ -2081,47 +2155,52 @@ function renderStudioGrid() {
         continue;
       }
 
-      const entry = filteredEntries.find(e => e.day_id === day.id && e.slot_id === slot.id);
+      const cellEntries = filteredEntries.filter(e => e.day_id === day.id && e.slot_id === slot.id);
       const isStepSource = Boolean(activeStepHighlight && activeStepHighlight.sourceDayId === day.id && activeStepHighlight.sourceSlotId === slot.id);
       const isStepTarget = Boolean(activeStepHighlight && activeStepHighlight.targetDayId === day.id && activeStepHighlight.targetSlotId === slot.id);
 
-      if (entry) {
-        const entryConflicts = conflictsByEntry[entry.id] || [];
-        const hasConflict = entryConflicts.length > 0;
+      if (cellEntries.length > 0) {
+        html += `
+          <td class="timetable-cell-drop-target" data-day-id="${day.id}" data-slot-id="${slot.id}" data-entry-id="${cellEntries[0].id}" style="padding: 0.4rem; border: 1px solid var(--border-subtle); vertical-align: top; min-height: 75px;">
+            <div style="display: flex; flex-direction: column; gap: 0.35rem; height: 100%;">
+        `;
 
-        // Check if modified compared to original / resolved for comparison highlight
-        let isModified = false;
-        if (originalVersionEntries && draftWorkingEntries) {
-          const orig = originalVersionEntries.find(o => o.id === entry.id);
-          const draft = draftWorkingEntries.find(d => d.id === entry.id);
-          if (orig && draft) {
-            if (orig.day_id !== draft.day_id || orig.slot_id !== draft.slot_id || orig.faculty_id !== draft.faculty_id || orig.room_id !== draft.room_id) {
-              isModified = true;
+        for (const entry of cellEntries) {
+          const entryConflicts = conflictsByEntry[entry.id] || [];
+          const hasConflict = entryConflicts.length > 0;
+
+          // Check if modified compared to original / resolved for comparison highlight
+          let isModified = false;
+          if (originalVersionEntries && draftWorkingEntries) {
+            const orig = originalVersionEntries.find(o => o.id === entry.id);
+            const draft = draftWorkingEntries.find(d => d.id === entry.id);
+            if (orig && draft) {
+              if (Number(orig.day_id) !== Number(draft.day_id) || Number(orig.slot_id) !== Number(draft.slot_id) || Number(orig.faculty_id) !== Number(draft.faculty_id) || Number(orig.room_id) !== Number(draft.room_id)) {
+                isModified = true;
+              }
             }
           }
-        }
 
-        let chipStyle = 'padding: 0.45rem 0.5rem; border-radius: var(--radius-sm); cursor: grab; text-align: left; height: 100%; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.2s ease;';
-        if (isStepSource) {
-          chipStyle += ' background: #FEF3C7; border: 2px solid #D97706; box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.45); transform: scale(1.02);';
-        } else if (isStepTarget) {
-          chipStyle += ' background: #DBEAFE; border: 2px solid #2563EB; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.45); transform: scale(1.02);';
-        } else if (isComparingWithOriginal && isModified) {
-          chipStyle += ' background: #FEF3C7; border: 2px solid #D97706; outline: 2px solid #FCD34D; box-shadow: 0 0 8px rgba(217, 119, 6, 0.25);';
-        } else if (!isComparingWithOriginal && isModified) {
-          chipStyle += ' background: #EFF6FF; border: 2px solid #2563EB; outline: 2px solid #93C5FD; box-shadow: 0 0 8px rgba(37, 99, 235, 0.25);';
-        } else if (hasConflict) {
-          chipStyle += ' background: #FEF2F2; border: 2px solid var(--color-error); box-shadow: 0 0 0 1px var(--color-error);';
-        } else {
-          chipStyle += ' background: var(--color-brand-blush-soft); border: 1px solid var(--border-strong);';
-        }
+          let chipStyle = 'padding: 0.45rem 0.5rem; border-radius: var(--radius-sm); cursor: grab; text-align: left; height: 100%; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.2s ease;';
+          if (isStepSource) {
+            chipStyle += ' background: #FEF3C7; border: 2px solid #D97706; box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.45); transform: scale(1.02);';
+          } else if (isStepTarget) {
+            chipStyle += ' background: #DBEAFE; border: 2px solid #2563EB; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.45); transform: scale(1.02);';
+          } else if (isComparingWithOriginal && isModified) {
+            chipStyle += ' background: #FEF3C7; border: 2px solid #D97706; outline: 2px solid #FCD34D; box-shadow: 0 0 8px rgba(217, 119, 6, 0.25);';
+          } else if (!isComparingWithOriginal && isModified) {
+            chipStyle += ' background: #EFF6FF; border: 2px solid #2563EB; outline: 2px solid #93C5FD; box-shadow: 0 0 8px rgba(37, 99, 235, 0.25);';
+          } else if (hasConflict) {
+            chipStyle += ' background: #FEF2F2; border: 2px solid var(--color-error); box-shadow: 0 0 0 1px var(--color-error);';
+          } else {
+            chipStyle += ' background: var(--color-brand-blush-soft); border: 1px solid var(--border-strong);';
+          }
 
-        const conflictTooltip = hasConflict
-          ? `title="[CONFLICT DETECTED] ${escapeHtml(entryConflicts.map(c => c.message).join(' | '))}"`
-          : (isModified ? `title="[MODIFIED] Class changed during conflict resolution"` : '');
+          const conflictTooltip = hasConflict
+            ? `title="[CONFLICT DETECTED] ${escapeHtml(entryConflicts.map(c => c.message).join(' | '))}"`
+            : (isModified ? `title="[MODIFIED] Class changed during conflict resolution"` : '');
 
-        html += `
-          <td class="timetable-cell-drop-target" data-day-id="${day.id}" data-slot-id="${slot.id}" data-entry-id="${entry.id}" style="padding: 0.4rem; border: 1px solid var(--border-subtle); vertical-align: top; height: 75px;">
+          html += `
             <div class="studio-entry-chip" draggable="true" data-entry-id="${entry.id}" ${conflictTooltip} style="${chipStyle}">
               <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.25rem;">
                 <span style="font-weight: 700; font-size: 0.85rem; color: ${hasConflict ? 'var(--color-error)' : 'var(--color-brand-primary)'};">${escapeHtml(entry.subject_code)}</span>
@@ -2139,6 +2218,11 @@ function renderStudioGrid() {
               <div style="font-size: 0.7rem; color: var(--text-muted);">
                 ${escapeHtml(studioMode === 'room' ? entry.section_name : entry.room_name)} ${entry.is_lab_block ? '· Lab' : ''}
               </div>
+            </div>
+          `;
+        }
+
+        html += `
             </div>
           </td>
         `;
@@ -2487,7 +2571,7 @@ function updateGenerationButtons(isLocked) {
   }
 }
 
-function onGenerationCompleted(data) {
+async function onGenerationCompleted(data) {
   isGenerationRunning = false;
   stopGenerationTimer();
   updateGenerationButtons(false);
@@ -2601,9 +2685,12 @@ function onGenerationCompleted(data) {
   }
 
   // Reload studio with the new version and overview
-  loadStudio(data.versionId);
+  if (data.versionId) {
+    activeVersionId = data.versionId;
+  }
+  await loadStudio(data.versionId);
   loadOverview();
-  switchTab('studio');
+  switchTab('studio', data.versionId);
 }
 
 function onGenerationFailed(data) {
@@ -2758,8 +2845,7 @@ function setupModals() {
       } else {
         showToast(res.message || 'Timetable generated successfully', 'success');
       }
-      onGenerationCompleted(res);
-      switchTab('studio');
+      await onGenerationCompleted(res);
     } catch (err) {
       if (err.status === 409 || err.message?.includes('computation is currently active')) {
         showToast('A timetable generation computation is already active in the background. Duplicate runs locked.', 'warning');
@@ -4413,13 +4499,13 @@ function renderDecisionRankResult(data) {
 
 window.applyAiSubstituteAssignment = async (entryId, dateStr, facultyId) => {
   try {
-    await apiRequest('/api/absence/substitutions/assign', {
+    await apiRequest('/api/absence/substitute/assign', {
       method: 'POST',
-      body: JSON.stringify({
+      body: {
         timetableEntryId: entryId,
-        dateStr,
+        date: dateStr,
         substituteFacultyId: facultyId
-      })
+      }
     });
     showToast('AI substitute recommendation approved and assigned!', 'success');
     await populateDecisionAffectedSlots();

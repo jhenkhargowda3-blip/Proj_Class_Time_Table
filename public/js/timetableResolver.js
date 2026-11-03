@@ -29,6 +29,13 @@ export class TimetableResolver {
     this.originalEntries = JSON.parse(JSON.stringify(entries || []));
     this.masterData = masterData || {};
 
+    this.validator = options.validator || ((entries, mData) => {
+      if (typeof window !== 'undefined' && typeof window.calculateTimetableConflicts === 'function') {
+        return window.calculateTimetableConflicts(entries, mData);
+      }
+      return evaluateTimetableConflicts(entries, mData);
+    });
+
     this.onProgress = options.onProgress || (() => {});
     this.onStep = options.onStep || (() => {});
     this.onComplete = options.onComplete || (() => {});
@@ -52,6 +59,13 @@ export class TimetableResolver {
     this.tabuSet = new Set();
     this.resolutionLog = [];
     this.timerHandle = null;
+  }
+
+  evaluateConflicts(entries) {
+    if (this.validator) {
+      return this.validator(entries, this.masterData);
+    }
+    return evaluateTimetableConflicts(entries, this.masterData);
   }
 
   setSpeed(speedName) {
@@ -133,7 +147,7 @@ export class TimetableResolver {
     this.tabuSet.clear();
     this.resolutionLog = [];
 
-    const initialVal = evaluateTimetableConflicts(this.entries, this.masterData);
+    const initialVal = this.evaluateConflicts(this.entries);
     this.onProgress({
       iterations: 0,
       conflictsCount: initialVal.errorCount,
@@ -175,19 +189,19 @@ export class TimetableResolver {
 
     // Safety checks
     if (Date.now() - this.startTime > this.maxDurationMs) {
-      const val = evaluateTimetableConflicts(this.entries, this.masterData);
+      const val = this.evaluateConflicts(this.entries);
       this.finishWithRemaining(val, `Time limit reached (${Math.round(this.maxDurationMs / 1000)}s)`);
       return;
     }
 
     if (this.iterations >= this.maxIterations) {
-      const val = evaluateTimetableConflicts(this.entries, this.masterData);
+      const val = this.evaluateConflicts(this.entries);
       this.finishWithRemaining(val, `Iteration limit reached (${this.maxIterations.toLocaleString()} iterations)`);
       return;
     }
 
     this.iterations++;
-    let currentVal = evaluateTimetableConflicts(this.entries, this.masterData);
+    let currentVal = this.evaluateConflicts(this.entries);
 
     if (currentVal.errorCount === 0) {
       this.isRunning = false;
@@ -217,7 +231,7 @@ export class TimetableResolver {
     if (bestMove && bestMove.delta < 0) {
       this.stepCount++;
       const stepRecord = this.applyMoveAndDescribe(bestMove, currentVal);
-      const afterVal = evaluateTimetableConflicts(this.entries, this.masterData);
+      const afterVal = this.evaluateConflicts(this.entries);
       stepRecord.conflictsAfter = afterVal.errorCount;
       this.tabuSet.add(this.getStateSignature(this.entries));
       this.resolutionLog.push(stepRecord);
@@ -227,8 +241,10 @@ export class TimetableResolver {
         stepNo: this.stepCount,
         step: stepRecord,
         conflictsRemaining: afterVal.errorCount,
+        conflictsCount: afterVal.errorCount,
         entries: this.entries,
-        iterations: this.iterations
+        iterations: this.iterations,
+        log: this.resolutionLog
       });
 
       this.onProgress({
@@ -259,7 +275,7 @@ export class TimetableResolver {
       if (this.restarts < this.maxRestarts) {
         this.restarts++;
         this.perturbRandomUnlockedEntries();
-        const pertVal = evaluateTimetableConflicts(this.entries, this.masterData);
+        const pertVal = this.evaluateConflicts(this.entries);
         this.onProgress({
           iterations: this.iterations,
           stepCount: this.stepCount,
@@ -281,7 +297,7 @@ export class TimetableResolver {
 
   runRapidCompletion() {
     while (this.isRunning && !this.isCancelled) {
-      let currentVal = evaluateTimetableConflicts(this.entries, this.masterData);
+      let currentVal = this.evaluateConflicts(this.entries);
       if (currentVal.errorCount === 0) {
         this.isRunning = false;
         this.onComplete({
@@ -313,7 +329,7 @@ export class TimetableResolver {
       if (bestMove && bestMove.delta < 0) {
         this.stepCount++;
         const stepRecord = this.applyMoveAndDescribe(bestMove, currentVal);
-        const afterVal = evaluateTimetableConflicts(this.entries, this.masterData);
+        const afterVal = this.evaluateConflicts(this.entries);
         stepRecord.conflictsAfter = afterVal.errorCount;
         this.tabuSet.add(this.getStateSignature(this.entries));
         this.resolutionLog.push(stepRecord);
@@ -322,8 +338,10 @@ export class TimetableResolver {
           stepNo: this.stepCount,
           step: stepRecord,
           conflictsRemaining: afterVal.errorCount,
+          conflictsCount: afterVal.errorCount,
           entries: this.entries,
-          iterations: this.iterations
+          iterations: this.iterations,
+          log: this.resolutionLog
         });
       } else {
         if (this.restarts < this.maxRestarts) {
@@ -511,7 +529,7 @@ export class TimetableResolver {
     const sig = this.getStateSignature(mutated);
     if (this.tabuSet.has(sig)) return 99999;
 
-    const val = evaluateTimetableConflicts(mutated, this.masterData);
+    const val = this.evaluateConflicts(mutated);
     return val.errorCount;
   }
 

@@ -142,16 +142,17 @@ router.post('/substitute/claim', requireAuth, (req, res) => {
  * POST /api/absence/substitute/assign
  * Mode B: Admin direct assignment
  */
-router.post('/substitute/assign', requireAuth, requireRole('admin'), (req, res) => {
+router.post(['/substitute/assign', '/substitutions/assign'], requireAuth, requireRole('admin'), (req, res) => {
   try {
-    const { timetableEntryId, date, substituteFacultyId } = req.body;
-    if (!timetableEntryId || !date || !substituteFacultyId) {
+    const { timetableEntryId, date, dateStr, substituteFacultyId } = req.body;
+    const targetDate = date || dateStr;
+    if (!timetableEntryId || !targetDate || !substituteFacultyId) {
       return res.status(400).json({ error: 'timetableEntryId, date, and substituteFacultyId are required' });
     }
 
     const result = assignSubstitution({
       timetableEntryId: Number(timetableEntryId),
-      dateStr: date,
+      dateStr: targetDate,
       substituteFacultyId: Number(substituteFacultyId),
       adminUserId: req.user.id
     });

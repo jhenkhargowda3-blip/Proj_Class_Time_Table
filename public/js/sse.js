@@ -28,7 +28,6 @@ export function initSSE(url = '/api/events') {
     };
 
     eventSource.onerror = () => {
-      console.warn('[CTAS SSE] Connection dropped, reconnecting in 5s...');
       eventSource.close();
       eventSource = null;
       if (!reconnectTimer) {
@@ -46,7 +45,18 @@ export function initSSE(url = '/api/events') {
     };
 
     // Specific event listeners
-    const knownEvents = ['timetable.updated', 'absence.reported', 'substitution.assigned', 'notification.new'];
+    const knownEvents = [
+      'timetable.updated',
+      'timetable.generation_progress',
+      'timetable.generation_completed',
+      'timetable.generation_failed',
+      'absence:created',
+      'substitution:claimed',
+      'substitution:assigned',
+      'absence.reported',
+      'substitution.assigned',
+      'notification.new'
+    ];
     for (const ev of knownEvents) {
       eventSource.addEventListener(ev, (e) => {
         try {

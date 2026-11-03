@@ -162,6 +162,7 @@ export function seedDatabase(customDb) {
   `);
 
   const updateUserFacultyId = db.prepare('UPDATE users SET faculty_id = ? WHERE id = ?');
+  const updateFacultyUserId = db.prepare('UPDATE faculty SET user_id = ? WHERE id = ?');
 
   // Insert Admin (Primary: sharma, with alias: admin)
   const adminUserId = insertUser.run(
@@ -236,6 +237,7 @@ export function seedDatabase(customDb) {
     null
   ).lastInsertRowid;
   updateUserFacultyId.run(facultyIds['faculty1'], alanUserId);
+  updateFacultyUserId.run(alanUserId, facultyIds['faculty1']);
 
   // Insert faculty account: donald (mapped to Prof. Donald Knuth)
   const donaldHash = bcrypt.hashSync('donald@123$', passwordSaltRounds);
@@ -249,6 +251,7 @@ export function seedDatabase(customDb) {
     null
   ).lastInsertRowid;
   updateUserFacultyId.run(facultyIds['faculty3'], donaldUserId);
+  updateFacultyUserId.run(donaldUserId, facultyIds['faculty3']);
 
   // Also insert alias 'faculty'
   insertUser.run(

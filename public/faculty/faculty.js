@@ -152,25 +152,38 @@ async function loadProfile() {
     currentFaculty = data.faculty;
     if (data.faculty) {
       document.getElementById('faculty-name-header').textContent = data.faculty.name;
-      document.getElementById('faculty-dept-line').textContent = `${data.faculty.department_name} · Email: ${data.faculty.email} · Phone: ${data.faculty.phone}`;
+      const deptParts = [
+        data.faculty.department_name,
+        data.faculty.email ? `Email: ${data.faculty.email}` : null,
+        data.faculty.phone ? `Phone: ${data.faculty.phone}` : null
+      ].filter(Boolean);
+      document.getElementById('faculty-dept-line').textContent = deptParts.join(' · ') || 'Department of Computer Science & Engineering';
       document.getElementById('stat-weekly-load').textContent = `${data.weeklySchedule?.length || 0} Periods`;
       const headerChip = document.getElementById('user-display-name');
       if (headerChip) {
         headerChip.textContent = data.faculty.name;
       }
+      const roleBadge = document.getElementById('user-role-badge');
+      if (roleBadge) {
+        roleBadge.textContent = 'FACULTY';
+      }
     }
 
     const subList = document.getElementById('assigned-subjects-list');
-    if (subList && data.assignedSubjects?.length) {
-      subList.innerHTML = data.assignedSubjects.map(s => `
-        <div style="padding: 0.6rem 0.8rem; background: var(--bg-surface-subtle); border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <span style="font-weight: 700; color: var(--color-brand-primary);">${s.code}</span>
-            <span style="font-size: 0.85rem; margin-left: 0.4rem;">${s.name}</span>
+    if (subList) {
+      if (data.assignedSubjects?.length) {
+        subList.innerHTML = data.assignedSubjects.map(s => `
+          <div style="padding: 0.6rem 0.8rem; background: var(--bg-surface-subtle); border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <span style="font-weight: 700; color: var(--color-brand-primary);">${s.code}</span>
+              <span style="font-size: 0.85rem; margin-left: 0.4rem;">${s.name}</span>
+            </div>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">${s.section_name} (${s.type})</span>
           </div>
-          <span style="font-size: 0.75rem; color: var(--text-muted);">${s.section_name} (${s.type})</span>
-        </div>
-      `).join('');
+        `).join('');
+      } else {
+        subList.innerHTML = `<div style="color: var(--text-muted); font-size: 0.85rem;">No courses currently assigned.</div>`;
+      }
     }
   } catch (err) {
     console.error('Failed to load profile:', err);

@@ -66,7 +66,7 @@ router.get('/master-data', (req, res) => {
   const faculty = db.prepare(`
     SELECT f.*, d.name as department_name, d.code as department_code, u.username
     FROM faculty f
-    JOIN departments d ON f.department_id = d.id
+    LEFT JOIN departments d ON f.department_id = d.id
     LEFT JOIN users u ON f.user_id = u.id
     ORDER BY f.name ASC
   `).all();
@@ -109,7 +109,49 @@ router.get('/master-data', (req, res) => {
   });
 });
 
-// 3. Faculty CRUD
+// 3. Faculty CRUD & Search
+router.get('/faculty', (req, res) => {
+  const db = getDatabase();
+  const rawQuery = String(req.query.search || req.query.q || '').trim().toLowerCase();
+  const deptFilter = String(req.query.department || '').trim().toLowerCase();
+
+  const allFaculty = db.prepare(`
+    SELECT f.*, d.name as department_name, d.code as department_code, u.username
+    FROM faculty f
+    LEFT JOIN departments d ON f.department_id = d.id
+    LEFT JOIN users u ON f.user_id = u.id
+    ORDER BY f.name ASC
+  `).all();
+
+  const filtered = allFaculty.filter((f) => {
+    if (deptFilter) {
+      const code = (f.department_code || '').toLowerCase();
+      const dName = (f.department_name || '').toLowerCase();
+      const dId = String(f.department_id || '');
+      if (code !== deptFilter && dName !== deptFilter && dId !== deptFilter) {
+        return false;
+      }
+    }
+    if (!rawQuery) return true;
+    const tokens = rawQuery.split(/\s+/).filter(Boolean);
+    const haystack = [
+      f.name || '',
+      f.department_code || '',
+      f.department_name || '',
+      f.email || '',
+      f.phone || '',
+      f.username || ''
+    ].join(' ').toLowerCase();
+    return tokens.every((t) => haystack.includes(t));
+  });
+
+  res.json({
+    faculty: filtered,
+    total: allFaculty.length,
+    count: filtered.length
+  });
+});
+
 router.post('/faculty', (req, res) => {
   const { name, departmentId, email, phone, maxPeriodsPerDay, maxPeriodsPerWeek } = req.body;
   const db = getDatabase();

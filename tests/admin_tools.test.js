@@ -101,23 +101,42 @@ test('Batch 2: Admin Tools (Backup System JSON Download & Faculty Search Filter)
     assert.ok(log, 'Audit trail entry must be recorded');
   });
 
-  await t.test('3. Master Data: Faculty search query filters correctly by name and department', async () => {
-    const faculty = db.prepare(`
-      SELECT f.*, d.name as department_name, d.code as department_code
-      FROM faculty f
-      JOIN departments d ON f.department_id = d.id
-    `).all();
+  await t.test('3. Master Data & Faculty Management: Faculty search query filters correctly by name, department, and email', async () => {
+    // Verify API endpoint GET /api/admin/faculty?search=...
+    const nameRes = await fetch(`${baseUrl}/api/admin/faculty?search=turing`, {
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    assert.strictEqual(nameRes.status, 200);
+    const nameData = await nameRes.json();
+    assert.ok(nameData.faculty.length >= 1, 'Should find Dr. Alan Turing by name');
+    assert.ok(nameData.faculty.some(f => f.name === 'Dr. Alan Turing'));
 
-    // Test name search
-    const turingMatches = faculty.filter(f => f.name.toLowerCase().includes('turing'));
-    assert.ok(turingMatches.length >= 1, 'Should find Turing by name');
+    // Test department search (both code and full department name)
+    const deptCodeRes = await fetch(`${baseUrl}/api/admin/faculty?search=cse`, {
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    const deptCodeData = await deptCodeRes.json();
+    assert.ok(deptCodeData.faculty.length >= 1, 'Should find CSE faculty by department code');
 
-    // Test department code search
-    const cseMatches = faculty.filter(f => f.department_code.toLowerCase().includes('cse'));
-    assert.ok(cseMatches.length >= 1, 'Should find CSE faculty');
+    const deptNameRes = await fetch(`${baseUrl}/api/admin/faculty?search=${encodeURIComponent('Computer Science')}`, {
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    const deptNameData = await deptNameRes.json();
+    assert.ok(deptNameData.faculty.length >= 1, 'Should find faculty by full department name');
+
+    // Test email search
+    const emailRes = await fetch(`${baseUrl}/api/admin/faculty?search=${encodeURIComponent('turing@college.edu')}`, {
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    const emailData = await emailRes.json();
+    assert.strictEqual(emailData.faculty.length, 1, 'Should find exact faculty by email');
+    assert.strictEqual(emailData.faculty[0].email, 'turing@college.edu');
 
     // Test nonexistent query
-    const zeroMatches = faculty.filter(f => f.name.toLowerCase().includes('nonexistent_prof_xyz'));
-    assert.strictEqual(zeroMatches.length, 0, 'No match for nonexistent name');
+    const zeroRes = await fetch(`${baseUrl}/api/admin/faculty?search=nonexistent_prof_xyz`, {
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    const zeroData = await zeroRes.json();
+    assert.strictEqual(zeroData.faculty.length, 0, 'No match for nonexistent query');
   });
 });

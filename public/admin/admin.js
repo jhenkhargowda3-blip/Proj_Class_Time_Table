@@ -88,6 +88,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await checkGenerationStatus();
   await loadOverview();
   await loadMasterData();
+  renderMasterDataTables();
 });
 
 // Navigation tab switching
@@ -951,20 +952,34 @@ function escapeHtml(str) {
 }
 
 function setupMasterDataTools() {
-  // 1. Faculty Search Bar
+  // 1. Faculty Real-Time Search & Department Filter Bar
   const facultySearchInput = document.getElementById('faculty-search-input');
+  const facultyDeptFilter = document.getElementById('faculty-dept-filter');
   const facultySearchClear = document.getElementById('btn-faculty-search-clear');
 
-  facultySearchInput?.addEventListener('input', () => {
+  const handleSearchChange = () => {
     applyFacultySearch();
+  };
+
+  facultySearchInput?.addEventListener('input', handleSearchChange);
+  facultySearchInput?.addEventListener('keyup', handleSearchChange);
+  facultySearchInput?.addEventListener('search', handleSearchChange);
+  facultySearchInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      facultySearchInput.value = '';
+      if (facultyDeptFilter) facultyDeptFilter.value = '';
+      applyFacultySearch();
+    }
   });
 
+  facultyDeptFilter?.addEventListener('change', handleSearchChange);
+
   facultySearchClear?.addEventListener('click', () => {
-    if (facultySearchInput) {
-      facultySearchInput.value = '';
-      applyFacultySearch();
-      facultySearchInput.focus();
-    }
+    if (facultySearchInput) facultySearchInput.value = '';
+    if (facultyDeptFilter) facultyDeptFilter.value = '';
+    applyFacultySearch();
+    facultySearchInput?.focus();
   });
 
   // 2. Backup System (JSON Download)
@@ -985,37 +1000,68 @@ function setupMasterDataTools() {
   document.getElementById('btn-overview-backup-json')?.addEventListener('click', handleBackupDownload);
 }
 
-function applyFacultySearch() {
-  if (!masterData?.faculty) return;
-  const searchInput = document.getElementById('faculty-search-input');
-  const q = (searchInput?.value || '').trim().toLowerCase();
+export function filterFacultyList(facultyList = [], rawQuery = '', deptFilter = '') {
+  const q = String(rawQuery || '').trim().toLowerCase();
+  const dept = String(deptFilter || '').trim().toLowerCase();
+  const tokens = q ? q.split(/\s+/).filter(Boolean) : [];
 
-  if (!q) {
-    renderFacultyTable(masterData.faculty);
-    return;
-  }
+  return (facultyList || []).filter((f) => {
+    if (dept) {
+      const code = (f.department_code || '').toLowerCase();
+      const dName = (f.department_name || '').toLowerCase();
+      const dId = String(f.department_id || '');
+      if (code !== dept && dName !== dept && dId !== dept) {
+        return false;
+      }
+    }
+    if (tokens.length === 0) return true;
 
-  const filtered = masterData.faculty.filter(f => {
     const name = (f.name || '').toLowerCase();
     const email = (f.email || '').toLowerCase();
     const phone = (f.phone || '').toLowerCase();
     const deptCode = (f.department_code || '').toLowerCase();
     const deptName = (f.department_name || '').toLowerCase();
-    return name.includes(q) || email.includes(q) || phone.includes(q) || deptCode.includes(q) || deptName.includes(q);
-  });
+    const username = (f.username || '').toLowerCase();
+    const combined = `${name} ${deptCode} ${deptName} ${email} ${phone} ${username}`;
 
-  renderFacultyTable(filtered);
+    return tokens.every((token) =>
+      name.includes(token) ||
+      deptCode.includes(token) ||
+      deptName.includes(token) ||
+      email.includes(token) ||
+      phone.includes(token) ||
+      username.includes(token) ||
+      combined.includes(token)
+    );
+  });
 }
+window.filterFacultyList = filterFacultyList;
+
+export function applyFacultySearch() {
+  if (!masterData?.faculty) return [];
+  const searchInput = document.getElementById('faculty-search-input');
+  const deptSelect = document.getElementById('faculty-dept-filter');
+  const q = (searchInput?.value || '').trim();
+  const dept = (deptSelect?.value || '').trim();
+
+  const filtered = filterFacultyList(masterData.faculty, q, dept);
+  renderFacultyTable(filtered);
+  return filtered;
+}
+window.applyFacultySearch = applyFacultySearch;
 
 function renderFacultyTable(facultyList = masterData?.faculty || []) {
   const facTable = document.getElementById('table-faculty-body');
   const countLabel = document.getElementById('faculty-search-count');
   const clearBtn = document.getElementById('btn-faculty-search-clear');
   const searchInput = document.getElementById('faculty-search-input');
+  const deptSelect = document.getElementById('faculty-dept-filter');
 
   const total = masterData?.faculty?.length || 0;
+  const hasActiveFilter = Boolean((searchInput && searchInput.value.trim()) || (deptSelect && deptSelect.value));
+
   if (countLabel) {
-    if (searchInput && searchInput.value.trim()) {
+    if (hasActiveFilter) {
       countLabel.textContent = `Showing ${facultyList.length} of ${total} faculty`;
       if (clearBtn) clearBtn.style.display = 'inline-block';
     } else {
@@ -1027,10 +1073,11 @@ function renderFacultyTable(facultyList = masterData?.faculty || []) {
   if (!facTable) return;
 
   if (facultyList.length === 0) {
+    const queryDesc = searchInput?.value?.trim() || deptSelect?.value || '';
     facTable.innerHTML = `
       <tr style="border-bottom: 1px solid var(--border-subtle);">
         <td colspan="6" style="padding: 2rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle);">
-          🔍 No faculty members match "<strong>${escapeHtml(searchInput?.value || '')}</strong>".
+          🔍 No faculty members match "<strong>${escapeHtml(queryDesc)}</strong>".
         </td>
       </tr>
     `;
@@ -1038,12 +1085,12 @@ function renderFacultyTable(facultyList = masterData?.faculty || []) {
   }
 
   facTable.innerHTML = facultyList.map(f => `
-    <tr style="border-bottom: 1px solid var(--border-subtle);">
-      <td style="padding: 0.6rem 0.75rem; font-weight: 600;">${f.name}</td>
-      <td style="padding: 0.6rem 0.75rem;"><span style="background: var(--bg-surface-subtle); padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 600;">${f.department_code}</span> ${f.department_name}</td>
-      <td style="padding: 0.6rem 0.75rem;">${f.email || '—'}</td>
-      <td style="padding: 0.6rem 0.75rem;">${f.phone || '—'}</td>
-      <td style="padding: 0.6rem 0.75rem;" class="tabular-nums">${f.max_periods_per_day} / day · ${f.max_periods_per_week} / wk</td>
+    <tr class="faculty-row" data-faculty-id="${f.id}" data-faculty-name="${escapeHtml(f.name || '')}" data-faculty-dept="${escapeHtml((f.department_code || '') + ' ' + (f.department_name || ''))}" data-faculty-email="${escapeHtml(f.email || '')}" style="border-bottom: 1px solid var(--border-subtle);">
+      <td style="padding: 0.6rem 0.75rem; font-weight: 600;">${escapeHtml(f.name || '—')}</td>
+      <td style="padding: 0.6rem 0.75rem;">${f.department_code ? `<span style="background: var(--bg-surface-subtle); padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 600;">${escapeHtml(f.department_code)}</span>` : ''} ${escapeHtml(f.department_name || '—')}</td>
+      <td style="padding: 0.6rem 0.75rem;">${escapeHtml(f.email || '—')}</td>
+      <td style="padding: 0.6rem 0.75rem;">${escapeHtml(f.phone || '—')}</td>
+      <td style="padding: 0.6rem 0.75rem;" class="tabular-nums">${f.max_periods_per_day ?? 4} / day · ${f.max_periods_per_week ?? 18} / wk</td>
       <td style="padding: 0.6rem 0.75rem; text-align: right;">
         <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editFaculty(${f.id})">Edit</button>
         <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteFaculty(${f.id})">Delete</button>
@@ -1054,6 +1101,15 @@ function renderFacultyTable(facultyList = masterData?.faculty || []) {
 
 function renderMasterDataTables() {
   if (!masterData) return;
+
+  // Populate Department Filter dropdown for Faculty Management
+  const deptSelect = document.getElementById('faculty-dept-filter');
+  if (deptSelect && masterData.departments) {
+    const currentDeptVal = deptSelect.value;
+    deptSelect.innerHTML = `<option value="">All Departments</option>` +
+      masterData.departments.map(d => `<option value="${escapeHtml(d.code)}">${escapeHtml(d.code)} — ${escapeHtml(d.name)}</option>`).join('');
+    deptSelect.value = currentDeptVal;
+  }
 
   // Counts
   const facCount = document.getElementById('count-faculty');
@@ -1069,7 +1125,7 @@ function renderMasterDataTables() {
   const deptCount = document.getElementById('count-departments');
   if (deptCount) deptCount.textContent = masterData.departments?.length || 0;
 
-  // 1. Faculty with search filtering
+  // 1. Faculty with real-time search filtering
   applyFacultySearch();
 
   // 2. Subjects
@@ -3338,14 +3394,39 @@ window.openAddEntryModal = openAddEntryModal;
 async function loadAvailabilityEditor() {
   await loadMasterData();
   const select = document.getElementById('avail-faculty-selector');
+  const searchInput = document.getElementById('avail-faculty-search');
   if (!select || !masterData) return;
 
-  select.innerHTML = masterData.faculty.map(f => `
-    <option value="${f.id}">${f.name} (${f.department_code})</option>
-  `).join('');
+  const populateAvailabilitySelect = (query = '') => {
+    const filtered = filterFacultyList(masterData.faculty || [], query);
+    const prevSelected = select.value;
+    if (filtered.length === 0) {
+      select.innerHTML = `<option value="">No matching faculty found</option>`;
+      return;
+    }
+    select.innerHTML = filtered.map(f => `
+      <option value="${f.id}">${escapeHtml(f.name)} (${escapeHtml(f.department_code || 'General')}${f.email ? ' · ' + escapeHtml(f.email) : ''})</option>
+    `).join('');
+    if (prevSelected && filtered.some(f => String(f.id) === String(prevSelected))) {
+      select.value = prevSelected;
+    }
+    const selectedId = parseInt(select.value, 10);
+    if (!isNaN(selectedId)) {
+      renderFacultyAvailabilityGrid(selectedId);
+    }
+  };
 
-  select.onchange = () => renderFacultyAvailabilityGrid(parseInt(select.value, 10));
-  renderFacultyAvailabilityGrid(parseInt(select.value, 10));
+  if (searchInput && !searchInput._boundAvailFilter) {
+    searchInput._boundAvailFilter = true;
+    searchInput.addEventListener('input', () => populateAvailabilitySelect(searchInput.value));
+    searchInput.addEventListener('search', () => populateAvailabilitySelect(searchInput.value));
+  }
+
+  populateAvailabilitySelect(searchInput?.value || '');
+  select.onchange = () => {
+    const selectedId = parseInt(select.value, 10);
+    if (!isNaN(selectedId)) renderFacultyAvailabilityGrid(selectedId);
+  };
 }
 
 async function renderFacultyAvailabilityGrid(facId) {

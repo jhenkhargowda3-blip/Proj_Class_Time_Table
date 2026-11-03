@@ -583,14 +583,17 @@
         <!-- Master Data Content Panels -->
         <!-- 1. Faculty -->
         <div id="master-subpanel-faculty" class="master-subpanel">
-          <!-- Faculty Search Bar -->
-          <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; background: var(--bg-surface-subtle); padding: 0.75rem 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+          <!-- Faculty Real-Time Search & Filter Bar -->
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; background: var(--bg-surface-subtle); padding: 0.75rem 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
             <div style="flex: 1; min-width: 260px; position: relative;">
-              <input type="text" id="faculty-search-input" class="form-input" placeholder="🔍 Search faculty by name, department, email, or phone..." style="width: 100%; font-size: 0.85rem;">
+              <input type="search" id="faculty-search-input" class="form-input" placeholder="🔍 Search faculty by name, department, or email..." aria-label="Search faculty by name, department, or email" autocomplete="off" style="width: 100%; font-size: 0.85rem;">
             </div>
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+              <select id="faculty-dept-filter" class="form-input" aria-label="Filter faculty by department" style="font-size: 0.82rem; padding: 0.4rem 0.65rem; width: auto; min-width: 170px;">
+                <option value="">All Departments</option>
+              </select>
               <span id="faculty-search-count" style="font-size: 0.82rem; color: var(--text-secondary); font-weight: 600;"></span>
-              <button type="button" class="btn-secondary" id="btn-faculty-search-clear" style="font-size: 0.75rem; padding: 0.35rem 0.65rem; display: none;">Clear Search</button>
+              <button type="button" class="btn-secondary" id="btn-faculty-search-clear" style="font-size: 0.75rem; padding: 0.35rem 0.65rem; display: none;">Clear Filter</button>
             </div>
           </div>
 
@@ -712,7 +715,8 @@
               Click individual time slots to toggle availability. Green = Available, Red = Unavailable.
             </p>
           </div>
-          <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <input type="search" id="avail-faculty-search" class="form-input" placeholder="🔍 Filter by name, dept, or email..." aria-label="Filter faculty availability list by name, department, or email" autocomplete="off" style="font-size: 0.85rem; width: 230px; padding: 0.4rem 0.65rem;">
             <select id="avail-faculty-selector" style="font-size: 0.9rem; font-weight: 600; min-width: 240px;"></select>
             <button class="btn-primary" id="btn-save-availability">Save Availability</button>
           </div>

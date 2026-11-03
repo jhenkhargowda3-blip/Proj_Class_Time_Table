@@ -18,7 +18,16 @@ router.get('/', optionalAuth, (req, res) => {
 
   res.write(`data: ${JSON.stringify({ type: 'connected', message: 'SSE connection established' })}\n\n`);
 
+  const keepAliveTimer = setInterval(() => {
+    try {
+      res.write(': keepalive\n\n');
+    } catch {
+      clearInterval(keepAliveTimer);
+    }
+  }, 25000);
+
   req.on('close', () => {
+    clearInterval(keepAliveTimer);
     removeClient(client);
   });
 });

@@ -2,6 +2,8 @@ import { apiRequest, setStoredToken, setStoredUser, getStoredUser, getStoredToke
 import { showToast } from './toast.js';
 
 export async function login(username, password, role) {
+  setStoredToken(null);
+  setStoredUser(null);
   try {
     const data = await apiRequest('/api/auth/login', {
       method: 'POST',
@@ -15,7 +17,8 @@ export async function login(username, password, role) {
       setStoredUser(data.user);
     }
 
-    showToast(`Welcome, ${data.user.fullName || data.user.full_name || data.user.username}!`, 'success');
+    const displayName = data.user.facultyName || data.user.faculty_name || data.user.fullName || data.user.full_name || data.user.username;
+    showToast(`Welcome, ${displayName}!`, 'success');
 
     // Route to actual user role dashboard
     const targetRole = data?.user?.role || role || 'admin';
@@ -76,7 +79,9 @@ export async function getCurrentUser() {
 
 export async function checkSession(expectedRole) {
   const user = await getCurrentUser();
-  if (!user) {
+  if (!user || (user.username && user.username.toLowerCase() === 'raj')) {
+    setStoredToken(null);
+    setStoredUser(null);
     window.location.href = '/#login';
     return null;
   }
@@ -90,10 +95,10 @@ export async function checkSession(expectedRole) {
     return null;
   }
 
-  // Populate header user badge if present
+  // Populate header user badge if present (pulling linked faculty record name first)
   const userDisplay = document.getElementById('user-display-name');
   if (userDisplay) {
-    userDisplay.textContent = user.fullName || user.full_name || user.username;
+    userDisplay.textContent = user.facultyName || user.faculty_name || user.fullName || user.full_name || user.username;
   }
 
   const roleBadge = document.getElementById('user-role-badge');

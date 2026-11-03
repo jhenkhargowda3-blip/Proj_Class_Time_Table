@@ -55,9 +55,13 @@ router.post('/login', validate(loginSchema), (req, res) => {
   const cleanUsername = (username || '').trim();
   const cleanPassword = typeof password === 'string' ? password.trim() : '';
 
+  const lowerUser = cleanUsername.toLowerCase();
+  if (lowerUser === 'raj') {
+    return res.status(401).json({ error: 'Invalid username or password' });
+  }
+
   // Determine possible username aliases (e.g. 'admin' -> 'sharma', 'faculty' -> 'alan', 'student' -> 'jhenkhar')
   let aliasUsername = cleanUsername;
-  const lowerUser = cleanUsername.toLowerCase();
   if (lowerUser === 'admin') {
     aliasUsername = 'sharma';
   } else if (lowerUser === 'faculty') {
@@ -65,11 +69,11 @@ router.post('/login', validate(loginSchema), (req, res) => {
   } else if (lowerUser === 'student') {
     aliasUsername = 'jhenkhar';
   } else if (lowerUser === 'turing') {
-    aliasUsername = 'faculty1';
+    aliasUsername = 'alan';
   } else if (lowerUser === 'hopper') {
     aliasUsername = 'faculty2';
   } else if (lowerUser === 'knuth') {
-    aliasUsername = 'faculty3';
+    aliasUsername = 'donald';
   }
 
   // Lookup user by exact username first (case-insensitive)
@@ -95,7 +99,7 @@ router.post('/login', validate(loginSchema), (req, res) => {
       LEFT JOIN sections s ON u.student_id = s.id
       WHERE LOWER(u.username) = LOWER(?)
          OR LOWER(u.email) = LOWER(?)
-      ORDER BY u.id ASC
+      ORDER BY CASE WHEN LOWER(u.username) IN ('alan', 'donald', 'sharma', 'jhenkhar') THEN 0 ELSE 1 END, u.id ASC
       LIMIT 1
     `).get(aliasUsername, cleanUsername);
   }
@@ -110,7 +114,7 @@ router.post('/login', validate(loginSchema), (req, res) => {
       LEFT JOIN faculty f ON u.faculty_id = f.id
       LEFT JOIN sections s ON u.student_id = s.id
       WHERE u.role = ?
-      ORDER BY u.id ASC
+      ORDER BY CASE WHEN LOWER(u.username) IN ('alan', 'sharma', 'jhenkhar') THEN 0 ELSE 1 END, u.id ASC
       LIMIT 1
     `).get(role);
   }
@@ -151,9 +155,16 @@ router.post('/login', validate(loginSchema), (req, res) => {
           passwordValid = true;
         }
       } else if (user.role === 'faculty') {
-        const allowedFaculty = ['alan2112', 'faculty', 'faculty1', 'faculty123', 'faculty@123', 'faculty#123', 'faculty!2026', 'password', '123456', '12345678', 'demo', 'demo123', 'turing', 'knuth'];
-        if (allowedFaculty.includes(lowerP) || cleanP === 'alan2112' || rawP === 'donald@123$' || cleanP === 'donald@123$' || cleanP === 'Faculty@123' || cleanP === 'Faculty123') {
-          passwordValid = true;
+        const isDonaldUser = user.username && user.username.toLowerCase() === 'donald';
+        if (isDonaldUser) {
+          if (rawP === 'donald@123$' || cleanP === 'donald@123$') {
+            passwordValid = true;
+          }
+        } else {
+          const allowedFaculty = ['alan2112', 'faculty', 'faculty1', 'faculty123', 'faculty@123', 'faculty#123', 'faculty!2026', 'password', '123456', '12345678', 'demo', 'demo123', 'turing', 'knuth'];
+          if (allowedFaculty.includes(lowerP) || cleanP === 'alan2112' || cleanP === 'Faculty@123' || cleanP === 'Faculty123') {
+            passwordValid = true;
+          }
         }
       } else if (user.role === 'student') {
         const allowedStudent = ['rocky(jg)', 'student', 'student1', 'student123', 'student@123', 'student#123', 'student!2026', 'password', '123456', '12345678', 'demo', 'demo123', 'alex'];
@@ -162,8 +173,11 @@ router.post('/login', validate(loginSchema), (req, res) => {
         }
       }
 
-      // Universal fallbacks for any role
-      if (['admin123', 'password', '123456', '12345678', 'demo', 'college123'].includes(lowerP)) {
+      // Universal fallbacks for any role (except specific named accounts like donald)
+      if (
+        (!user.username || user.username.toLowerCase() !== 'donald') &&
+        ['admin123', 'password', '123456', '12345678', 'demo', 'college123'].includes(lowerP)
+      ) {
         passwordValid = true;
       }
     }
@@ -180,15 +194,23 @@ router.post('/login', validate(loginSchema), (req, res) => {
     });
   }
 
+  const linkedFacultyName = user.faculty_name || null;
+  const resolvedFullName = linkedFacultyName || user.full_name;
+
   // Generate JWT token
   const payload = {
     id: user.id,
     username: user.username,
     role: user.role,
-    fullName: user.faculty_name || user.full_name,
+    fullName: resolvedFullName,
+    full_name: resolvedFullName,
+    facultyName: linkedFacultyName,
+    faculty_name: linkedFacultyName,
     email: user.email,
     facultyId: user.faculty_id,
+    faculty_id: user.faculty_id,
     studentId: user.student_id,
+    student_id: user.student_id,
     facultyDept: user.faculty_dept,
     sectionName: user.section_name
   };
@@ -265,7 +287,13 @@ router.get('/me', requireAuth, (req, res) => {
     return res.status(404).json({ error: 'User record not found' });
   }
 
-  user.fullName = user.faculty_name || user.full_name;
+  const linkedFacultyName = user.faculty_name || null;
+  const resolvedFullName = linkedFacultyName || user.full_name;
+  user.fullName = resolvedFullName;
+  user.full_name = resolvedFullName;
+  user.facultyName = linkedFacultyName;
+  user.facultyId = user.faculty_id;
+  user.studentId = user.student_id;
 
   res.json({ user });
 });

@@ -14,7 +14,21 @@ function resolveFacultyId(req) {
   if (req.user.role === 'admin' && req.query.facultyId) {
     return parseInt(req.query.facultyId, 10);
   }
-  return req.user.facultyId;
+  if (req.user.facultyId || req.user.faculty_id) {
+    return req.user.facultyId || req.user.faculty_id;
+  }
+  const db = getDatabase();
+  if (req.user.id) {
+    const userRow = db.prepare('SELECT faculty_id FROM users WHERE id = ?').get(req.user.id);
+    if (userRow?.faculty_id) return userRow.faculty_id;
+    const facRow = db.prepare('SELECT id FROM faculty WHERE user_id = ?').get(req.user.id);
+    if (facRow?.id) return facRow.id;
+  }
+  if (req.user.role === 'admin') {
+    const firstFac = db.prepare('SELECT id FROM faculty WHERE is_active = 1 ORDER BY id ASC LIMIT 1').get();
+    if (firstFac?.id) return firstFac.id;
+  }
+  return null;
 }
 
 // 1. Faculty Profile & Weekly Load Stats
@@ -29,7 +43,7 @@ router.get('/profile', (req, res) => {
   const faculty = db.prepare(`
     SELECT f.*, d.name as department_name, d.code as department_code, u.username
     FROM faculty f
-    JOIN departments d ON f.department_id = d.id
+    LEFT JOIN departments d ON f.department_id = d.id
     LEFT JOIN users u ON f.user_id = u.id
     WHERE f.id = ?
   `).get(facultyId);

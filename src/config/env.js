@@ -8,17 +8,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '../../');
 
-const DUMMY_GROK_KEYS = new Set([
-  'sk-O5H6dMXC2rhdz8eXeKslEVayje9cdm8xxTEUs3M9KfvaRcb2',
-  'sk-N7N67Rdftw83QM1NgmKpCeYkbmP2KmHrVYh3Pce7q1YQzbLO',
-  'sk-DNzNaHrJNawbul49deBKbBFzelBaCiNpqnMWxWa1ZKkfatca'
-]);
-
 function sanitizeGrokKey(key) {
   if (!key) return '';
   const trimmed = key.trim();
   if (
-    DUMMY_GROK_KEYS.has(trimmed) ||
     trimmed.startsWith('sk-O5H6d') ||
     trimmed.startsWith('sk-N7N67') ||
     trimmed.startsWith('sk-DNzNa') ||

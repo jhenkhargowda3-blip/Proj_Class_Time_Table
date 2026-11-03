@@ -59,14 +59,14 @@
         <!-- Real-Time Interactive Class Changes & Substitute Notices Popover Drawer -->
         <div id="student-notices-popover" class="student-notices-popover" style="display: none;" role="dialog" aria-modal="false" aria-label="Class Changes and Substitute Notices">
           <div class="notices-popover-header">
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
-              <span style="font-size: 1.1rem;">🔔</span>
-              <div>
-                <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary); line-height: 1.2;">Class Updates &amp; Notices</div>
-                <div style="font-size: 0.75rem; color: var(--text-muted);">Real-time substitute &amp; schedule alerts</div>
+            <div style="display: flex; align-items: center; gap: 0.5rem; min-width: 0; flex: 1 1 auto;">
+              <span style="font-size: 1.1rem; flex-shrink: 0;">🔔</span>
+              <div style="min-width: 0; flex: 1 1 auto;">
+                <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary); line-height: 1.2; white-space: normal; overflow-wrap: anywhere; word-break: break-word;">Class Updates &amp; Notices</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); white-space: normal; overflow-wrap: anywhere; word-break: break-word;">Real-time substitute &amp; schedule alerts</div>
               </div>
             </div>
-            <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; min-width: 0;">
               <button type="button" id="btn-mark-all-read" class="btn-notices-mark-all" title="Mark all notices as read">
                 ✓ Mark all read
               </button>
@@ -82,7 +82,7 @@
           </div>
 
           <div class="notices-popover-footer">
-            <div style="display: flex; gap: 0.35rem;">
+            <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; min-width: 0;">
               <button type="button" class="btn-secondary" id="btn-refresh-notices" style="font-size: 0.78rem; padding: 0.3rem 0.65rem;" title="Refresh notices">
                 🔄 Refresh
               </button>
@@ -130,12 +130,6 @@
           </div>
           <button class="btn-primary" id="btn-student-export-pdf" style="font-size: 0.85rem; padding: 0.5rem 0.85rem;" title="Download print-ready PDF schedule">
             📄 Export PDF
-          </button>
-          <button class="btn-secondary" id="btn-student-print-schedule" style="font-size: 0.85rem; padding: 0.5rem 0.85rem;" title="Print weekly schedule">
-            🖨️ Print
-          </button>
-          <button class="btn-secondary" id="btn-student-export-ics" style="font-size: 0.85rem; padding: 0.5rem 0.85rem;" title="Export schedule to calendar (.ics)">
-            📅 Export ICS
           </button>
         </div>
       </div>

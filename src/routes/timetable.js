@@ -496,40 +496,7 @@ router.delete('/entries/:id', requireAuth, requireRole('admin'), (req, res) => {
   res.json({ success: true, message: 'Timetable entry removed' });
 });
 
-// 12. Export Version to CSV
-router.get('/versions/:id/export.csv', requireAuth, (req, res) => {
-  const versionId = parseInt(req.params.id, 10);
-  const db = getDatabase();
-
-  const version = db.prepare('SELECT name FROM timetable_versions WHERE id = ?').get(versionId);
-  if (!version) return res.status(404).send('Version not found');
-
-  const entries = db.prepare(`
-    SELECT wd.day_name, ts.slot_no, ts.start_time, ts.end_time,
-           sec.name as section_name, s.code as subject_code, s.name as subject_name,
-           f.name as faculty_name, r.name as room_name, s.type as subject_type
-    FROM timetable_entries te
-    JOIN working_days wd ON te.day_id = wd.id
-    JOIN time_slots ts ON te.slot_id = ts.id
-    JOIN sections sec ON te.section_id = sec.id
-    JOIN subjects s ON te.subject_id = s.id
-    JOIN faculty f ON te.faculty_id = f.id
-    JOIN rooms r ON te.room_id = r.id
-    WHERE te.version_id = ?
-    ORDER BY wd.day_index, ts.slot_no, sec.name
-  `).all(versionId);
-
-  let csv = 'Day,Period,Start Time,End Time,Section,Subject Code,Subject Name,Faculty,Room,Type\n';
-  for (const e of entries) {
-    csv += `"${e.day_name}","Period ${e.slot_no}","${e.start_time}","${e.end_time}","${e.section_name}","${e.subject_code}","${e.subject_name.replace(/"/g, '""')}","${e.faculty_name}","${e.room_name}","${e.subject_type}"\n`;
-  }
-
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', `attachment; filename="timetable_v${versionId}_export.csv"`);
-  res.send(csv);
-});
-
-// 13. Export Version to iCalendar (ICS)
+// 12. Export Version to iCalendar (ICS)
 router.get('/versions/:id/export.ics', requireAuth, (req, res) => {
   const versionId = parseInt(req.params.id, 10);
   const db = getDatabase();

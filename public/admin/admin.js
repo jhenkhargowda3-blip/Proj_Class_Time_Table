@@ -1420,11 +1420,6 @@ function setupStudioControls() {
     } catch (err) {}
   });
 
-  document.getElementById('btn-studio-export')?.addEventListener('click', () => {
-    if (!activeVersionId) return;
-    window.location.href = `/api/timetable/versions/${activeVersionId}/export.csv`;
-  });
-
   document.getElementById('btn-studio-export-pdf')?.addEventListener('click', async () => {
     if (!currentVersionData || !masterData) {
       showToast('No timetable version loaded to export', 'warning');
@@ -4046,7 +4041,6 @@ let selectedVisionFile = null;
 
 async function loadAiCenter() {
   if (!masterData) await loadMasterData();
-  await loadAiStatusPills();
   setupAiSubtabs();
 
   // Populate selectors
@@ -4058,30 +4052,6 @@ async function loadAiCenter() {
   if (!aiCenterInitialized) {
     setupAiCenterEvents();
     aiCenterInitialized = true;
-  }
-}
-
-async function loadAiStatusPills() {
-  const container = document.getElementById('ai-model-status-pills');
-  if (!container) return;
-
-  try {
-    const res = await apiRequest('/api/ai/status');
-    const { configured, models } = res;
-
-    container.innerHTML = `
-      <div style="background: ${configured.vision ? 'var(--color-success-bg)' : 'var(--color-warning-bg)'}; border: 1px solid ${configured.vision ? 'var(--color-success)' : 'var(--color-warning)'}; border-radius: var(--radius-sm); padding: 0.35rem 0.65rem; font-size: 0.75rem;">
-        <strong>Vision:</strong> ${configured.vision ? models.vision : 'Fallback Template'}
-      </div>
-      <div style="background: ${configured.reasoning ? 'var(--color-success-bg)' : 'var(--color-warning-bg)'}; border: 1px solid ${configured.reasoning ? 'var(--color-success)' : 'var(--color-warning)'}; border-radius: var(--radius-sm); padding: 0.35rem 0.65rem; font-size: 0.75rem;">
-        <strong>Reasoning:</strong> ${configured.reasoning ? models.reasoning : 'Deterministic Rules'}
-      </div>
-      <div style="background: ${configured.decision ? 'var(--color-success-bg)' : 'var(--color-warning-bg)'}; border: 1px solid ${configured.decision ? 'var(--color-success)' : 'var(--color-warning)'}; border-radius: var(--radius-sm); padding: 0.35rem 0.65rem; font-size: 0.75rem;">
-        <strong>Decision:</strong> ${configured.decision ? models.decision : 'Deterministic Heuristic'}
-      </div>
-    `;
-  } catch (err) {
-    container.innerHTML = `<span style="font-size: 0.8rem; color: var(--text-muted);">Status offline</span>`;
   }
 }
 

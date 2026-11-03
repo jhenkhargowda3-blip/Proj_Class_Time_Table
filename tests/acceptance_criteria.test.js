@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getDatabase } from '../src/db/connection.js';
+import { seedDatabase } from '../src/db/seed.js';
 import { generateTimetable } from '../src/services/scheduler.js';
 import { validateTimetable } from '../src/services/validator.js';
 import {
@@ -16,6 +17,10 @@ import {
 
 test('Acceptance Suite: Timetable Generation & Absence Substitution', async (t) => {
   const db = getDatabase();
+  seedDatabase(db);
+  t.after(() => {
+    seedDatabase(db);
+  });
 
   await t.test('1. Master-data validation: Validates working days and slots', () => {
     const totalSlots = db.prepare("SELECT COUNT(*) as cnt FROM time_slots WHERE is_break = 0").get().cnt;

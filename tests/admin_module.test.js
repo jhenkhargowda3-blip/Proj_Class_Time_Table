@@ -166,19 +166,4 @@ test('Phase 6: Admin Module (Master Data, Availability, Studio Drag & Drop, Vers
     db.prepare('DELETE FROM timetable_entries WHERE version_id = ?').run(data.versionId);
     db.prepare('DELETE FROM timetable_versions WHERE id = ?').run(data.versionId);
   });
-
-  await t.test('6. Export CSV generates valid downloadable CSV structure', async () => {
-    const activeVer = db.prepare("SELECT id FROM timetable_versions WHERE status = 'active' LIMIT 1").get();
-    assert.ok(activeVer);
-
-    const res = await fetch(`${baseUrl}/api/timetable/versions/${activeVer.id}/export.csv`, {
-      headers: { Authorization: `Bearer ${adminToken}` }
-    });
-
-    assert.strictEqual(res.status, 200);
-    assert.ok(res.headers.get('content-type').includes('text/csv'));
-    const text = await res.text();
-    assert.ok(text.startsWith('Day,Period,Start Time,End Time,Section,Subject Code'));
-    assert.ok(text.includes('CSE-4A'));
-  });
 });

@@ -365,7 +365,6 @@
             <button class="btn-secondary" id="btn-studio-regenerate" title="Regenerate alternative timetable or resolve conflicts">Regenerate</button>
             <button class="btn-secondary" id="btn-studio-activate" title="Publish and activate timetable so Faculty and Students see it immediately">Publish (Activate)</button>
             <button class="btn-secondary" id="btn-studio-duplicate">Duplicate</button>
-            <button class="btn-secondary" id="btn-studio-export">Export CSV</button>
             <button class="btn-secondary" id="btn-studio-export-pdf">Export PDF</button>
             <button class="btn-secondary" id="btn-studio-undo" title="Undo manual edit (Ctrl+Z)" disabled style="padding: 0.4rem 0.65rem; font-size: 0.85rem;">↺ Undo</button>
             <button class="btn-secondary" id="btn-studio-redo" title="Redo manual edit (Ctrl+Y)" disabled style="padding: 0.4rem 0.65rem; font-size: 0.85rem;">↻ Redo</button>
@@ -769,26 +768,6 @@
 
     <!-- 6. PANEL: AI INTELLIGENCE CENTER (Phases 10, 11, 12) -->
     <div id="panel-ai-center" class="admin-panel animate-fade-in" style="display: none;">
-      <!-- AI Engine Status Banner -->
-      <div class="card" style="margin-bottom: 1.5rem; background: linear-gradient(135deg, var(--color-brand-blush-soft) 0%, var(--bg-surface) 100%);">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-          <div>
-            <div style="font-size: 0.8rem; color: var(--color-brand-primary); font-weight: 700; text-transform: uppercase;">
-              Grok AI Architecture &amp; Deterministic Core
-            </div>
-            <h2 style="font-size: 1.85rem; color: var(--text-primary); margin: 0.25rem 0;">
-              AI Academic Operations Center
-            </h2>
-            <p style="font-size: 0.9rem; color: var(--text-secondary); max-width: 780px;">
-              Hard constraints are strictly verified by deterministic algorithms. Grok AI models provide visual schedule extraction, plain-English clash diagnosis, and ranked multi-objective decision support.
-            </p>
-          </div>
-          <div id="ai-model-status-pills" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-            <!-- Status badges inserted dynamically -->
-          </div>
-        </div>
-      </div>
-
       <!-- AI Sub Tabs -->
       <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
         <button class="btn-primary" data-ai-subtab="vision">📷 Vision Timetable Import (Phase 10)</button>

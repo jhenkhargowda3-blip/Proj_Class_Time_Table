@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert';
 import app from '../server.js';
-import { SEED_PASSWORDS } from '../src/db/seed.js';
+import { getDatabase } from '../src/db/connection.js';
+import { SEED_PASSWORDS, seedDatabase } from '../src/db/seed.js';
 
 let serverInstance;
 let baseUrl;
@@ -18,6 +19,8 @@ test.before(async () => {
 });
 
 test.after(async () => {
+  const db = getDatabase();
+  seedDatabase(db);
   if (serverInstance) {
     serverInstance.close();
   }

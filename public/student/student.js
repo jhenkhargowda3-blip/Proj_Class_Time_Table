@@ -2,7 +2,7 @@ import { apiRequest } from '/js/api.js';
 import { checkSession, logout } from '/js/auth.js';
 import { showToast } from '/js/toast.js';
 import { initSSE, onEvent } from '/js/sse.js';
-import { exportTimetableToPdf, printOrExportPdf, exportToIcs } from '/js/exportUtils.js';
+import { exportTimetableToPdf } from '/js/exportUtils.js';
 
 // Local date utilities to prevent timezone and UTC boundary shifts
 function getLocalDateString(d = new Date()) {
@@ -311,53 +311,7 @@ function setupControls() {
   // Render quick weekday shortcut chips
   renderQuickDayShortcuts();
 
-  // Export to PDF / Print Schedule
-  const triggerPdfOrPrint = () => {
-    if (!currentScheduleData || !currentScheduleData.fullWeeklySchedule) {
-      showToast('No schedule data loaded to print', 'warning');
-      return;
-    }
-
-    const days = [
-      { id: 1, day_name: 'Monday', day_index: 1 },
-      { id: 2, day_name: 'Tuesday', day_index: 2 },
-      { id: 3, day_name: 'Wednesday', day_index: 3 },
-      { id: 4, day_name: 'Thursday', day_index: 4 },
-      { id: 5, day_name: 'Friday', day_index: 5 },
-      { id: 6, day_name: 'Saturday', day_index: 6 }
-    ];
-
-    const slotMap = new Map();
-    (currentScheduleData.fullWeeklySchedule || []).forEach(e => {
-      if (!slotMap.has(e.slot_no)) {
-        slotMap.set(e.slot_no, {
-          id: e.slot_id,
-          slot_no: e.slot_no,
-          label: e.slot_label || `Period ${e.slot_no}`,
-          start_time: e.start_time,
-          end_time: e.end_time,
-          is_break: false
-        });
-      }
-    });
-
-    const slots = Array.from(slotMap.values()).sort((a, b) => a.slot_no - b.slot_no);
-    const sec = currentScheduleData.section || {};
-
-    printOrExportPdf({
-      title: `Student Timetable · Section ${sec.name || 'General'}`,
-      subtitle: `${sec.department_name || ''} · Semester ${sec.semester || ''} · Academic Year 2026`,
-      meta: {
-        'Section': sec.name || 'N/A',
-        'Department': sec.department_name || 'N/A',
-        'Total Weekly Periods': `${(currentScheduleData.fullWeeklySchedule || []).length} classes`
-      },
-      days,
-      slots,
-      entries: currentScheduleData.fullWeeklySchedule || []
-    });
-  };
-
+  // Export to PDF
   const exportStudentPdf = async () => {
     if (!currentScheduleData) {
       showToast('No schedule data available to export', 'warning');
@@ -408,13 +362,11 @@ function setupControls() {
       showToast('Timetable PDF generated and downloaded', 'success');
     } catch (err) {
       console.error('PDF export failed:', err);
-      showToast('Opening fallback print preview...', 'warning');
-      triggerPdfOrPrint();
+      showToast('Failed to generate timetable PDF', 'error');
     }
   };
 
   document.getElementById('btn-student-export-pdf')?.addEventListener('click', exportStudentPdf);
-  document.getElementById('btn-student-print-schedule')?.addEventListener('click', triggerPdfOrPrint);
 
   // Student avatar profile and separate real-time notification bell click handlers
   const bellBtn = document.getElementById('btn-student-notices');
@@ -947,7 +899,7 @@ function renderNoticeCardHtml(notice, todayStr, tomorrowStr) {
         </span>
       </div>
       <div class="notice-card-title">${notice.title}</div>
-      <div style="font-size: 0.76rem; font-weight: 600; color: var(--color-brand-primary); margin-bottom: 0.25rem;">
+      <div class="notice-card-subtitle">
         ${notice.subtitle || ''} ${notice.roomName ? `· Room ${notice.roomName}` : ''}
       </div>
       <div class="notice-card-body">
@@ -983,10 +935,10 @@ function renderNoticesPopoverList() {
     container.innerHTML = `
       <div class="notices-empty-state">
         <span class="notices-empty-icon">✅</span>
-        <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary); margin-bottom: 0.3rem;">
+        <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary); margin-bottom: 0.3rem; white-space: normal; overflow-wrap: anywhere; word-break: break-word;">
           All Classes As Scheduled
         </div>
-        <div style="font-size: 0.8rem; line-height: 1.45; color: var(--text-muted); max-width: 300px; margin: 0 auto;">
+        <div style="font-size: 0.8rem; line-height: 1.45; color: var(--text-muted); max-width: 300px; margin: 0 auto; white-space: normal; overflow-wrap: anywhere; word-break: break-word;">
           There are no upcoming teacher absences or substitute notices for your section. Real-time updates will appear here automatically.
         </div>
       </div>
@@ -1007,7 +959,7 @@ function renderNoticesPopoverList() {
         <div class="notice-category-header">
           <div class="notice-category-title-wrap">
             <span class="notice-category-icon">${group.icon}</span>
-            <span>${group.title}</span>
+            <span style="min-width: 0;">${group.title}</span>
             <span class="notice-category-count-badge" title="${group.items.length} total in this category">${group.items.length}</span>
           </div>
           ${unreadCount > 0 ? `
@@ -1016,7 +968,7 @@ function renderNoticesPopoverList() {
             <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 600;">All read</span>
           `}
         </div>
-        <div style="display: flex; flex-direction: column; gap: 0.65rem;">
+        <div style="display: flex; flex-direction: column; gap: 0.65rem; min-width: 0; width: 100%;">
           ${cardsHtml}
         </div>
       </div>
@@ -1056,6 +1008,39 @@ function renderNoticesPopoverList() {
 }
 
 /**
+ * Ensures the anchored popover stays fully visible within viewport horizontal bounds
+ */
+function adjustNoticesPopoverViewportPosition() {
+  const popover = document.getElementById('student-notices-popover');
+  if (!popover || !noticesPopoverOpen) return;
+
+  popover.style.right = '0px';
+  popover.style.left = 'auto';
+
+  const vw = document.documentElement.clientWidth || window.innerWidth;
+  const margin = 8;
+  const rect = popover.getBoundingClientRect();
+
+  let rightOffset = 0;
+  if (rect.right > vw - margin) {
+    rightOffset += rect.right - (vw - margin);
+    popover.style.right = `${rightOffset}px`;
+  }
+
+  const updatedRect = popover.getBoundingClientRect();
+  if (updatedRect.left < margin) {
+    rightOffset -= margin - updatedRect.left;
+    popover.style.right = `${rightOffset}px`;
+  }
+}
+
+window.addEventListener('resize', () => {
+  if (noticesPopoverOpen) {
+    adjustNoticesPopoverViewportPosition();
+  }
+});
+
+/**
  * Toggle the interactive notices popover drawer
  */
 function toggleNoticesPopover(forceState = null) {
@@ -1069,6 +1054,7 @@ function toggleNoticesPopover(forceState = null) {
   if (noticesPopoverOpen) {
     renderNoticesPopoverList();
     popover.style.display = 'flex';
+    adjustNoticesPopoverViewportPosition();
     if (bellBtn) bellBtn.setAttribute('aria-expanded', 'true');
   } else {
     popover.style.display = 'none';

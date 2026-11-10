@@ -998,6 +998,372 @@ function setupMasterDataTools() {
 
   document.getElementById('btn-admin-backup-json')?.addEventListener('click', handleBackupDownload);
   document.getElementById('btn-overview-backup-json')?.addEventListener('click', handleBackupDownload);
+
+  // 3. Timetable JSON Import & Undo Subsystem
+  setupTimetableImportTools();
+}
+
+let pendingImportPayload = null;
+
+function parseClientTimeMinutes(tStr) {
+  if (!tStr) return 0;
+  const parts = String(tStr).trim().split(':');
+  let h = parseInt(parts[0], 10) || 0;
+  const m = parseInt(parts[1] || '0', 10) || 0;
+  // Afternoon 12-hour format e.g. 1:30 -> 13:30
+  if (h >= 1 && h <= 6) h += 12;
+  return h * 60 + m;
+}
+
+function normalizeClientDayCode(day) {
+  if (!day) return 'MON';
+  const d = String(day).trim().toUpperCase();
+  if (d.startsWith('MON')) return 'MON';
+  if (d.startsWith('TUE')) return 'TUE';
+  if (d.startsWith('WED')) return 'WED';
+  if (d.startsWith('THU')) return 'THU';
+  if (d.startsWith('FRI')) return 'FRI';
+  if (d.startsWith('SAT')) return 'SAT';
+  if (d.startsWith('SUN')) return 'SUN';
+  return d;
+}
+
+function checkClientSessionsOverlap(s1, s2) {
+  if (s1.period_start != null && s2.period_start != null) {
+    const p1s = Number(s1.period_start);
+    const p1e = Number(s1.period_end ?? s1.period_start);
+    const p2s = Number(s2.period_start);
+    const p2e = Number(s2.period_end ?? s2.period_start);
+    return Math.max(p1s, p2s) <= Math.min(p1e, p2e);
+  }
+  if (s1.start && s1.end && s2.start && s2.end) {
+    const start1 = parseClientTimeMinutes(s1.start);
+    const end1 = parseClientTimeMinutes(s1.end);
+    const start2 = parseClientTimeMinutes(s2.start);
+    const end2 = parseClientTimeMinutes(s2.end);
+    return start1 < end2 && start2 < end1;
+  }
+  return false;
+}
+
+function validateTimetableClient(data) {
+  const errors = [];
+  const warnings = [];
+
+  const faculty = Array.isArray(data.faculty) ? data.faculty : [];
+  const subjects = Array.isArray(data.subjects) ? data.subjects : [];
+  const sessions = Array.isArray(data.sessions) ? data.sessions : [];
+  const breaks = Array.isArray(data.breaks) && data.breaks.length > 0 ? data.breaks : [
+    { name: 'Tea Break', start: '10:30', end: '10:45' },
+    { name: 'Lunch Break', start: '12:45', end: '13:30' }
+  ];
+
+  const knownFacultyIds = new Set(faculty.map(f => String(f.id)));
+  (masterData?.faculty || []).forEach(f => knownFacultyIds.add(String(f.id)));
+
+  // 1. Duplicate session ID check
+  const seenIds = new Set();
+  sessions.forEach(sess => {
+    const sId = String(sess.id ?? '');
+    if (!sId) {
+      errors.push('A session is missing a required "id" attribute.');
+    } else if (seenIds.has(sId)) {
+      errors.push(`Duplicate session id '${sId}' found in import file.`);
+    } else {
+      seenIds.add(sId);
+    }
+  });
+
+  // 2. Unknown faculty_id check
+  sessions.forEach(sess => {
+    const facId = sess.faculty_id != null ? String(sess.faculty_id) : '';
+    if (!facId) {
+      errors.push(`Session '${sess.id || '?'}' has no faculty_id specified.`);
+    } else if (!knownFacultyIds.has(facId)) {
+      errors.push(`Session '${sess.id}' references unknown faculty_id: '${sess.faculty_id}'.`);
+    }
+  });
+
+  // 3. Faculty overlapping sessions on same day
+  for (let i = 0; i < sessions.length; i++) {
+    for (let j = i + 1; j < sessions.length; j++) {
+      const s1 = sessions[i];
+      const s2 = sessions[j];
+      if (s1.faculty_id != null && s2.faculty_id != null && String(s1.faculty_id) === String(s2.faculty_id)) {
+        if (normalizeClientDayCode(s1.day) === normalizeClientDayCode(s2.day)) {
+          if (checkClientSessionsOverlap(s1, s2)) {
+            const fac = faculty.find(f => String(f.id) === String(s1.faculty_id)) || (masterData?.faculty || []).find(f => String(f.id) === String(s1.faculty_id));
+            const facName = fac ? fac.name : `ID ${s1.faculty_id}`;
+            errors.push(`Faculty "${facName}" has overlapping sessions on ${s1.day}: Session '${s1.id}' (${s1.subject || ''} ${s1.start || 'P' + s1.period_start}-${s1.end || 'P' + s1.period_end}) overlaps with Session '${s2.id}' (${s2.subject || ''} ${s2.start || 'P' + s2.period_start}-${s2.end || 'P' + s2.period_end}).`);
+          }
+        }
+      }
+    }
+  }
+
+  // 4. Warnings: Break overlap
+  sessions.forEach(sess => {
+    if (sess.start && sess.end) {
+      const sStart = parseClientTimeMinutes(sess.start);
+      const sEnd = parseClientTimeMinutes(sess.end);
+      breaks.forEach(brk => {
+        const bStart = parseClientTimeMinutes(brk.start);
+        const bEnd = parseClientTimeMinutes(brk.end);
+        if (sStart < bEnd && bStart < sEnd) {
+          warnings.push(`Session '${sess.id}' (${sess.subject || 'Class'} on ${sess.day} ${sess.start}-${sess.end}) falls during scheduled ${brk.name || 'Break'} (${brk.start}-${brk.end}).`);
+        }
+      });
+    }
+  });
+
+  // 5. Warnings: Holiday overlap
+  const holidays = masterData?.holidays || [];
+  if (holidays.length > 0) {
+    sessions.forEach(sess => {
+      if (sess.date) {
+        const hol = holidays.find(h => h.date === sess.date);
+        if (hol) {
+          warnings.push(`Session '${sess.id}' falls on scheduled holiday: ${hol.name} (${hol.date}).`);
+        }
+      }
+    });
+  }
+
+  // 6. Warnings: Same semester + batch has two different subjects at same time
+  for (let i = 0; i < sessions.length; i++) {
+    for (let j = i + 1; j < sessions.length; j++) {
+      const s1 = sessions[i];
+      const s2 = sessions[j];
+      if (s1.semester != null && s2.semester != null && Number(s1.semester) === Number(s2.semester)) {
+        if (normalizeClientDayCode(s1.day) === normalizeClientDayCode(s2.day)) {
+          const sameBatch = (s1.batch && s2.batch && String(s1.batch).trim().toLowerCase() === String(s2.batch).trim().toLowerCase()) ||
+                            (!s1.batch && !s2.batch && (!s1.section || !s2.section || String(s1.section) === String(s2.section)));
+          if (sameBatch && String(s1.subject || '').trim() !== String(s2.subject || '').trim()) {
+            if (checkClientSessionsOverlap(s1, s2)) {
+              warnings.push(`Semester ${s1.semester}${s1.batch ? ' (Batch ' + s1.batch + ')' : ''} has two different subjects ('${s1.subject}' and '${s2.subject}') scheduled at the same time on ${s1.day} (${s1.start || 'P' + s1.period_start} - ${s1.end || 'P' + s1.period_end}).`);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    errors,
+    warnings,
+    counts: {
+      faculty: faculty.length,
+      subjects: subjects.length,
+      sessions: sessions.length
+    }
+  };
+}
+
+function updateUndoButtonState(canUndo) {
+  const btnUndo = document.getElementById('btn-admin-undo-import');
+  if (btnUndo) {
+    btnUndo.style.display = canUndo ? 'inline-block' : 'none';
+  }
+}
+
+function setupTimetableImportTools() {
+  const btnImport = document.getElementById('btn-admin-import-json');
+  const fileInput = document.getElementById('import-json-file-input');
+  const modal = document.getElementById('modal-import-preview');
+  const btnCloseX = document.getElementById('btn-close-import-preview-x');
+  const btnCancel = document.getElementById('btn-cancel-import-preview');
+  const btnConfirm = document.getElementById('btn-confirm-import-json');
+  const btnUndo = document.getElementById('btn-admin-undo-import');
+
+  // Trigger file chooser
+  btnImport?.addEventListener('click', () => {
+    if (fileInput) {
+      fileInput.value = '';
+      fileInput.click();
+    }
+  });
+
+  // Handle file selection
+  fileInput?.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.json') && file.type !== 'application/json') {
+      showToast('Please select a valid JSON file (ctas_timetable_import.json)', 'warning');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target.result);
+        if (!json || typeof json !== 'object') {
+          throw new Error('Parsed JSON is not an object.');
+        }
+
+        pendingImportPayload = json;
+
+        // Perform client-side validation
+        const val = validateTimetableClient(json);
+
+        // Update preview UI
+        const filenameEl = document.getElementById('import-preview-filename');
+        const filesizeEl = document.getElementById('import-preview-filesize');
+        const facCountEl = document.getElementById('import-preview-faculty-count');
+        const subCountEl = document.getElementById('import-preview-subjects-count');
+        const sessCountEl = document.getElementById('import-preview-sessions-count');
+        const bannerEl = document.getElementById('import-preview-status-banner');
+        const errSec = document.getElementById('import-preview-errors-section');
+        const errCountEl = document.getElementById('import-preview-errors-count');
+        const errListEl = document.getElementById('import-preview-errors-list');
+        const warnSec = document.getElementById('import-preview-warnings-section');
+        const warnCountEl = document.getElementById('import-preview-warnings-count');
+        const warnListEl = document.getElementById('import-preview-warnings-list');
+        const actionStatusEl = document.getElementById('import-preview-action-status');
+
+        if (filenameEl) filenameEl.textContent = file.name;
+        if (filesizeEl) filesizeEl.textContent = `${(file.size / 1024).toFixed(1)} KB`;
+        if (facCountEl) facCountEl.textContent = val.counts.faculty;
+        if (subCountEl) subCountEl.textContent = val.counts.subjects;
+        if (sessCountEl) sessCountEl.textContent = val.counts.sessions;
+
+        // Errors display
+        if (val.errors.length > 0) {
+          if (errSec) errSec.style.display = 'block';
+          if (errCountEl) errCountEl.textContent = val.errors.length;
+          if (errListEl) {
+            errListEl.innerHTML = val.errors.map(err => `<li style="margin-bottom: 0.35rem;">${escapeHtml(err)}</li>`).join('');
+          }
+          if (bannerEl) {
+            bannerEl.style.display = 'flex';
+            bannerEl.innerHTML = `<div style="background: rgba(225, 29, 72, 0.12); color: var(--color-error); font-weight: 600; padding: 0.65rem 0.85rem; border-radius: 6px; width: 100%;">🚫 Import Blocked: ${val.errors.length} constraint violation${val.errors.length > 1 ? 's' : ''} found. Please resolve conflicting sessions or unknown faculty before importing.</div>`;
+          }
+          if (btnConfirm) {
+            btnConfirm.disabled = true;
+            btnConfirm.style.opacity = '0.5';
+            btnConfirm.style.cursor = 'not-allowed';
+            btnConfirm.title = 'Resolve blocking errors to proceed';
+          }
+          if (actionStatusEl) actionStatusEl.textContent = 'Import blocked due to validation errors.';
+        } else {
+          if (errSec) errSec.style.display = 'none';
+          if (btnConfirm) {
+            btnConfirm.disabled = false;
+            btnConfirm.style.opacity = '1';
+            btnConfirm.style.cursor = 'pointer';
+            btnConfirm.title = 'Confirm and apply timetable data';
+          }
+          if (val.warnings.length > 0) {
+            if (bannerEl) {
+              bannerEl.style.display = 'flex';
+              bannerEl.innerHTML = `<div style="background: rgba(245, 158, 11, 0.12); color: #d97706; font-weight: 600; padding: 0.65rem 0.85rem; border-radius: 6px; width: 100%;">⚠️ Validation Passed with ${val.warnings.length} warning${val.warnings.length > 1 ? 's' : ''}. Timetable data is ready to import.</div>`;
+            }
+            if (actionStatusEl) actionStatusEl.textContent = 'Ready to import. Click "Confirm Import" to save.';
+          } else {
+            if (bannerEl) {
+              bannerEl.style.display = 'flex';
+              bannerEl.innerHTML = `<div style="background: rgba(16, 185, 129, 0.12); color: #059669; font-weight: 600; padding: 0.65rem 0.85rem; border-radius: 6px; width: 100%;">✅ Validation Passed: 0 conflicts detected. All faculty, subjects, and sessions are verified.</div>`;
+            }
+            if (actionStatusEl) actionStatusEl.textContent = 'All constraints verified. Click "Confirm Import" to proceed.';
+          }
+        }
+
+        // Warnings display
+        if (val.warnings.length > 0) {
+          if (warnSec) warnSec.style.display = 'block';
+          if (warnCountEl) warnCountEl.textContent = val.warnings.length;
+          if (warnListEl) {
+            warnListEl.innerHTML = val.warnings.map(warn => `<li style="margin-bottom: 0.35rem;">${escapeHtml(warn)}</li>`).join('');
+          }
+        } else {
+          if (warnSec) warnSec.style.display = 'none';
+        }
+
+        // Open modal
+        if (modal) modal.style.display = 'flex';
+      } catch (err) {
+        showToast('Failed to parse timetable JSON: ' + err.message, 'error');
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  // Close preview modal
+  const closeModal = () => {
+    if (modal) modal.style.display = 'none';
+    if (fileInput) fileInput.value = '';
+    pendingImportPayload = null;
+  };
+  btnCloseX?.addEventListener('click', closeModal);
+  btnCancel?.addEventListener('click', closeModal);
+
+  // Confirm Import
+  btnConfirm?.addEventListener('click', async () => {
+    if (!pendingImportPayload) {
+      showToast('No timetable payload selected to import', 'warning');
+      return;
+    }
+
+    try {
+      btnConfirm.disabled = true;
+      btnConfirm.textContent = 'Importing...';
+      showToast('Importing timetable data and updating master records...', 'info');
+
+      const res = await apiRequest('/api/admin/import-timetable', 'POST', { data: pendingImportPayload });
+
+      showToast(`Import completed! Loaded ${res.stats?.faculty || 0} faculty, ${res.stats?.subjects || 0} subjects, ${res.stats?.sessions || 0} timetable classes.`, 'success');
+      closeModal();
+      updateUndoButtonState(res.canUndo);
+
+      // Refresh master data, overview statistics, and timetable studio
+      await loadMasterData();
+      await loadOverview();
+      if (typeof window.loadStudio === 'function') {
+        await window.loadStudio();
+      }
+    } catch (err) {
+      showToast('Import failed: ' + (err.message || 'Error'), 'error');
+    } finally {
+      btnConfirm.disabled = false;
+      btnConfirm.textContent = 'Confirm Import';
+    }
+  });
+
+  // Undo Last Import
+  btnUndo?.addEventListener('click', async () => {
+    const ok = await showAppConfirm({
+      title: 'Undo Last Timetable Import',
+      message: 'Are you sure you want to revert the last timetable import? This will restore all faculty, curriculum subjects, sections, and timetable classes back to their exact state prior to the import.',
+      okText: 'Undo Import',
+      danger: true
+    });
+    if (!ok) return;
+
+    try {
+      showToast('Reverting to pre-import snapshot...', 'info');
+      const res = await apiRequest('/api/admin/undo-import', 'POST');
+      showToast(res.message || 'Import undone successfully.', 'success');
+      updateUndoButtonState(res.canUndo);
+
+      // Refresh views
+      await loadMasterData();
+      await loadOverview();
+      if (typeof window.loadStudio === 'function') {
+        await window.loadStudio();
+      }
+    } catch (err) {
+      showToast('Failed to undo import: ' + (err.message || 'Error'), 'error');
+    }
+  });
+
+  // Check initial undo status on load
+  apiRequest('/api/admin/undo-status')
+    .then(status => {
+      if (status && status.canUndo) {
+        updateUndoButtonState(true);
+      }
+    })
+    .catch(() => {});
 }
 
 export function filterFacultyList(facultyList = [], rawQuery = '', deptFilter = '') {
@@ -1086,11 +1452,14 @@ function renderFacultyTable(facultyList = masterData?.faculty || []) {
 
   facTable.innerHTML = facultyList.map(f => `
     <tr class="faculty-row" data-faculty-id="${f.id}" data-faculty-name="${escapeHtml(f.name || '')}" data-faculty-dept="${escapeHtml((f.department_code || '') + ' ' + (f.department_name || ''))}" data-faculty-email="${escapeHtml(f.email || '')}" style="border-bottom: 1px solid var(--border-subtle);">
-      <td style="padding: 0.6rem 0.75rem; font-weight: 600;">${escapeHtml(f.name || '—')}</td>
-      <td style="padding: 0.6rem 0.75rem;">${f.department_code ? `<span style="background: var(--bg-surface-subtle); padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 600;">${escapeHtml(f.department_code)}</span>` : ''} ${escapeHtml(f.department_name || '—')}</td>
-      <td style="padding: 0.6rem 0.75rem;">${escapeHtml(f.email || '—')}</td>
-      <td style="padding: 0.6rem 0.75rem;">${escapeHtml(f.phone || '—')}</td>
-      <td style="padding: 0.6rem 0.75rem;" class="tabular-nums">${f.max_periods_per_day ?? 4} / day · ${f.max_periods_per_week ?? 18} / wk</td>
+      <td style="padding: 0.6rem 0.75rem; font-weight: 600;">
+        ${escapeHtml(f.name || '-')}
+        ${f.classes_taught ? `<div style="font-size: 0.72rem; color: var(--text-muted); font-weight: normal;">Classes: ${escapeHtml(f.classes_taught)}</div>` : ''}
+      </td>
+      <td style="padding: 0.6rem 0.75rem;">${f.department_code ? `<span style="background: var(--bg-surface-subtle); padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 600;">${escapeHtml(f.department_code)}</span>` : ''} ${escapeHtml(f.department_name || '-')}</td>
+      <td style="padding: 0.6rem 0.75rem;">${escapeHtml(f.email || '-')}</td>
+      <td style="padding: 0.6rem 0.75rem;">${escapeHtml(f.phone || '-')}</td>
+      <td style="padding: 0.6rem 0.75rem;" class="tabular-nums">${f.max_periods_per_day ?? 4} / day · ${f.max_periods_per_week ?? 18} / wk ${f.weekly_hours != null ? `(${f.weekly_hours} hrs)` : ''}</td>
       <td style="padding: 0.6rem 0.75rem; text-align: right;">
         <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editFaculty(${f.id})">Edit</button>
         <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteFaculty(${f.id})">Delete</button>
@@ -1142,12 +1511,12 @@ function renderMasterDataTables() {
     } else {
       subTable.innerHTML = masterData.subjects.map(s => `
         <tr style="border-bottom: 1px solid var(--border-subtle);">
-          <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--color-brand-primary);">${s.code}</td>
-          <td style="padding: 0.6rem 0.75rem; font-weight: 600;">${s.name}</td>
-          <td style="padding: 0.6rem 0.75rem;">${s.department_code}</td>
-          <td style="padding: 0.6rem 0.75rem;">Sem ${s.semester}</td>
-          <td style="padding: 0.6rem 0.75rem;"><span style="text-transform: capitalize; background: var(--bg-surface-subtle); padding: 0.15rem 0.45rem; border-radius: 4px;">${s.type}</span> ${s.type === 'lab' ? `(${s.lab_block_length}p block)` : ''}</td>
-          <td style="padding: 0.6rem 0.75rem;" class="tabular-nums">${s.weekly_periods} periods</td>
+          <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--color-brand-primary);">${s.code || '-'}</td>
+          <td style="padding: 0.6rem 0.75rem; font-weight: 600;">${s.name || '-'}</td>
+          <td style="padding: 0.6rem 0.75rem;">${s.department_code || '-'}</td>
+          <td style="padding: 0.6rem 0.75rem;">${s.semester != null ? 'Sem ' + s.semester : '-'}</td>
+          <td style="padding: 0.6rem 0.75rem;"><span style="text-transform: capitalize; background: var(--bg-surface-subtle); padding: 0.15rem 0.45rem; border-radius: 4px;">${s.type || '-'}</span> ${s.type === 'lab' ? `(${s.lab_block_length || 2}p block)` : ''}</td>
+          <td style="padding: 0.6rem 0.75rem;" class="tabular-nums">${s.weekly_periods != null ? s.weekly_periods + ' periods' : '-'}</td>
           <td style="padding: 0.6rem 0.75rem; text-align: right;">
             <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editSubject(${s.id})">Edit</button>
             <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteSubject(${s.id})">Delete</button>
@@ -1171,9 +1540,9 @@ function renderMasterDataTables() {
     } else {
       roomTable.innerHTML = masterData.rooms.map(r => `
         <tr style="border-bottom: 1px solid var(--border-subtle);">
-          <td style="padding: 0.6rem 0.75rem; font-weight: 600;">${r.name}</td>
-          <td style="padding: 0.6rem 0.75rem;"><span style="text-transform: capitalize; background: var(--bg-surface-subtle); padding: 0.15rem 0.45rem; border-radius: 4px;">${r.type}</span></td>
-          <td style="padding: 0.6rem 0.75rem;" class="tabular-nums">${r.capacity} seats</td>
+          <td style="padding: 0.6rem 0.75rem; font-weight: 600;">${r.name || '-'}</td>
+          <td style="padding: 0.6rem 0.75rem;"><span style="text-transform: capitalize; background: var(--bg-surface-subtle); padding: 0.15rem 0.45rem; border-radius: 4px;">${r.type || '-'}</span></td>
+          <td style="padding: 0.6rem 0.75rem;" class="tabular-nums">${r.capacity != null ? r.capacity + ' seats' : '-'}</td>
           <td style="padding: 0.6rem 0.75rem;"><span style="color: var(--color-success); font-weight: 600;">● Active</span></td>
           <td style="padding: 0.6rem 0.75rem; text-align: right;">
             <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editRoom(${r.id})">Edit</button>

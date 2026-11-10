@@ -566,6 +566,9 @@
             <button class="btn-secondary" id="btn-add-holiday" onclick="window.openHolidayModal()">+ Add Holiday</button>
             <button class="btn-secondary" id="btn-add-department" onclick="window.openDepartmentModal()">+ Add Department</button>
             <button class="btn-secondary" id="btn-admin-backup-json" title="Download snapshot of entire database configuration (JSON)">💾 Backup System (JSON)</button>
+            <button class="btn-secondary" id="btn-admin-import-json" title="Import timetable data from JSON (ctas_timetable_import.json)">📥 Import Timetable (JSON)</button>
+            <button class="btn-secondary" id="btn-admin-undo-import" title="Undo the last timetable import" style="display: none; color: var(--color-warning);">↩️ Undo last import</button>
+            <input type="file" id="import-json-file-input" accept=".json,application/json" style="display: none;">
           </div>
         </div>
 
@@ -1343,6 +1346,104 @@
         <div style="display: flex; gap: 0.5rem;">
           <button type="button" class="btn-secondary" id="btn-close-drilldown">Close</button>
           <button type="button" class="btn-primary" id="btn-drilldown-action">Manage Resource &rarr;</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL: Import Timetable (JSON) Preview & Validation -->
+  <div id="modal-import-preview" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(5px); padding: 1rem;">
+    <div class="card" style="max-width: 680px; width: 100%; max-height: 90vh; border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6); padding: 1.5rem; background: var(--bg-surface); border: 1px solid var(--border-subtle); display: flex; flex-direction: column; overflow: hidden; animation: fadeIn 0.15s ease-out;">
+      
+      <!-- Modal Header -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-subtle);">
+        <div>
+          <h3 style="margin: 0; font-size: 1.3rem; color: var(--color-brand-primary); font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+            <span>📥</span> Preview Timetable Import
+          </h3>
+          <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: var(--text-secondary);" id="import-preview-subtitle">
+            Validating timetable data against scheduling and integrity constraints.
+          </p>
+        </div>
+        <button type="button" id="btn-close-import-preview-x" style="background: none; border: none; font-size: 1.5rem; color: var(--text-muted); cursor: pointer; line-height: 1; padding: 0.2rem;" aria-label="Close modal">&times;</button>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div style="flex: 1; overflow-y: auto; padding-right: 0.25rem; display: flex; flex-direction: column; gap: 1rem;">
+        
+        <!-- File Metadata & Counts -->
+        <div style="background: var(--bg-surface-subtle); padding: 0.75rem 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Selected File</div>
+            <div style="font-size: 0.9rem; font-weight: 700; color: var(--text-primary); word-break: break-all;" id="import-preview-filename">ctas_timetable_import.json</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);" id="import-preview-filesize">0 KB</div>
+          </div>
+          <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+            <div style="text-align: center; background: var(--bg-surface); padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); min-width: 75px;">
+              <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600;">Faculty</div>
+              <div style="font-size: 1.15rem; font-weight: 700; color: var(--color-brand-primary);" id="import-preview-faculty-count">0</div>
+            </div>
+            <div style="text-align: center; background: var(--bg-surface); padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); min-width: 75px;">
+              <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600;">Subjects</div>
+              <div style="font-size: 1.15rem; font-weight: 700; color: #10b981;" id="import-preview-subjects-count">0</div>
+            </div>
+            <div style="text-align: center; background: var(--bg-surface); padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); min-width: 75px;">
+              <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600;">Sessions</div>
+              <div style="font-size: 1.15rem; font-weight: 700; color: #3b82f6;" id="import-preview-sessions-count">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Validation Status Banner -->
+        <div id="import-preview-status-banner" style="padding: 0.75rem 1rem; border-radius: var(--radius-md); font-size: 0.88rem; display: flex; align-items: flex-start; gap: 0.6rem;">
+          <!-- Dynamically filled with success / error / warning status -->
+        </div>
+
+        <!-- Blocking Errors Section -->
+        <div id="import-preview-errors-section" style="display: none;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
+            <div style="font-size: 0.82rem; font-weight: 700; color: var(--color-error); display: flex; align-items: center; gap: 0.35rem;">
+              <span>🚫</span> Blocking Errors (<span id="import-preview-errors-count">0</span>)
+            </div>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Must be fixed before import can proceed</span>
+          </div>
+          <div style="background: rgba(225, 29, 72, 0.08); border: 1px solid rgba(225, 29, 72, 0.25); border-radius: var(--radius-md); padding: 0.75rem; max-height: 180px; overflow-y: auto;">
+            <ul id="import-preview-errors-list" style="margin: 0; padding-left: 1.25rem; font-size: 0.82rem; color: var(--text-primary); line-height: 1.5;">
+              <!-- Dynamic error items -->
+            </ul>
+          </div>
+        </div>
+
+        <!-- Warnings Section -->
+        <div id="import-preview-warnings-section" style="display: none;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
+            <div style="font-size: 0.82rem; font-weight: 700; color: var(--color-warning); display: flex; align-items: center; gap: 0.35rem;">
+              <span>⚠️</span> Warnings (<span id="import-preview-warnings-count">0</span>)
+            </div>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Non-blocking: break, holiday, or batch overlap notes</span>
+          </div>
+          <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: var(--radius-md); padding: 0.75rem; max-height: 160px; overflow-y: auto;">
+            <ul id="import-preview-warnings-list" style="margin: 0; padding-left: 1.25rem; font-size: 0.82rem; color: var(--text-primary); line-height: 1.5;">
+              <!-- Dynamic warning items -->
+            </ul>
+          </div>
+        </div>
+
+        <!-- Snapshot & Safety Notice -->
+        <div style="font-size: 0.78rem; color: var(--text-muted); background: var(--bg-surface-subtle); padding: 0.6rem 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 0.5rem;">
+          <span style="font-size: 1rem;">🛡️</span>
+          <span>A pre-import snapshot will be saved automatically. You can revert this import anytime using <strong>"Undo last import"</strong>.</span>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; margin-top: 1rem; padding-top: 0.85rem; border-top: 1px solid var(--border-subtle); flex-wrap: wrap;">
+        <span style="font-size: 0.8rem; color: var(--text-secondary);" id="import-preview-action-status">Review details and confirm import.</span>
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="button" class="btn-secondary" id="btn-cancel-import-preview">Cancel</button>
+          <button type="button" class="btn-primary" id="btn-confirm-import-json" style="padding: 0.5rem 1.25rem; font-weight: 600;">Confirm Import</button>
         </div>
       </div>
 

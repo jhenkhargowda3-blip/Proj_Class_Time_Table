@@ -37,6 +37,29 @@ export function initSchema(db) {
     const schemaSql = fs.readFileSync(schemaPath, 'utf8');
     db.exec(schemaSql);
   }
+
+  // Ensure faculty table supports extended fields from JSON import
+  try {
+    const facultyCols = db.prepare("PRAGMA table_info(faculty)").all().map(c => c.name);
+    if (!facultyCols.includes('classes_taught')) {
+      db.exec("ALTER TABLE faculty ADD COLUMN classes_taught TEXT NULL");
+    }
+    if (!facultyCols.includes('effective_from')) {
+      db.exec("ALTER TABLE faculty ADD COLUMN effective_from TEXT NULL");
+    }
+    if (!facultyCols.includes('weekly_hours')) {
+      db.exec("ALTER TABLE faculty ADD COLUMN weekly_hours INTEGER NULL");
+    }
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS import_snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        snapshot_json TEXT NOT NULL
+      )
+    `);
+  } catch (err) {
+    // ignore migration error if already exists
+  }
 }
 
 export function closeDatabase() {

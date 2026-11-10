@@ -2163,24 +2163,33 @@ function populateStudioEntitySelector() {
   if (!entitySelector || !masterData) return;
 
   if (studioMode === 'section') {
-    entitySelector.innerHTML = (masterData.sections || []).map(s => `
-      <option value="${s.id}">Section: ${s.name} (Sem ${s.semester})</option>
-    `).join('');
+    if (!masterData.sections || masterData.sections.length === 0) {
+      entitySelector.innerHTML = '<option value="">Add a section in Master Data to start building a timetable.</option>';
+    } else {
+      entitySelector.innerHTML = masterData.sections.map(s => `
+        <option value="${s.id}">Section: ${s.name} (Sem ${s.semester})</option>
+      `).join('');
+    }
   } else if (studioMode === 'faculty') {
     if (!masterData.faculty || masterData.faculty.length === 0) {
       entitySelector.innerHTML = '<option value="">No faculty added yet</option>';
     } else {
       entitySelector.innerHTML = masterData.faculty.map(f => `
-        <option value="${f.id}">Faculty: ${f.name} (${f.department_code})</option>
+        <option value="${f.id}">Faculty: ${f.name} (${f.department_code || 'CSE'})</option>
       `).join('');
     }
   } else if (studioMode === 'room') {
-    entitySelector.innerHTML = (masterData.rooms || []).map(r => `
-      <option value="${r.id}">Room: ${r.name} (${r.type})</option>
-    `).join('');
+    if (!masterData.rooms || masterData.rooms.length === 0) {
+      entitySelector.innerHTML = '<option value="">No rooms added yet</option>';
+    } else {
+      entitySelector.innerHTML = (masterData.rooms || []).map(r => `
+        <option value="${r.id}">Room: ${r.name} (${r.type})</option>
+      `).join('');
+    }
   }
 
-  studioEntityId = parseInt(entitySelector.value, 10);
+  const parsedVal = parseInt(entitySelector.value, 10);
+  studioEntityId = isNaN(parsedVal) ? null : parsedVal;
 }
 
 async function loadStudioVersion(versionId) {
@@ -2221,11 +2230,11 @@ function renderStudioGrid() {
   // Filter entries based on studioMode
   let filteredEntries = [];
   if (studioMode === 'section') {
-    filteredEntries = entries.filter(e => e.section_id === studioEntityId);
+    filteredEntries = studioEntityId ? entries.filter(e => e.section_id === studioEntityId) : [];
   } else if (studioMode === 'faculty') {
-    filteredEntries = entries.filter(e => e.faculty_id === studioEntityId);
+    filteredEntries = studioEntityId ? entries.filter(e => e.faculty_id === studioEntityId) : [];
   } else if (studioMode === 'room') {
-    filteredEntries = entries.filter(e => e.room_id === studioEntityId);
+    filteredEntries = studioEntityId ? entries.filter(e => e.room_id === studioEntityId) : [];
   }
 
   const conflictsByEntry = lastSharedValidation?.conflictsByEntryId || {};
@@ -3048,6 +3057,23 @@ function setupModals() {
     if (!entryId) {
       const sectionSelect = document.getElementById('edit-entry-section');
       const sectionId = parseInt(sectionSelect?.value || (studioMode === 'section' ? studioEntityId : masterData?.sections?.[0]?.id), 10);
+      if (!sectionId || isNaN(sectionId)) {
+        showToast('Please add a section in Master Data first before scheduling.', 'warning');
+        return;
+      }
+      if (!subjectId || isNaN(subjectId)) {
+        showToast('Please add and select a subject from Master Data first.', 'warning');
+        return;
+      }
+      if (!facultyId || isNaN(facultyId)) {
+        showToast('Please select a valid faculty instructor.', 'warning');
+        return;
+      }
+      if (!roomId || isNaN(roomId)) {
+        showToast('Please add and select a classroom/lab room from Master Data first.', 'warning');
+        return;
+      }
+
       const sec = masterData?.sections?.find(s => s.id === sectionId);
       const day = masterData?.workingDays?.find(d => d.id === dayId);
       const slot = masterData?.timeSlots?.find(s => s.id === slotId);

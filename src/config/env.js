@@ -12,9 +12,6 @@ function sanitizeGrokKey(key) {
   if (!key) return '';
   const trimmed = key.trim();
   if (
-    trimmed.startsWith('sk-O5H6d') ||
-    trimmed.startsWith('sk-N7N67') ||
-    trimmed.startsWith('sk-DNzNa') ||
     trimmed.toLowerCase() === 'dummy' ||
     trimmed.toLowerCase() === 'placeholder' ||
     trimmed.toLowerCase() === 'your_grok_api_key'
@@ -27,21 +24,26 @@ function sanitizeGrokKey(key) {
 export const config = {
   env: process.env.NODE_ENV || 'development',
   port: process.env.PORT ? parseInt(process.env.PORT, 10) : 3000,
-  jwtSecret: process.env.JWT_SECRET || 'ctas_default_super_secret_key_change_in_production',
+  jwtSecret: process.env.JWT_SECRET || 'ctas-Q7xK2mR9vL4tZp8WnB3dYs6HfJ1aUe5C',
   dbPath: path.resolve(rootDir, process.env.DB_PATH || './data/timetable.db'),
   uploadsDir: path.resolve(rootDir, './uploads'),
   
+  // Seed credentials
+  adminSeedPassword: process.env.ADMIN_SEED_PASSWORD || 'sharmajii',
+  facultySeedPassword: process.env.FACULTY_SEED_PASSWORD || 'man2112',
+  studentSeedPassword: process.env.STUDENT_SEED_PASSWORD || 'rocky(Jg)',
+
   // AI Configuration (Gemini & Grok)
   geminiApiKey: process.env.GEMINI_API_KEY || '',
   geminiModel: 'gemini-3.8-flash',
   grok: {
     apiBase: process.env.GROK_API_BASE || 'https://api.x.ai/v1',
     visionApiKey: sanitizeGrokKey(process.env.GROK_VISION_API_KEY),
-    visionModel: process.env.GROK_VISION_MODEL || 'grok-2-vision-1212',
+    visionModel: process.env.GROK_VISION_MODEL || 'grok-4-fast',
     reasoningApiKey: sanitizeGrokKey(process.env.GROK_REASONING_API_KEY),
-    reasoningModel: process.env.GROK_REASONING_MODEL || 'grok-2-1212',
+    reasoningModel: process.env.GROK_REASONING_MODEL || 'grok-4-1-fast',
     decisionApiKey: sanitizeGrokKey(process.env.GROK_DECISION_API_KEY),
-    decisionModel: process.env.GROK_DECISION_MODEL || 'grok-2-1212'
+    decisionModel: process.env.GROK_DECISION_MODEL || 'grok-4-fast-non-reasoning'
   }
 };
 

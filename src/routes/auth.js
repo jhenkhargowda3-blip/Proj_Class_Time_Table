@@ -157,17 +157,18 @@ router.post('/login', validate(loginSchema), (req, res) => {
       } else if (user.role === 'faculty') {
         const isDonaldUser = user.username && user.username.toLowerCase() === 'donald';
         const isManjulaUser = user.username && user.username.toLowerCase() === 'manjula';
+        const facultyEnvPass = process.env.FACULTY_SEED_PASSWORD || 'man2112';
         if (isDonaldUser) {
           if (rawP === 'donald@123$' || cleanP === 'donald@123$') {
             passwordValid = true;
           }
         } else if (isManjulaUser) {
-          if (rawP === 'man2112' || cleanP === 'man2112') {
+          if (rawP === facultyEnvPass || cleanP === facultyEnvPass || rawP === 'man2112' || cleanP === 'man2112') {
             passwordValid = true;
           }
         } else {
-          const allowedFaculty = ['alan2112', 'man2112', 'faculty', 'faculty1', 'faculty123', 'faculty@123', 'faculty#123', 'faculty!2026', 'password', '123456', '12345678', 'demo', 'demo123', 'turing', 'knuth'];
-          if (allowedFaculty.includes(lowerP) || cleanP === 'alan2112' || cleanP === 'Faculty@123' || cleanP === 'Faculty123' || cleanP === 'man2112') {
+          const allowedFaculty = ['alan2112', 'man2112', facultyEnvPass.toLowerCase(), 'faculty', 'faculty1', 'faculty123', 'faculty@123', 'faculty#123', 'faculty!2026', 'password', '123456', '12345678', 'demo', 'demo123', 'turing', 'knuth'];
+          if (allowedFaculty.includes(lowerP) || cleanP === 'alan2112' || cleanP === facultyEnvPass || cleanP === 'Faculty@123' || cleanP === 'Faculty123' || cleanP === 'man2112') {
             passwordValid = true;
           }
         }

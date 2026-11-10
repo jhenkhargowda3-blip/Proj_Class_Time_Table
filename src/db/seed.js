@@ -3,16 +3,17 @@ import { getDatabase, initSchema } from './connection.js';
 
 // Configured credentials for admin, faculty, and student roles
 export const SEED_PASSWORDS = {
-  admin: 'sharmajii',
-  faculty: 'alan2112',
-  student: 'rocky(Jg)'
+  admin: process.env.ADMIN_SEED_PASSWORD || 'sharmajii',
+  faculty: process.env.FACULTY_SEED_PASSWORD || 'man2112',
+  student: process.env.STUDENT_SEED_PASSWORD || 'rocky(Jg)'
 };
 
 export function seedDatabase(customDb, options = {}) {
   const db = customDb || getDatabase();
   initSchema(db);
 
-  const isTestRun = Boolean(options.includeDemo || (process.env.NODE_TEST_CONTEXT && !options.clean));
+  const isTestDb = Boolean(process.env.DB_PATH && process.env.DB_PATH.includes('test'));
+  const isTestRun = Boolean(options.includeDemo || (isTestDb && process.env.NODE_TEST_CONTEXT && !options.clean));
   console.log(`[CTAS Seeder] Starting database initialization (${isTestRun ? 'test fixtures mode' : 'clean academic data mode'})...`);
 
   // Wrap everything in a database transaction for atomicity and speed
@@ -155,29 +156,80 @@ export function seedDatabase(customDb, options = {}) {
     ).lastInsertRowid;
 
     if (!isTestRun) {
-      // CLEAN MODE: Zero faculty, zero subjects, zero entries, zero absences, zero substitutions, zero departments, zero sections, zero rooms, zero holidays.
+      // Ensure CSE Department exists
+      let cseDept = db.prepare("SELECT * FROM departments WHERE code = 'CSE'").get();
+      if (!cseDept) {
+        const insertDept = db.prepare('INSERT INTO departments (name, code) VALUES (?, ?)');
+        const cseId = insertDept.run('Computer Science & Engineering', 'CSE').lastInsertRowid;
+        cseDept = { id: cseId, name: 'Computer Science & Engineering', code: 'CSE' };
+      }
+
+      // Ensure Mrs. Manjula H S exists with her exact credentials and details
+      let manjulaUser = db.prepare("SELECT * FROM users WHERE username = 'manjula'").get();
+      let manjulaFaculty = db.prepare("SELECT * FROM faculty WHERE name LIKE '%Manjula%'").get();
+      if (!manjulaFaculty && manjulaUser?.faculty_id) {
+        manjulaFaculty = db.prepare('SELECT * FROM faculty WHERE id = ?').get(manjulaUser.faculty_id);
+      }
+
+      const facultyPass = process.env.FACULTY_SEED_PASSWORD || 'man2112';
+      const facultyHash = bcrypt.hashSync(facultyPass, passwordSaltRounds);
+
+      if (!manjulaFaculty) {
+        const insertFaculty = db.prepare(`
+          INSERT INTO faculty (name, department_id, email, phone, max_periods_per_day, max_periods_per_week, is_active)
+          VALUES (?, ?, ?, ?, ?, ?, 1)
+        `);
+        const facId = insertFaculty.run('Mrs. Manjula H S', cseDept.id, 'manjula@gmail.com', '7374619852', 4, 18).lastInsertRowid;
+        manjulaFaculty = { id: facId };
+      }
+
+      if (!manjulaUser) {
+        const insertUser = db.prepare(`
+          INSERT INTO users (username, password_hash, role, full_name, email, faculty_id)
+          VALUES (?, ?, 'faculty', ?, ?, ?)
+        `);
+        const uId = insertUser.run('manjula', facultyHash, 'Mrs. Manjula H S', 'manjula@gmail.com', manjulaFaculty.id).lastInsertRowid;
+        manjulaUser = { id: uId };
+      }
+
+      db.prepare('UPDATE faculty SET user_id = ? WHERE id = ?').run(manjulaUser.id, manjulaFaculty.id);
+      db.prepare('UPDATE users SET faculty_id = ? WHERE id = ?').run(manjulaFaculty.id, manjulaUser.id);
+
+      // Populate availability for Mrs. Manjula H S across active slots
+      const days = db.prepare('SELECT id FROM working_days WHERE is_active = 1').all();
+      const slots = db.prepare('SELECT id FROM time_slots WHERE is_break = 0').all();
+      const existingAvail = db.prepare('SELECT count(*) as count FROM faculty_availability WHERE faculty_id = ?').get(manjulaFaculty.id);
+      if (!existingAvail || existingAvail.count === 0) {
+        const insertAvail = db.prepare('INSERT INTO faculty_availability (faculty_id, day_id, slot_id, is_available) VALUES (?, ?, ?, 1)');
+        for (const d of days) {
+          for (const s of slots) {
+            insertAvail.run(manjulaFaculty.id, d.id, s.id);
+          }
+        }
+      }
+
       const insertAudit = db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)');
       insertAudit.run(adminUserId, 'SYSTEM_INITIALIZED', JSON.stringify({
         version: 'Master Academic Timetable',
         status: 'active',
-        departmentsCount: 0,
+        departmentsCount: 1,
         sectionsCount: 0,
         roomsCount: 0,
         holidaysCount: 0,
-        facultyCount: 0,
+        facultyCount: 1,
         subjectsCount: 0,
         entriesCount: 0,
-        message: 'Clean academic database ready for college master data and timetable scheduling.'
+        message: 'Clean academic database ready with CSE department and Mrs. Manjula H S.'
       }));
 
       console.log('\n========================================================================');
       console.log(' [CTAS Seeder] 100% CLEAN MASTER DATABASE INITIALIZED');
       console.log('========================================================================');
-      console.log(' - Departments: 0 (Empty - ready for college departments)');
+      console.log(' - Departments: 1 (Computer Science & Engineering [CSE])');
+      console.log(' - Faculty: 1 (Mrs. Manjula H S)');
       console.log(' - Sections: 0 (Empty - ready for real student sections)');
       console.log(' - Rooms: 0 (Empty - ready for real classrooms & labs)');
       console.log(' - Holidays: 0 (Empty - ready for real academic calendar)');
-      console.log(' - Faculty: 0 (Empty - ready for real faculty records)');
       console.log(' - Subjects: 0 (Empty - ready for real subject records)');
       console.log(' - Timetable Entries: 0 (All periods showing "+ Free")');
       console.log(' - Absences & Substitutions: 0 (Clean history)');
@@ -185,6 +237,9 @@ export function seedDatabase(customDb, options = {}) {
       console.log(' Administrator Credentials:');
       console.log('    Username: sharma (alias: admin)');
       console.log(`    Password: ${SEED_PASSWORDS.admin}`);
+      console.log(' Faculty Credentials:');
+      console.log('    Username: manjula');
+      console.log(`    Password: ${SEED_PASSWORDS.faculty}`);
       console.log('========================================================================\n');
       return true;
     }
@@ -297,7 +352,7 @@ export function seedDatabase(customDb, options = {}) {
     insertUser.run('faculty', facultyHash, 'faculty', 'Dr. Alan Turing', 'faculty@college.edu', facultyIds['faculty1'], null);
 
     // Register Mrs. Manjula H S (username: manjula, password: man2112, CSE Department)
-    const manjulaHash = bcrypt.hashSync('man2112', passwordSaltRounds);
+    const manjulaHash = bcrypt.hashSync(process.env.FACULTY_SEED_PASSWORD || 'man2112', passwordSaltRounds);
     const manjulaUserId = insertUser.run(
       'manjula',
       manjulaHash,

@@ -116,7 +116,7 @@ try {
   // Ensure faculty profile & credentials for Mrs. Manjula H S are initialized
   registerTeacher({
     username: 'manjula',
-    password: 'man2112',
+    password: process.env.FACULTY_SEED_PASSWORD || 'man2112',
     fullName: 'Mrs. Manjula H S',
     email: 'manjula@gmail.com',
     phone: '7374619852',

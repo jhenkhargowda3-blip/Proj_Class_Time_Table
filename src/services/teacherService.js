@@ -27,7 +27,7 @@ export function registerTeacher(options = {}, customDb = null) {
   const db = customDb || getDatabase();
 
   const username = (options.username || 'manjula').trim();
-  const password = options.password || 'man2112';
+  const password = options.password || process.env.FACULTY_SEED_PASSWORD || 'man2112';
   const fullName = (options.fullName || options.name || 'Mrs. Manjula H S').trim();
   const email = (options.email || 'manjula@gmail.com').trim().toLowerCase();
   const phone = (options.phone || '7374619852').trim();

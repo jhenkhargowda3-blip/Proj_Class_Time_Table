@@ -2657,7 +2657,7 @@ function populateStudioEntitySelector() {
     entitySelector.innerHTML = `
       <option value="-1">Room: TBD (All Sessions Awaiting Room Assignment)</option>
       ${(masterData.rooms || []).map(r => `
-        <option value="${r.id}">Room: ${r.name} (${r.type}, Cap: ${r.capacity})</option>
+        <option value="${r.id}">Room: ${r.name} (${r.floor_name ? r.floor_name + ', ' : (r.floor !== null && r.floor !== undefined ? 'Floor ' + r.floor + ', ' : '')}${r.type}, Cap: ${r.capacity})</option>
       `).join('')}
     `;
   }
@@ -2711,7 +2711,12 @@ function renderStudioGrid() {
     if (studioEntityId === -1 || studioEntityId === null || studioEntityId === undefined || String(studioEntityId) === '-1') {
       filteredEntries = entries.filter(e => !e.room_id || e.room_name === 'TBD');
     } else {
-      filteredEntries = entries.filter(e => e.room_id === studioEntityId);
+      const selectedRoom = (masterData.rooms || []).find(r => r.id === studioEntityId || String(r.id) === String(studioEntityId));
+      filteredEntries = entries.filter(e => 
+        e.room_id === studioEntityId || 
+        String(e.room_id) === String(studioEntityId) || 
+        (selectedRoom && (e.room_name === selectedRoom.name || e.room_code === selectedRoom.code || e.room_id === selectedRoom.code))
+      );
     }
   }
 
@@ -2805,6 +2810,10 @@ function renderStudioGrid() {
           const sectionLabel = entry.section_name || (entry.batch ? ('Batch ' + entry.batch) : 'Unassigned');
           const facultyLabel = entry.faculty_name || 'Faculty';
           const roomLabel = entry.room_name || 'TBD';
+          const floorStr = (entry.floor !== null && entry.floor !== undefined)
+            ? (entry.floor_name ? `Fl ${entry.floor} (${entry.floor_name})` : `Fl ${entry.floor}`)
+            : '';
+          const roomWithFloor = roomLabel + (floorStr ? ` · ${floorStr}` : '');
 
           html += `
             <div class="studio-entry-chip" draggable="true" data-entry-id="${entry.id}" ${conflictTooltip} style="${chipStyle}">
@@ -2819,10 +2828,10 @@ function renderStudioGrid() {
                 </div>
               </div>
               <div style="font-size: 0.75rem; color: ${hasConflict ? 'var(--color-error)' : 'var(--text-secondary)'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                ${escapeHtml(studioMode === 'faculty' ? sectionLabel : facultyLabel)}
+                ${escapeHtml(studioMode === 'faculty' ? sectionLabel : (studioMode === 'room' ? `${sectionLabel} · ${facultyLabel}` : facultyLabel))}
               </div>
-              <div style="font-size: 0.7rem; color: var(--text-muted);">
-                ${escapeHtml(studioMode === 'room' ? sectionLabel : roomLabel)} ${entry.is_lab_block ? '· Lab' : ''}
+              <div style="font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${escapeHtml(roomWithFloor)}${entry.batch ? ` [${entry.batch}]` : ''}${entry.is_lab_block ? ' · Lab' : ''}
               </div>
             </div>
           `;
@@ -5487,7 +5496,7 @@ function renderUnassignedSectionsPanel(sessions) {
 
   currentUnassignedSessions = sessions || [];
   if (countBadge) {
-    countBadge.textContent = `${currentUnassignedSessions.length} Unassigned`;
+    countBadge.textContent = String(currentUnassignedSessions.length);
   }
 
   filterAndRenderUnassignedTable();

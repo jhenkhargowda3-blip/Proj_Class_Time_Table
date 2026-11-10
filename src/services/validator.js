@@ -41,6 +41,7 @@ export function validateTimetable(versionIdOrEntries, context = {}) {
   // Double Booking Maps
   const facultySlotMap = new Map();
   const sectionSlotMap = new Map();
+  const sectionFloorSlotMap = new Map();
   const roomSlotMap = new Map();
 
   // Availability map
@@ -73,7 +74,7 @@ export function validateTimetable(versionIdOrEntries, context = {}) {
       });
     }
 
-    // 2. Faculty double-booking (Hard Error)
+    // 2. Faculty double-booking (Hard Error - Rule 2)
     if (e.faculty_id) {
       const facKey = `${e.faculty_id}_${timeKey}`;
       if (facultySlotMap.has(facKey)) {
@@ -92,13 +93,16 @@ export function validateTimetable(versionIdOrEntries, context = {}) {
     }
 
     // 3. Section double-booking (Hard Error)
-    // Only check if section_id is valid. Do not flag shared Wednesday ACTIVITY slot (two faculty supervise one section).
+    // Parallel lab batches and parallel electives / activities in different rooms are valid.
     if (e.section_id) {
       const secKey = `${e.section_id}_${timeKey}`;
       if (sectionSlotMap.has(secKey)) {
         const prior = sectionSlotMap.get(secKey);
         const isSharedActivity = (e.subject_code === 'ACTIVITY' && prior.subject_code === 'ACTIVITY');
-        if (!isSharedActivity) {
+        const isBothLabs = (e.subject_type === 'lab' && prior.subject_type === 'lab');
+        const isParallelElective = (e.room_id !== prior.room_id && (e.room_note || prior.room_note || (e.batch && prior.batch && e.batch !== prior.batch) || (e.subject_code !== prior.subject_code)));
+
+        if (!isSharedActivity && !isBothLabs && !isParallelElective) {
           violations.push({
             severity: 'error',
             code: 'SECTION_DOUBLE_BOOKED',
@@ -113,8 +117,26 @@ export function validateTimetable(versionIdOrEntries, context = {}) {
       }
     }
 
-    // 4. Room double-booking (Hard Error)
-    // Skip room conflict check when room is TBD or room_id is null
+    // 4. Same-section lab batches floor conflict (Rule 5)
+    // Lab batches of the same section that run at the same time must be on different floors
+    if (e.section_id && e.subject_type === 'lab' && e.floor !== null && e.floor !== undefined) {
+      const secFloorKey = `${e.section_id}_${timeKey}_fl_${e.floor}`;
+      if (sectionFloorSlotMap.has(secFloorKey)) {
+        const prior = sectionFloorSlotMap.get(secFloorKey);
+        violations.push({
+          severity: 'error',
+          code: 'FLOOR_CONFLICT',
+          message: `Section '${e.section_name}' has two lab batches ('${e.subject_code}' and '${prior.subject_code}') on the same floor (${e.floor_name || 'Floor ' + e.floor}) on ${e.day_name} at ${e.slot_label}.`,
+          entities: { sectionId: e.section_id, entryId1: prior.id, entryId2: e.id, floor: e.floor },
+          day: e.day_name,
+          slot: e.slot_label
+        });
+      } else {
+        sectionFloorSlotMap.set(secFloorKey, e);
+      }
+    }
+
+    // 5. Room double-booking (Hard Error - Rule 1)
     if (e.room_id && e.room_name && e.room_name !== 'TBD') {
       const roomKey = `${e.room_id}_${timeKey}`;
       if (roomSlotMap.has(roomKey)) {
@@ -132,9 +154,7 @@ export function validateTimetable(versionIdOrEntries, context = {}) {
       }
     }
 
-    // 5. Faculty availability check (Hard Error)
-    // When validating imported faculty sessions where availability marks busy during sessions,
-    // only check if explicitly not bypassed.
+    // 6. Faculty availability check (Hard Error)
     if (!context.skipFacultyAvailabilityCheck && e.faculty_id && availRows.length > 0) {
       if (!availMap.has(`${e.faculty_id}_${e.day_id}_${e.slot_id}`)) {
         violations.push({
@@ -148,13 +168,23 @@ export function validateTimetable(versionIdOrEntries, context = {}) {
       }
     }
 
-    // 6. Room type mismatch (Hard Error)
+    // 7. Room type mismatch (Hard Error - Rule 3)
     if (e.room_id && e.room_name && e.room_name !== 'TBD') {
-      if (e.subject_type === 'lab' && e.room_type !== 'lab') {
+      const isLabRoom = (e.room_type || '').toLowerCase() === 'lab';
+      if (e.subject_type === 'lab' && !isLabRoom) {
         violations.push({
           severity: 'error',
           code: 'ROOM_TYPE_MISMATCH',
           message: `Lab subject '${e.subject_code}' is scheduled in regular classroom '${e.room_name}' instead of a laboratory.`,
+          entities: { entryId: e.id, roomId: e.room_id, subjectId: e.subject_id },
+          day: e.day_name,
+          slot: e.slot_label
+        });
+      } else if (e.subject_type !== 'lab' && isLabRoom) {
+        violations.push({
+          severity: 'error',
+          code: 'ROOM_TYPE_MISMATCH',
+          message: `Theory/activity subject '${e.subject_code}' is scheduled in laboratory '${e.room_name}' instead of a classroom.`,
           entities: { entryId: e.id, roomId: e.room_id, subjectId: e.subject_id },
           day: e.day_name,
           slot: e.slot_label
@@ -187,9 +217,9 @@ export function validateTimetable(versionIdOrEntries, context = {}) {
     if (!sectionDaySlots.has(secDayKey)) sectionDaySlots.set(secDayKey, []);
     sectionDaySlots.get(secDayKey).push(e);
 
-    // Group labs
+    // Group labs per session or per batch
     if (e.subject_type === 'lab' && (e.lab_block_length > 1 || e.is_lab_block === 1)) {
-      const lk = `${e.section_id}_${e.day_id}_${e.subject_id}`;
+      const lk = e.session_id ? `session_${e.session_id}` : `${e.section_id}_${e.day_id}_${e.subject_id}_${e.batch || 'all'}`;
       if (!labGroups.has(lk)) labGroups.set(lk, []);
       labGroups.get(lk).push(e);
     }

@@ -164,25 +164,44 @@ export function seedDatabase(customDb, options = {}) {
     const itDept = insertDept.run('Information Technology', 'IT').lastInsertRowid;
     const eceDept = insertDept.run('Electronics & Communication', 'ECE').lastInsertRowid;
 
-    // 2. Rooms (11: 8 Classrooms + 3 Labs)
-    const insertRoom = db.prepare('INSERT INTO rooms (name, type, capacity, is_active) VALUES (?, ?, ?, ?)');
+    // 2. Rooms (29: 17 Classrooms + 12 Labs)
+    const insertRoom = db.prepare('INSERT INTO rooms (name, code, type, capacity, floor, floor_name, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)');
     const roomIds = { classrooms: [], labs: [] };
-    const classrooms = [
-      { name: 'CR-101', cap: 50 }, { name: 'CR-102', cap: 50 },
-      { name: 'CR-103', cap: 50 }, { name: 'CR-104', cap: 50 },
-      { name: 'CR-201', cap: 60 }, { name: 'CR-202', cap: 60 },
-      { name: 'CR-203', cap: 60 }, { name: 'CR-204', cap: 60 }
+    const defaultSeedRooms = [
+      { name: 'CR-101', code: 'CR-101', type: 'classroom', cap: 50, floor: 0, floor_name: 'Ground' },
+      { name: 'CR-102', code: 'CR-102', type: 'classroom', cap: 50, floor: 0, floor_name: 'Ground' },
+      { name: 'CR-103', code: 'CR-103', type: 'classroom', cap: 50, floor: 0, floor_name: 'Ground' },
+      { name: 'CR-104', code: 'CR-104', type: 'classroom', cap: 50, floor: 0, floor_name: 'Ground' },
+      { name: 'CR-105', code: 'CR-105', type: 'classroom', cap: 50, floor: 0, floor_name: 'Ground' },
+      { name: 'CR-201', code: 'CR-201', type: 'classroom', cap: 60, floor: 1, floor_name: 'First' },
+      { name: 'CR-202', code: 'CR-202', type: 'classroom', cap: 60, floor: 1, floor_name: 'First' },
+      { name: 'CR-203', code: 'CR-203', type: 'classroom', cap: 60, floor: 1, floor_name: 'First' },
+      { name: 'CR-204', code: 'CR-204', type: 'classroom', cap: 60, floor: 1, floor_name: 'First' },
+      { name: 'CR-301', code: 'CR-301', type: 'classroom', cap: 60, floor: 2, floor_name: 'Second' },
+      { name: 'CR-302', code: 'CR-302', type: 'classroom', cap: 60, floor: 2, floor_name: 'Second' },
+      { name: 'CR-303', code: 'CR-303', type: 'classroom', cap: 60, floor: 2, floor_name: 'Second' },
+      { name: 'CR-304', code: 'CR-304', type: 'classroom', cap: 60, floor: 2, floor_name: 'Second' },
+      { name: 'CR-307', code: 'CR-307', type: 'classroom', cap: 60, floor: 3, floor_name: 'Third' },
+      { name: 'CR-308', code: 'CR-308', type: 'classroom', cap: 60, floor: 3, floor_name: 'Third' },
+      { name: 'CR-309', code: 'CR-309', type: 'classroom', cap: 60, floor: 3, floor_name: 'Third' },
+      { name: 'CR-310', code: 'CR-310', type: 'classroom', cap: 60, floor: 3, floor_name: 'Third' },
+      { name: 'Alan Turing Lab A', code: 'LAB-0A', type: 'lab', cap: 45, floor: 0, floor_name: 'Ground' },
+      { name: 'Alan Turing Lab B', code: 'LAB-0B', type: 'lab', cap: 45, floor: 0, floor_name: 'Ground' },
+      { name: 'Alan Turing Lab C', code: 'LAB-0C', type: 'lab', cap: 45, floor: 0, floor_name: 'Ground' },
+      { name: 'Sutherland Lee Lab A', code: 'LAB-1A', type: 'lab', cap: 45, floor: 1, floor_name: 'First' },
+      { name: 'Sutherland Lee Lab B', code: 'LAB-1B', type: 'lab', cap: 45, floor: 1, floor_name: 'First' },
+      { name: 'Sutherland Lee Lab C', code: 'LAB-1C', type: 'lab', cap: 45, floor: 1, floor_name: 'First' },
+      { name: 'Aryabhatta Lab A', code: 'LAB-2A', type: 'lab', cap: 45, floor: 2, floor_name: 'Second' },
+      { name: 'Aryabhatta Lab B', code: 'LAB-2B', type: 'lab', cap: 45, floor: 2, floor_name: 'Second' },
+      { name: 'Aryabhatta Lab C', code: 'LAB-2C', type: 'lab', cap: 45, floor: 2, floor_name: 'Second' },
+      { name: 'Bellman Ford Lab A', code: 'LAB-3A', type: 'lab', cap: 45, floor: 3, floor_name: 'Third' },
+      { name: 'Bellman Ford Lab B', code: 'LAB-3B', type: 'lab', cap: 45, floor: 3, floor_name: 'Third' },
+      { name: 'Bellman Ford Lab C', code: 'LAB-3C', type: 'lab', cap: 45, floor: 3, floor_name: 'Third' }
     ];
-    for (const cr of classrooms) {
-      roomIds.classrooms.push(insertRoom.run(cr.name, 'classroom', cr.cap, 1).lastInsertRowid);
-    }
-    const labs = [
-      { name: 'Computing Lab A', cap: 45 },
-      { name: 'Computing Lab B', cap: 45 },
-      { name: 'Advanced Systems Lab', cap: 40 }
-    ];
-    for (const lab of labs) {
-      roomIds.labs.push(insertRoom.run(lab.name, 'lab', lab.cap, 1).lastInsertRowid);
+    for (const rm of defaultSeedRooms) {
+      const id = insertRoom.run(rm.name, rm.code, rm.type, rm.cap, rm.floor, rm.floor_name).lastInsertRowid;
+      if (rm.type === 'lab') roomIds.labs.push(id);
+      else roomIds.classrooms.push(id);
     }
 
     // 3. Sections (4)

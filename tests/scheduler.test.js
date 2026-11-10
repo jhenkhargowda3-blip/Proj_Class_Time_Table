@@ -3,9 +3,11 @@ import assert from 'node:assert';
 import { generateTimetable } from '../src/services/scheduler.js';
 import { validateTimetable } from '../src/services/validator.js';
 import { getDatabase } from '../src/db/connection.js';
+import { seedDatabase } from '../src/db/seed.js';
 
 test('Phase 4: Scheduling Engine (CSP Solver & Optimizer)', async (t) => {
   const db = getDatabase();
+  seedDatabase(db, { includeDemo: true });
 
   await t.test('1. Solves and generates complete conflict-free draft in under 20s', () => {
     const start = Date.now();

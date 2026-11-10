@@ -110,6 +110,8 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
     e.room_name = rm.name;
     e.room_type = rm.type;
     e.room_capacity = rm.capacity;
+    e.floor = (e.floor !== null && e.floor !== undefined) ? e.floor : (rm.floor !== undefined ? rm.floor : null);
+    e.floor_name = e.floor_name || rm.floor_name || null;
     e.section_name = sec.name;
     e.section_strength = sec.strength;
     e.subject_code = sub.code;
@@ -159,10 +161,11 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
       });
     }
 
-    // Check 8a: Room Type Mismatch (e.g. Lab in regular classroom)
-    const isLabSubject = sub.type === 'lab' || Number(e.is_lab_block) === 1 || Number(sub.lab_block_length) > 1;
+    // Check 8a: Room Type Mismatch (e.g. Lab in regular classroom or theory in laboratory)
+    const isLabSubject = (e.subject_type || sub.type) === 'lab';
     if (e.room_id && e.room_name && e.room_name !== 'TBD') {
-      if (isLabSubject && rm.type !== 'lab') {
+      const isLabRoom = (rm.type || '').toLowerCase() === 'lab';
+      if (isLabSubject && !isLabRoom) {
         registerViolation({
           type: 'ROOM_TYPE_MISMATCH',
           day: day.day_name,
@@ -176,7 +179,24 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
           room: rm.name,
           roomId: rm.id,
           message: `Practical lab course '${sub.code}' requires a laboratory room, but is assigned to standard classroom '${rm.name}'.`,
-          suggestedFix: `Reassign to a laboratory venue (e.g. Computer Lab or Science Lab).`,
+          suggestedFix: `Reassign to a laboratory venue (e.g. Alan Turing Lab, Sutherland Lee Lab, Aryabhatta Lab, or Bellman Ford Lab).`,
+          involvedEntryIds: [e.id]
+        });
+      } else if (!isLabSubject && isLabRoom) {
+        registerViolation({
+          type: 'ROOM_TYPE_MISMATCH',
+          day: day.day_name,
+          dayId: day.id,
+          period: slot.label,
+          slotId: slot.id,
+          section: sec.name,
+          sectionId: sec.id,
+          faculty: fac.name,
+          facultyId: fac.id,
+          room: rm.name,
+          roomId: rm.id,
+          message: `Theory course '${sub.code}' is scheduled in laboratory '${rm.name}' instead of a classroom.`,
+          suggestedFix: `Reassign to section's home classroom.`,
           involvedEntryIds: [e.id]
         });
       }
@@ -231,9 +251,9 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
     if (!sectionSubjectCountMap.has(secSubKey)) sectionSubjectCountMap.set(secSubKey, []);
     sectionSubjectCountMap.get(secSubKey).push(e);
 
-    // Lab blocks grouping
+    // Lab blocks grouping per session/batch
     if (isLabSubject) {
-      const labKey = `${e.section_id}_${e.subject_id}_${e.day_id}`;
+      const labKey = e.session_id ? `session_${e.session_id}` : `${e.section_id}_${e.subject_id}_${e.day_id}_${e.batch || 'all'}`;
       if (!labBlocksMap.has(labKey)) labBlocksMap.set(labKey, []);
       labBlocksMap.get(labKey).push(e);
     }
@@ -295,7 +315,7 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
     }
   }
 
-  // Check 3: Section Double-Booked
+  // Check 3: Section Double-Booked (Rules 4-5)
   for (const [, booked] of sectionSlotMap) {
     if (booked.length > 1) {
       for (let i = 0; i < booked.length; i++) {
@@ -303,7 +323,30 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
           const e1 = booked[i];
           const e2 = booked[j];
           const isSharedActivity = (e1.subject_code === 'ACTIVITY' && e2.subject_code === 'ACTIVITY');
-          if (!isSharedActivity) {
+          const isBothLabs = ((e1.subject_type === 'lab' || Number(e1.is_lab_block) === 1) && (e2.subject_type === 'lab' || Number(e2.is_lab_block) === 1));
+          const isParallelElective = (e1.room_id !== e2.room_id && (e1.room_note || e2.room_note || (e1.batch && e2.batch && e1.batch !== e2.batch) || (e1.subject_code !== e2.subject_code)));
+
+          // Check Floor Conflict: Lab batches of the same section that run at the same time must be on different floors (Rule 5)
+          if (isBothLabs && e1.floor !== null && e1.floor !== undefined && e1.floor === e2.floor) {
+            registerViolation({
+              type: 'FLOOR_CONFLICT',
+              day: e1.day_name,
+              dayId: e1.day_id,
+              period: e1.slot_label,
+              slotId: e1.slot_id,
+              section: e1.section_name,
+              sectionId: e1.section_id,
+              faculty: `${e1.faculty_name} & ${e2.faculty_name}`,
+              facultyId: e1.faculty_id,
+              room: `${e1.room_name} & ${e2.room_name}`,
+              roomId: e1.room_id,
+              message: `Section '${e1.section_name}' has two lab batches ('${e1.subject_code}' and '${e2.subject_code}') scheduled on the same floor (${e1.floor_name || 'Floor ' + e1.floor}) on ${e1.day_name} at ${e1.slot_label}.`,
+              suggestedFix: `Move one lab batch to a laboratory on a different floor.`,
+              involvedEntryIds: [e1.id, e2.id]
+            });
+          }
+
+          if (!isSharedActivity && !isBothLabs && !isParallelElective) {
             registerViolation({
               type: 'SECTION_DOUBLE_BOOKED',
               day: e1.day_name,

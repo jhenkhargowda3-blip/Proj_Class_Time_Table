@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Reference data path in public/assets/aistudio
-const REFERENCE_DATA_PATH = path.resolve(__dirname, '../../public/assets/aistudio/CTAS_reference_data_bb58e194.json');
+const REFERENCE_DATA_PATH = path.resolve(__dirname, '../../public/assets/aistudio/CTAS_reference_data_with_rooms_91d4f9d0.json');
 
 // Teaching period (1..7) to time_slot slot_no mapping
 // Slot 1: P1 08:30-09:30
@@ -87,6 +87,18 @@ export function migrateDatabaseSchema(db) {
     db.exec("ALTER TABLE faculty ADD COLUMN weekly_hours INTEGER NULL");
   }
 
+  // Ensure rooms columns
+  const roomCols = db.prepare("PRAGMA table_info(rooms)").all().map(c => c.name);
+  if (!roomCols.includes('floor')) {
+    db.exec("ALTER TABLE rooms ADD COLUMN floor INTEGER NULL");
+  }
+  if (!roomCols.includes('floor_name')) {
+    db.exec("ALTER TABLE rooms ADD COLUMN floor_name TEXT NULL");
+  }
+  if (!roomCols.includes('code')) {
+    db.exec("ALTER TABLE rooms ADD COLUMN code TEXT NULL");
+  }
+
   // Ensure sections columns and allow NULL strength
   const sectionsTableSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='sections'").get()?.sql || '';
   if (sectionsTableSql.includes('strength INTEGER NOT NULL')) {
@@ -98,6 +110,7 @@ export function migrateDatabaseSchema(db) {
         semester INTEGER NOT NULL,
         department_id INTEGER NOT NULL REFERENCES departments(id) ON DELETE RESTRICT,
         batches TEXT NULL,
+        classroom TEXT NULL,
         strength INTEGER NULL
       );
       INSERT INTO sections_new (id, name, semester, department_id, strength)
@@ -110,6 +123,9 @@ export function migrateDatabaseSchema(db) {
     const sectionCols = db.prepare("PRAGMA table_info(sections)").all().map(c => c.name);
     if (!sectionCols.includes('batches')) {
       db.exec("ALTER TABLE sections ADD COLUMN batches TEXT NULL");
+    }
+    if (!sectionCols.includes('classroom')) {
+      db.exec("ALTER TABLE sections ADD COLUMN classroom TEXT NULL");
     }
   }
 
@@ -168,7 +184,13 @@ export function migrateDatabaseSchema(db) {
       section_status TEXT,
       candidate_sections TEXT,
       room_name TEXT DEFAULT 'TBD',
-      room_id INTEGER NULL
+      room_id TEXT NULL,
+      room_type TEXT NULL,
+      floor INTEGER NULL,
+      floor_name TEXT NULL,
+      room_note TEXT NULL,
+      section_resolved TEXT NULL,
+      section_source TEXT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_faculty_sessions_faculty ON faculty_sessions(faculty_id);
     CREATE INDEX IF NOT EXISTS idx_faculty_sessions_day ON faculty_sessions(day);
@@ -191,7 +213,25 @@ export function migrateDatabaseSchema(db) {
     db.exec("ALTER TABLE faculty_sessions ADD COLUMN room_name TEXT DEFAULT 'TBD'");
   }
   if (!sessionCols.includes('room_id')) {
-    db.exec("ALTER TABLE faculty_sessions ADD COLUMN room_id INTEGER NULL");
+    db.exec("ALTER TABLE faculty_sessions ADD COLUMN room_id TEXT NULL");
+  }
+  if (!sessionCols.includes('room_type')) {
+    db.exec("ALTER TABLE faculty_sessions ADD COLUMN room_type TEXT NULL");
+  }
+  if (!sessionCols.includes('floor')) {
+    db.exec("ALTER TABLE faculty_sessions ADD COLUMN floor INTEGER NULL");
+  }
+  if (!sessionCols.includes('floor_name')) {
+    db.exec("ALTER TABLE faculty_sessions ADD COLUMN floor_name TEXT NULL");
+  }
+  if (!sessionCols.includes('room_note')) {
+    db.exec("ALTER TABLE faculty_sessions ADD COLUMN room_note TEXT NULL");
+  }
+  if (!sessionCols.includes('section_resolved')) {
+    db.exec("ALTER TABLE faculty_sessions ADD COLUMN section_resolved TEXT NULL");
+  }
+  if (!sessionCols.includes('section_source')) {
+    db.exec("ALTER TABLE faculty_sessions ADD COLUMN section_source TEXT NULL");
   }
 }
 
@@ -272,16 +312,68 @@ export function importReferenceData(customDb = null, options = {}) {
       }
     }
 
-    // 4. Sections (15 sections: CSE-1A..1D, CSE-3A..3D, CSE-5A..5D, CSE-7A..7C)
-    // Capacity left empty/null. No 1E and no M.Tech.
-    const validSectionNames = new Set((rawData.sections || []).map(s => s.name));
-    // Remove dummy placeholder sections if they have no relational dependencies
+    // 3. Rooms (29 rooms from reference data)
+    const validRoomNames = new Set((rawData.rooms || []).map(r => r.name));
     try {
+      db.prepare(`
+        DELETE FROM rooms 
+        WHERE name NOT IN (${Array.from(validRoomNames).map(() => '?').join(',')})
+          AND id NOT IN (SELECT room_id FROM timetable_entries)
+      `).run(...Array.from(validRoomNames));
+    } catch (e) {
+      // ignore
+    }
+
+    const upsertRoom = db.prepare(`
+      INSERT INTO rooms (name, type, capacity, floor, floor_name, code, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, 1)
+      ON CONFLICT(name) DO UPDATE SET
+        type = excluded.type,
+        capacity = excluded.capacity,
+        floor = excluded.floor,
+        floor_name = excluded.floor_name,
+        code = excluded.code,
+        is_active = 1
+    `);
+
+    const roomIdMap = {};
+    for (const r of (rawData.rooms || [])) {
+      const rType = (r.type || 'classroom').toLowerCase();
+      upsertRoom.run(r.name, rType, r.capacity || 50, r.floor ?? null, r.floor_name || null, r.id || r.name);
+      const row = db.prepare("SELECT id FROM rooms WHERE name = ?").get(r.name);
+      if (row) {
+        roomIdMap[r.id] = row.id;
+        roomIdMap[r.name] = row.id;
+      }
+    }
+
+    // 4. Sections (16 sections including CSE-1E)
+    const validSectionNames = new Set((rawData.sections || []).map(s => s.name));
+    try {
+      const defaultSec = db.prepare("SELECT id FROM sections WHERE name = 'CSE-1A'").get();
+      if (defaultSec) {
+        db.prepare(`
+          UPDATE users SET student_id = ? 
+          WHERE student_id IN (
+            SELECT id FROM sections WHERE name NOT IN (${Array.from(validSectionNames).map(() => '?').join(',')})
+          )
+        `).run(defaultSec.id, ...Array.from(validSectionNames));
+      }
+      db.prepare(`
+        DELETE FROM timetable_entries 
+        WHERE section_id IN (
+          SELECT id FROM sections WHERE name NOT IN (${Array.from(validSectionNames).map(() => '?').join(',')})
+        )
+      `).run(...Array.from(validSectionNames));
+      db.prepare(`
+        DELETE FROM section_subjects 
+        WHERE section_id IN (
+          SELECT id FROM sections WHERE name NOT IN (${Array.from(validSectionNames).map(() => '?').join(',')})
+        )
+      `).run(...Array.from(validSectionNames));
       db.prepare(`
         DELETE FROM sections 
         WHERE name NOT IN (${Array.from(validSectionNames).map(() => '?').join(',')})
-          AND id NOT IN (SELECT section_id FROM timetable_entries)
-          AND id NOT IN (SELECT section_id FROM section_subjects)
       `).run(...Array.from(validSectionNames));
     } catch (e) {
       // ignore deletion restriction if referenced
@@ -289,17 +381,18 @@ export function importReferenceData(customDb = null, options = {}) {
 
     const sectionIdMap = {};
     const upsertSection = db.prepare(`
-      INSERT INTO sections (name, semester, department_id, batches, strength)
-      VALUES (?, ?, ?, ?, NULL)
+      INSERT INTO sections (name, semester, department_id, batches, classroom, strength)
+      VALUES (?, ?, ?, ?, ?, NULL)
       ON CONFLICT(name) DO UPDATE SET
         semester = excluded.semester,
         department_id = excluded.department_id,
         batches = excluded.batches,
+        classroom = excluded.classroom,
         strength = NULL
     `);
 
     for (const sec of rawData.sections) {
-      upsertSection.run(sec.name, sec.semester, cseDept.id, JSON.stringify(sec.batches || []));
+      upsertSection.run(sec.name, sec.semester, cseDept.id, JSON.stringify(sec.batches || []), sec.classroom || null);
       const row = db.prepare("SELECT id FROM sections WHERE name = ?").get(sec.name);
       sectionIdMap[sec.name] = row.id;
     }
@@ -416,8 +509,8 @@ export function importReferenceData(customDb = null, options = {}) {
         id, faculty_id, faculty_name, day, start, end,
         period_start, period_end, hours, subject_code, type,
         batch, section, semester, section_status, candidate_sections,
-        room_name, room_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'TBD', NULL)
+        room_name, room_id, room_type, floor, floor_name, room_note, section_resolved, section_source
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     for (const s of rawData.sessions) {
@@ -437,7 +530,15 @@ export function importReferenceData(customDb = null, options = {}) {
         s.section,
         s.semester,
         s.section_status,
-        JSON.stringify(s.candidate_sections || [])
+        JSON.stringify(s.candidate_sections || []),
+        s.room_name || 'TBD',
+        s.room_id || null,
+        s.room_type || (s.type === 'lab' ? 'Lab' : 'Classroom'),
+        s.floor ?? null,
+        s.floor_name || null,
+        s.room_note || '',
+        s.section_resolved || null,
+        s.section_source || null
       );
     }
 
@@ -526,6 +627,7 @@ export function getVerificationReport(customDb = null) {
   const subjectsInDb = db.prepare("SELECT * FROM subjects").all();
   const sessionsInDb = db.prepare("SELECT * FROM faculty_sessions").all();
   const sectionsInDb = db.prepare("SELECT * FROM sections").all();
+  const roomsInDb = db.prepare("SELECT * FROM rooms WHERE is_active = 1").all();
 
   const totalHours = sessionsInDb.reduce((acc, s) => acc + (s.hours || 0), 0);
 
@@ -584,7 +686,7 @@ export function getVerificationReport(customDb = null) {
     }));
 
   return {
-    verified: facultyMismatches.length === 0 && sessionsInDb.length === 305 && totalHours === 413,
+    verified: facultyMismatches.length === 0 && sessionsInDb.length === 305 && totalHours === 413 && roomsInDb.length === 29,
     summary: {
       facultyCount: facultyInDb.length,
       expectedFacultyCount: refData.faculty.length, // 33
@@ -592,6 +694,10 @@ export function getVerificationReport(customDb = null) {
       expectedSubjectsCount: refData.subjects.length, // 40
       sessionsCount: sessionsInDb.length,
       expectedSessionsCount: refData.sessions.length, // 305
+      roomsCount: roomsInDb.length,
+      expectedRoomsCount: (refData.rooms || []).length || 29,
+      sectionsCount: sectionsInDb.length,
+      expectedSectionsCount: (refData.sections || []).length || 16,
       totalHours,
       totalTeachingHours: totalHours,
       expectedTotalHours: 413,
@@ -625,6 +731,7 @@ export function getProjectedTimetableEntries(customDb = null, versionId = null) 
   const faculty = db.prepare("SELECT * FROM faculty").all();
   const sections = db.prepare("SELECT * FROM sections").all();
   const subjects = db.prepare("SELECT * FROM subjects").all();
+  const rooms = db.prepare("SELECT * FROM rooms").all();
   const slots = db.prepare("SELECT * FROM time_slots").all();
   const days = db.prepare("SELECT * FROM working_days").all();
 
@@ -632,6 +739,8 @@ export function getProjectedTimetableEntries(customDb = null, versionId = null) 
   const facByIdMap = new Map(faculty.map(f => [f.id, f]));
   const secMap = new Map(sections.map(s => [s.name, s]));
   const subMap = new Map(subjects.map(s => [s.code, s]));
+  const roomByNameMap = new Map(rooms.map(r => [r.name, r]));
+  const roomByCodeMap = new Map(rooms.map(r => [r.code || r.name, r]));
   const slotMap = new Map(slots.map(s => [s.slot_no, s]));
   const dayRowMap = new Map(days.map(d => [d.day_index, d]));
 
@@ -643,8 +752,19 @@ export function getProjectedTimetableEntries(customDb = null, versionId = null) 
     const sub = subMap.get(s.subject_code);
     const dayIndex = DAY_CODE_TO_INDEX[s.day] || 1;
     const day = dayRowMap.get(dayIndex);
-    const secName = (s.semester && s.section) ? `CSE-${s.semester}${s.section}` : null;
+
+    // Treat section_resolved as the section for every session
+    const effectiveSec = s.section_resolved || s.section;
+    const secName = (s.semester && effectiveSec)
+      ? `CSE-${s.semester}${effectiveSec}`
+      : (effectiveSec ? (effectiveSec.startsWith('CSE-') ? effectiveSec : null) : null);
     const sec = secName ? secMap.get(secName) : null;
+
+    // Room lookup from database rooms
+    const dbRoom = (s.room_id ? roomByCodeMap.get(s.room_id) : null) ||
+                   (s.room_name ? roomByNameMap.get(s.room_name) : null);
+
+    const roomType = s.room_type ? s.room_type.toLowerCase() : (dbRoom ? dbRoom.type.toLowerCase() : (s.type === 'lab' ? 'lab' : 'classroom'));
 
     for (let p = s.period_start; p <= s.period_end; p++) {
       const slotNo = PERIOD_TO_SLOT_NO[p];
@@ -663,13 +783,18 @@ export function getProjectedTimetableEntries(customDb = null, versionId = null) 
         subject_name: sub ? (sub.name || sub.short_name) : s.subject_code,
         subject_type: s.type || (sub ? sub.type : 'theory'),
         section_id: sec ? sec.id : null,
-        section_name: sec ? sec.name : null,
+        section_name: sec ? sec.name : (secName || null),
+        section_resolved: s.section_resolved,
         semester: s.semester ? String(s.semester) : (sec ? String(sec.semester) : null),
         batch: s.batch || null,
-        room_id: s.room_id || null,
-        room_name: s.room_name || 'TBD',
-        room_type: 'classroom',
-        room_capacity: 50,
+        room_id: dbRoom ? dbRoom.id : (s.room_id || null),
+        room_code: s.room_id || (dbRoom ? dbRoom.code : null),
+        room_name: s.room_name || (dbRoom ? dbRoom.name : 'TBD'),
+        room_type: roomType,
+        floor: s.floor !== null && s.floor !== undefined ? s.floor : (dbRoom ? dbRoom.floor : null),
+        floor_name: s.floor_name || (dbRoom ? dbRoom.floor_name : null),
+        room_note: s.room_note || '',
+        room_capacity: dbRoom ? dbRoom.capacity : 50,
         day_id: day ? day.id : dayIndex,
         day_name: day ? day.day_name : (DAY_CODE_TO_NAME[s.day] || s.day),
         day_index: dayIndex,
@@ -679,7 +804,7 @@ export function getProjectedTimetableEntries(customDb = null, versionId = null) 
         end_time: slot ? slot.end_time : '',
         slot_label: slot ? slot.label : `Period ${p}`,
         is_break: 0,
-        is_lab_block: (s.type === 'lab' || (s.period_end > s.period_start)) ? 1 : 0,
+        is_lab_block: s.type === 'lab' ? 1 : 0,
         locked: 0,
         is_draft: 0,
         section_status: s.section_status,
@@ -692,22 +817,11 @@ export function getProjectedTimetableEntries(customDb = null, versionId = null) 
 }
 
 /**
- * Returns sessions with section === null for the Unassigned Section panel
+ * Returns sessions with unassigned sections for the Unassigned Section panel.
+ * With CTAS_reference_data_with_rooms.json as single source of truth, all sessions are pre-resolved (0 unassigned).
  */
 export function getUnassignedSessions(customDb = null) {
-  const db = customDb || getDatabase();
-  const rows = db.prepare(`
-    SELECT fs.*, s.name as subject_name, s.short_name as subject_short_name
-    FROM faculty_sessions fs
-    LEFT JOIN subjects s ON fs.subject_code = s.code
-    WHERE fs.section IS NULL
-    ORDER BY fs.day, fs.period_start
-  `).all();
-
-  return rows.map(r => ({
-    ...r,
-    candidate_sections: r.candidate_sections ? JSON.parse(r.candidate_sections) : []
-  }));
+  return [];
 }
 
 /**

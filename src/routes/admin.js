@@ -435,24 +435,61 @@ router.delete('/sections/:id', (req, res) => {
 router.post('/rooms/restore-defaults', (req, res) => {
   const db = getDatabase();
   const defaultRooms = [
-    { id: 1, name: 'CR-101', type: 'classroom', capacity: 50, is_active: 1 },
-    { id: 2, name: 'CR-102', type: 'classroom', capacity: 50, is_active: 1 },
-    { id: 3, name: 'CR-103', type: 'classroom', capacity: 50, is_active: 1 },
-    { id: 4, name: 'CR-104', type: 'classroom', capacity: 50, is_active: 1 },
-    { id: 5, name: 'CR-201', type: 'classroom', capacity: 60, is_active: 1 },
-    { id: 6, name: 'CR-202', type: 'classroom', capacity: 60, is_active: 1 },
-    { id: 7, name: 'CR-203', type: 'classroom', capacity: 60, is_active: 1 },
-    { id: 8, name: 'CR-204', type: 'classroom', capacity: 60, is_active: 1 },
-    { id: 9, name: 'Computing Lab A', type: 'lab', capacity: 45, is_active: 1 },
-    { id: 10, name: 'Computing Lab B', type: 'lab', capacity: 45, is_active: 1 },
-    { id: 11, name: 'Advanced Systems Lab', type: 'lab', capacity: 40, is_active: 1 }
+    { name: 'CR-101', code: 'CR-101', type: 'classroom', capacity: 50, floor: 0, floor_name: 'Ground', is_active: 1 },
+    { name: 'CR-102', code: 'CR-102', type: 'classroom', capacity: 50, floor: 0, floor_name: 'Ground', is_active: 1 },
+    { name: 'CR-103', code: 'CR-103', type: 'classroom', capacity: 50, floor: 0, floor_name: 'Ground', is_active: 1 },
+    { name: 'CR-104', code: 'CR-104', type: 'classroom', capacity: 50, floor: 0, floor_name: 'Ground', is_active: 1 },
+    { name: 'CR-105', code: 'CR-105', type: 'classroom', capacity: 50, floor: 0, floor_name: 'Ground', is_active: 1 },
+    { name: 'CR-201', code: 'CR-201', type: 'classroom', capacity: 60, floor: 1, floor_name: 'First', is_active: 1 },
+    { name: 'CR-202', code: 'CR-202', type: 'classroom', capacity: 60, floor: 1, floor_name: 'First', is_active: 1 },
+    { name: 'CR-203', code: 'CR-203', type: 'classroom', capacity: 60, floor: 1, floor_name: 'First', is_active: 1 },
+    { name: 'CR-204', code: 'CR-204', type: 'classroom', capacity: 60, floor: 1, floor_name: 'First', is_active: 1 },
+    { name: 'CR-301', code: 'CR-301', type: 'classroom', capacity: 60, floor: 2, floor_name: 'Second', is_active: 1 },
+    { name: 'CR-302', code: 'CR-302', type: 'classroom', capacity: 60, floor: 2, floor_name: 'Second', is_active: 1 },
+    { name: 'CR-303', code: 'CR-303', type: 'classroom', capacity: 60, floor: 2, floor_name: 'Second', is_active: 1 },
+    { name: 'CR-304', code: 'CR-304', type: 'classroom', capacity: 60, floor: 2, floor_name: 'Second', is_active: 1 },
+    { name: 'CR-307', code: 'CR-307', type: 'classroom', capacity: 60, floor: 3, floor_name: 'Third', is_active: 1 },
+    { name: 'CR-308', code: 'CR-308', type: 'classroom', capacity: 60, floor: 3, floor_name: 'Third', is_active: 1 },
+    { name: 'CR-309', code: 'CR-309', type: 'classroom', capacity: 60, floor: 3, floor_name: 'Third', is_active: 1 },
+    { name: 'CR-310', code: 'CR-310', type: 'classroom', capacity: 60, floor: 3, floor_name: 'Third', is_active: 1 },
+    { name: 'Alan Turing Lab A', code: 'LAB-0A', type: 'lab', capacity: 45, floor: 0, floor_name: 'Ground', is_active: 1 },
+    { name: 'Alan Turing Lab B', code: 'LAB-0B', type: 'lab', capacity: 45, floor: 0, floor_name: 'Ground', is_active: 1 },
+    { name: 'Alan Turing Lab C', code: 'LAB-0C', type: 'lab', capacity: 45, floor: 0, floor_name: 'Ground', is_active: 1 },
+    { name: 'Sutherland Lee Lab A', code: 'LAB-1A', type: 'lab', capacity: 45, floor: 1, floor_name: 'First', is_active: 1 },
+    { name: 'Sutherland Lee Lab B', code: 'LAB-1B', type: 'lab', capacity: 45, floor: 1, floor_name: 'First', is_active: 1 },
+    { name: 'Sutherland Lee Lab C', code: 'LAB-1C', type: 'lab', capacity: 45, floor: 1, floor_name: 'First', is_active: 1 },
+    { name: 'Aryabhatta Lab A', code: 'LAB-2A', type: 'lab', capacity: 45, floor: 2, floor_name: 'Second', is_active: 1 },
+    { name: 'Aryabhatta Lab B', code: 'LAB-2B', type: 'lab', capacity: 45, floor: 2, floor_name: 'Second', is_active: 1 },
+    { name: 'Aryabhatta Lab C', code: 'LAB-2C', type: 'lab', capacity: 45, floor: 2, floor_name: 'Second', is_active: 1 },
+    { name: 'Bellman Ford Lab A', code: 'LAB-3A', type: 'lab', capacity: 45, floor: 3, floor_name: 'Third', is_active: 1 },
+    { name: 'Bellman Ford Lab B', code: 'LAB-3B', type: 'lab', capacity: 45, floor: 3, floor_name: 'Third', is_active: 1 },
+    { name: 'Bellman Ford Lab C', code: 'LAB-3C', type: 'lab', capacity: 45, floor: 3, floor_name: 'Third', is_active: 1 }
   ];
 
-  const insert = db.prepare('INSERT OR REPLACE INTO rooms (id, name, type, capacity, is_active) VALUES (?, ?, ?, ?, ?)');
+  const upsert = db.prepare(`
+    INSERT INTO rooms (name, code, type, capacity, floor, floor_name, is_active)
+    VALUES (?, ?, ?, ?, ?, ?, 1)
+    ON CONFLICT(name) DO UPDATE SET
+      code = excluded.code,
+      type = excluded.type,
+      capacity = excluded.capacity,
+      floor = excluded.floor,
+      floor_name = excluded.floor_name,
+      is_active = 1
+  `);
 
+  const validNames = defaultRooms.map(r => r.name);
   const restoreTx = db.transaction(() => {
+    try {
+      db.prepare(`
+        DELETE FROM rooms 
+        WHERE name NOT IN (${validNames.map(() => '?').join(',')})
+          AND id NOT IN (SELECT room_id FROM timetable_entries)
+      `).run(...validNames);
+    } catch (e) {}
+
     for (const r of defaultRooms) {
-      insert.run(r.id, r.name, r.type, r.capacity, r.is_active);
+      upsert.run(r.name, r.code, r.type, r.capacity, r.floor, r.floor_name);
     }
     db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)')
       .run(req.user?.id || 1, 'ROOMS_RESTORED', JSON.stringify({ count: defaultRooms.length, restoredAt: new Date().toISOString() }));
@@ -460,8 +497,8 @@ router.post('/rooms/restore-defaults', (req, res) => {
 
   try {
     restoreTx();
-    const allRooms = db.prepare('SELECT * FROM rooms ORDER BY id').all();
-    res.json({ success: true, message: 'All 11 default rooms restored successfully', rooms: allRooms });
+    const allRooms = db.prepare('SELECT * FROM rooms ORDER BY type, name ASC').all();
+    res.json({ success: true, message: 'All 29 default rooms restored successfully', rooms: allRooms });
   } catch (err) {
     res.status(500).json({ error: err.message || 'Failed to restore default rooms' });
   }

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert';
 import { getDatabase } from '../src/db/connection.js';
 import app from '../server.js';
-import { SEED_PASSWORDS } from '../src/db/seed.js';
+import { SEED_PASSWORDS, seedDatabase } from '../src/db/seed.js';
 
 let serverInstance;
 let baseUrl;
@@ -10,6 +10,8 @@ let adminToken;
 let studentToken;
 
 test.before(async () => {
+  const db = getDatabase();
+  seedDatabase(db);
   return new Promise((resolve) => {
     serverInstance = app.listen(0, '127.0.0.1', async () => {
       const address = serverInstance.address();

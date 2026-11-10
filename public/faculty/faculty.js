@@ -167,6 +167,7 @@ async function loadProfile() {
       if (roleBadge) {
         roleBadge.textContent = 'FACULTY';
       }
+      document.title = `${data.faculty.name} · Faculty Dashboard · CTAS`;
     }
 
     const subList = document.getElementById('assigned-subjects-list');

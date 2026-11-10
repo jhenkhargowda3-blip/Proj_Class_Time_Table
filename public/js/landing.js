@@ -179,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Auto-adjust selectedRole to match username if clearly indicated
       const val = username.toLowerCase();
       let roleToUse = selectedRole;
-      if ((val.startsWith('faculty') || val === 'alan' || val === 'donald') && roleToUse !== 'faculty') {
+      if ((val.startsWith('faculty') || val === 'alan' || val === 'donald' || val === 'manjula') && roleToUse !== 'faculty') {
         roleToUse = 'faculty';
         setRole('faculty');
       } else if ((val.startsWith('student') || val === 'jhenkhar') && roleToUse !== 'student') {

@@ -1295,9 +1295,14 @@ function setupStudioControls() {
   studioControlsInitialized = true;
 
   const versionSelector = document.getElementById('studio-version-selector');
-  versionSelector?.addEventListener('change', () => {
+  versionSelector?.addEventListener('change', async () => {
     if (activeResolver && activeResolver.isRunning) {
-      const ok = confirm('Conflict resolution is currently in progress. Switching versions will cancel resolution and discard the copy. Continue?');
+      const ok = await showAppConfirm({
+        title: 'Cancel Conflict Resolution',
+        message: 'Conflict resolution is currently in progress. Switching versions will cancel resolution and discard the copy. Continue?',
+        confirmText: 'Discard & Switch',
+        isDanger: true
+      });
       if (!ok) {
         versionSelector.value = activeVersionId;
         return;
@@ -1306,7 +1311,12 @@ function setupStudioControls() {
       activeResolver = null;
       resetResolvedPreviewState();
     } else if (isResolvedDraftPreview) {
-      const ok = confirm('You have an unsaved resolved preview. Switching versions will discard this copy. Continue?');
+      const ok = await showAppConfirm({
+        title: 'Discard Unsaved Preview',
+        message: 'You have an unsaved resolved preview. Switching versions will discard this copy. Continue?',
+        confirmText: 'Discard & Switch',
+        isDanger: true
+      });
       if (!ok) {
         versionSelector.value = activeVersionId;
         return;
@@ -2981,9 +2991,13 @@ function setupModals() {
   // Delete Timetable Entry
   document.getElementById('btn-delete-edit-entry')?.addEventListener('click', async () => {
     const entryId = parseInt(document.getElementById('edit-entry-id')?.value, 10);
-    if (!entryId) return;
-
-    if (!confirm('Are you sure you want to remove this class from the schedule?')) return;
+    const ok = await showAppConfirm({
+      title: 'Remove Scheduled Class',
+      message: 'Are you sure you want to remove this class from the schedule?',
+      confirmText: 'Remove Class',
+      isDanger: true
+    });
+    if (!ok) return;
 
     // Record undo state
     pushUndoSnapshot();
@@ -3933,6 +3947,78 @@ window.autoAssignAllPending = async () => {
   }
 };
 
+// Global in-app confirmation modal (100% iframe-safe, zero window.confirm dependency)
+export function showAppConfirm({
+  title = 'Confirm Deletion',
+  message = 'Are you sure you want to proceed?',
+  confirmText = 'Delete Permanently',
+  cancelText = 'Cancel',
+  isDanger = true
+} = {}) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('modal-app-confirm');
+    if (!modal) {
+      // Fallback if modal container not found
+      return resolve(true);
+    }
+
+    const titleEl = modal.querySelector('#app-confirm-title');
+    const msgEl = modal.querySelector('#app-confirm-message');
+    const cancelBtn = modal.querySelector('#app-confirm-cancel-btn');
+    const okBtn = modal.querySelector('#app-confirm-ok-btn');
+    const iconEl = modal.querySelector('#app-confirm-icon');
+
+    if (titleEl) titleEl.textContent = title;
+    if (msgEl) msgEl.innerHTML = message;
+    if (cancelBtn) cancelBtn.textContent = cancelText;
+    if (okBtn) {
+      okBtn.textContent = confirmText;
+      if (isDanger) {
+        okBtn.style.background = '#E11D48';
+        okBtn.style.borderColor = '#E11D48';
+        okBtn.style.color = '#FFFFFF';
+        if (iconEl) {
+          iconEl.textContent = '🗑️';
+          iconEl.style.background = 'rgba(225, 29, 72, 0.15)';
+          iconEl.style.color = '#E11D48';
+        }
+      } else {
+        okBtn.style.background = 'var(--color-brand-primary)';
+        okBtn.style.borderColor = 'var(--color-brand-primary)';
+        okBtn.style.color = '#FFFFFF';
+        if (iconEl) {
+          iconEl.textContent = 'ℹ️';
+          iconEl.style.background = 'rgba(59, 130, 246, 0.15)';
+          iconEl.style.color = 'var(--color-brand-primary)';
+        }
+      }
+    }
+
+    const cleanup = () => {
+      modal.style.display = 'none';
+      if (cancelBtn) cancelBtn.onclick = null;
+      if (okBtn) okBtn.onclick = null;
+    };
+
+    if (cancelBtn) {
+      cancelBtn.onclick = () => {
+        cleanup();
+        resolve(false);
+      };
+    }
+
+    if (okBtn) {
+      okBtn.onclick = () => {
+        cleanup();
+        resolve(true);
+      };
+    }
+
+    modal.style.display = 'flex';
+  });
+}
+window.showAppConfirm = showAppConfirm;
+
 // Global functions for inline actions & Master Data Modals
 window.openFacultyModal = (id = null) => {
   const deptSelect = document.getElementById('fac-dept');
@@ -3945,6 +4031,8 @@ window.openFacultyModal = (id = null) => {
   }
   const title = document.getElementById('modal-faculty-title');
   const pwdWrap = document.getElementById('fac-password-wrap');
+  const deleteBtn = document.getElementById('btn-modal-delete-faculty');
+
   if (id) {
     const f = masterData.faculty.find(x => x.id === id);
     if (!f) return;
@@ -3957,11 +4045,19 @@ window.openFacultyModal = (id = null) => {
     document.getElementById('fac-max-week').value = f.max_periods_per_week;
     if (pwdWrap) pwdWrap.style.display = 'none';
     if (title) title.textContent = 'Edit Faculty Member';
+    if (deleteBtn) {
+      deleteBtn.style.display = 'inline-block';
+      deleteBtn.onclick = () => {
+        document.getElementById('modal-faculty').style.display = 'none';
+        window.deleteFaculty(id);
+      };
+    }
   } else {
     document.getElementById('form-faculty')?.reset();
     document.getElementById('fac-id').value = '';
     if (pwdWrap) pwdWrap.style.display = 'block';
     if (title) title.textContent = 'Add Faculty Member';
+    if (deleteBtn) deleteBtn.style.display = 'none';
   }
   document.getElementById('modal-faculty').style.display = 'flex';
 };
@@ -3969,16 +4065,52 @@ window.openFacultyModal = (id = null) => {
 window.editFaculty = (id) => window.openFacultyModal(id);
 
 window.deleteFaculty = async (id) => {
-  if (!confirm('Are you sure you want to delete this faculty member? All associated assignments and availability will be removed.')) return;
+  const fac = masterData?.faculty?.find(f => f.id === id);
+  const name = fac ? fac.name : 'this faculty member';
+
+  const confirmed = await showAppConfirm({
+    title: 'Delete Faculty Member',
+    message: `Are you sure you want to permanently delete <strong>${escapeHtml(name)}</strong>?<br><br><span style="color: var(--text-muted); font-size: 0.82rem;">This will remove their faculty profile, user account, availability records, and any active timetable class assignments.</span>`,
+    confirmText: 'Delete Faculty',
+    cancelText: 'Cancel',
+    isDanger: true
+  });
+
+  if (!confirmed) return;
+
   try {
-    const res = await apiRequest(`/api/admin/faculty/${id}`, { method: 'DELETE' });
-    showToast(res.message || 'Faculty deleted', 'success');
+    const res = await apiRequest(`/api/admin/faculty/${id}?cascade=true`, { method: 'DELETE' });
+    showToast(res.message || `Faculty ${name} deleted successfully`, 'success');
     await loadMasterData();
     renderMasterDataTables();
     if (typeof loadOverview === 'function') loadOverview();
-    populateStudioEntitySelector();
-    renderStudioGrid();
+    if (typeof populateStudioEntitySelector === 'function') populateStudioEntitySelector();
+    if (typeof renderStudioGrid === 'function') renderStudioGrid();
   } catch (err) {
+    if (err.status === 409 || (err.message && err.message.includes('active timetable class'))) {
+      const forceConfirmed = await showAppConfirm({
+        title: 'Force Delete Faculty',
+        message: `${escapeHtml(err.message)}<br><br>Do you want to permanently force-delete <strong>${escapeHtml(name)}</strong> and clear all their classes from the timetable?`,
+        confirmText: 'Force Delete',
+        cancelText: 'Cancel',
+        isDanger: true
+      });
+      if (forceConfirmed) {
+        try {
+          const forceRes = await apiRequest(`/api/admin/faculty/${id}?force=true&cascade=true`, { method: 'DELETE' });
+          showToast(forceRes.message || `Faculty ${name} deleted successfully`, 'success');
+          await loadMasterData();
+          renderMasterDataTables();
+          if (typeof loadOverview === 'function') loadOverview();
+          if (typeof populateStudioEntitySelector === 'function') populateStudioEntitySelector();
+          if (typeof renderStudioGrid === 'function') renderStudioGrid();
+          return;
+        } catch (forceErr) {
+          showToast(forceErr.message || 'Failed to delete faculty member', 'error');
+          return;
+        }
+      }
+    }
     showToast(err.message || 'Failed to delete faculty member', 'error');
   }
 };
@@ -4016,7 +4148,17 @@ window.openSubjectModal = (id = null) => {
 window.editSubject = (id) => window.openSubjectModal(id);
 
 window.deleteSubject = async (id) => {
-  if (!confirm('Are you sure you want to delete this subject? All associated timetable entries and mappings will be removed.')) return;
+  const sub = masterData?.subjects?.find(s => s.id === id);
+  const name = sub ? `${sub.code} (${sub.name})` : 'this subject';
+
+  const confirmed = await showAppConfirm({
+    title: 'Delete Subject',
+    message: `Are you sure you want to delete <strong>${escapeHtml(name)}</strong>?<br><br><span style="color: var(--text-muted); font-size: 0.82rem;">All associated timetable entries and mappings will be removed.</span>`,
+    confirmText: 'Delete Subject',
+    isDanger: true
+  });
+  if (!confirmed) return;
+
   try {
     const res = await apiRequest(`/api/admin/subjects/${id}`, { method: 'DELETE' });
     showToast(res.message || 'Subject deleted', 'success');
@@ -4051,7 +4193,17 @@ window.openRoomModal = (id = null) => {
 window.editRoom = (id) => window.openRoomModal(id);
 
 window.deleteRoom = async (id) => {
-  if (!confirm('Are you sure you want to delete this room? Any classes scheduled here will be cleared.')) return;
+  const room = masterData?.rooms?.find(r => r.id === id);
+  const name = room ? room.name : 'this room';
+
+  const confirmed = await showAppConfirm({
+    title: 'Delete Room / Lab',
+    message: `Are you sure you want to delete <strong>${escapeHtml(name)}</strong>?<br><br><span style="color: var(--text-muted); font-size: 0.82rem;">Any classes scheduled in this room will be cleared.</span>`,
+    confirmText: 'Delete Room',
+    isDanger: true
+  });
+  if (!confirmed) return;
+
   try {
     const res = await apiRequest(`/api/admin/rooms/${id}`, { method: 'DELETE' });
     showToast(res.message || 'Room deleted', 'success');
@@ -4095,7 +4247,17 @@ window.openSectionModal = (id = null) => {
 window.editSection = (id) => window.openSectionModal(id);
 
 window.deleteSection = async (id) => {
-  if (!confirm('Are you sure you want to delete this section? All timetable entries and subject mappings for this section will be removed.')) return;
+  const sec = masterData?.sections?.find(s => s.id === id);
+  const name = sec ? sec.name : 'this section';
+
+  const confirmed = await showAppConfirm({
+    title: 'Delete Student Section',
+    message: `Are you sure you want to delete <strong>${escapeHtml(name)}</strong>?<br><br><span style="color: var(--text-muted); font-size: 0.82rem;">All timetable entries and subject mappings for this section will be removed.</span>`,
+    confirmText: 'Delete Section',
+    isDanger: true
+  });
+  if (!confirmed) return;
+
   try {
     const res = await apiRequest(`/api/admin/sections/${id}`, { method: 'DELETE' });
     showToast(res.message || 'Section deleted', 'success');
@@ -4117,7 +4279,17 @@ window.openHolidayModal = () => {
 };
 
 window.deleteHoliday = async (id) => {
-  if (!confirm('Are you sure you want to remove this academic holiday?')) return;
+  const hol = masterData?.holidays?.find(h => h.id === id);
+  const desc = hol ? `${hol.description} (${hol.date})` : 'this holiday';
+
+  const confirmed = await showAppConfirm({
+    title: 'Remove Academic Holiday',
+    message: `Are you sure you want to remove <strong>${escapeHtml(desc)}</strong>?`,
+    confirmText: 'Remove Holiday',
+    isDanger: true
+  });
+  if (!confirmed) return;
+
   try {
     const res = await apiRequest(`/api/admin/holidays/${id}`, { method: 'DELETE' });
     showToast(res.message || 'Holiday removed', 'success');
@@ -4149,7 +4321,17 @@ window.openDepartmentModal = (id = null) => {
 window.editDepartment = (id) => window.openDepartmentModal(id);
 
 window.deleteDepartment = async (id) => {
-  if (!confirm('Are you sure you want to delete this department? All associated faculty, subjects, sections, and timetable records will also be removed.')) return;
+  const dept = masterData?.departments?.find(d => d.id === id);
+  const name = dept ? `${dept.name} (${dept.code})` : 'this department';
+
+  const confirmed = await showAppConfirm({
+    title: 'Delete Department',
+    message: `Are you sure you want to delete <strong>${escapeHtml(name)}</strong>?<br><br><span style="color: var(--text-muted); font-size: 0.82rem;">All associated faculty, subjects, sections, and timetable records will also be removed.</span>`,
+    confirmText: 'Delete Department',
+    isDanger: true
+  });
+  if (!confirmed) return;
+
   try {
     const res = await apiRequest(`/api/admin/departments/${id}`, { method: 'DELETE' });
     showToast(res.message || 'Department deleted', 'success');

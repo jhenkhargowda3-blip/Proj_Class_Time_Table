@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert';
 import { getDatabase } from '../src/db/connection.js';
+import { seedDatabase } from '../src/db/seed.js';
 import { getFacultyCalendar, getFacultyDaySchedule } from '../src/services/calendar.js';
 
 test('Phase 7: Faculty Module and Calendar Logic', async (t) => {
   const db = getDatabase();
+  seedDatabase(db);
   db.prepare('DELETE FROM substitutions').run();
   db.prepare('DELETE FROM absences').run();
 

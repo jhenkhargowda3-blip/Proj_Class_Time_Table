@@ -8,6 +8,8 @@ let serverInstance;
 let baseUrl;
 
 test.before(async () => {
+  const db = getDatabase();
+  seedDatabase(db);
   return new Promise((resolve) => {
     // Listen on an ephemeral port for testing
     serverInstance = app.listen(0, '127.0.0.1', () => {

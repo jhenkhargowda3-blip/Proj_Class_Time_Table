@@ -132,6 +132,16 @@ export function seedDatabase(customDb, options = {}) {
       null
     );
 
+    insertUser.run(
+      'student1',
+      studentHash,
+      'student',
+      'Student Account (CSE-4A)',
+      'student1@college.edu',
+      null,
+      null
+    );
+
     // 4. Timetable Version (Active Master Version)
     const insertVersion = db.prepare(`
       INSERT INTO timetable_versions (name, status, created_by, notes)
@@ -213,6 +223,9 @@ export function seedDatabase(customDb, options = {}) {
       ecea: insertSection.run('ECE-4A', 4, eceDept, 40).lastInsertRowid
     };
 
+    // Associate student users with default section in test fixtures mode
+    db.prepare("UPDATE users SET student_id = ? WHERE role = 'student'").run(sectionIds.csea);
+
     const insertHoliday = db.prepare('INSERT INTO holidays (date, description) VALUES (?, ?)');
     insertHoliday.run('2026-01-26', 'Republic Day');
     insertHoliday.run('2026-03-20', 'Spring Equinox & Founder Day');
@@ -283,6 +296,32 @@ export function seedDatabase(customDb, options = {}) {
 
     insertUser.run('faculty', facultyHash, 'faculty', 'Dr. Alan Turing', 'faculty@college.edu', facultyIds['faculty1'], null);
 
+    // Register Mrs. Manjula H S (username: manjula, password: man2112, CSE Department)
+    const manjulaHash = bcrypt.hashSync('man2112', passwordSaltRounds);
+    const manjulaUserId = insertUser.run(
+      'manjula',
+      manjulaHash,
+      'faculty',
+      'Mrs. Manjula H S',
+      'manjula@gmail.com',
+      null,
+      null
+    ).lastInsertRowid;
+
+    const manjulaFacId = insertFaculty.run(
+      manjulaUserId,
+      'Mrs. Manjula H S',
+      cseDept,
+      'manjula@gmail.com',
+      '7374619852',
+      4,
+      18,
+      1
+    ).lastInsertRowid;
+
+    updateUserFacultyId.run(manjulaFacId, manjulaUserId);
+    facultyIds['manjula'] = manjulaFacId;
+
     const insertFacSub = db.prepare('INSERT INTO faculty_subjects (faculty_id, subject_id) VALUES (?, ?)');
     const qualifications = [
       { f: 'faculty1', subs: ['CS201', 'CS205', 'CS201L'] },
@@ -294,7 +333,8 @@ export function seedDatabase(customDb, options = {}) {
       { f: 'faculty7', subs: ['CS202', 'IT202'] },
       { f: 'faculty8', subs: ['EC201', 'CS206'] },
       { f: 'faculty9', subs: ['EC201', 'CS205'] },
-      { f: 'faculty10', subs: ['CS203', 'CS203L', 'CS201'] }
+      { f: 'faculty10', subs: ['CS203', 'CS203L', 'CS201'] },
+      { f: 'manjula', subs: ['CS201', 'CS203', 'CS201L'] }
     ];
     for (const q of qualifications) {
       const fId = facultyIds[q.f];

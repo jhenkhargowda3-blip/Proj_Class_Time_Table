@@ -1121,9 +1121,12 @@
           <label class="form-label" for="fac-password">Portal Login Password <span style="font-weight: 400; color: var(--text-muted); font-size: 0.75rem;">(optional, default: Faculty@123)</span></label>
           <input type="password" id="fac-password" class="form-input" placeholder="Faculty@123">
         </div>
-        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.25rem;">
-          <button type="button" class="btn-secondary" onclick="document.getElementById('modal-faculty').style.display='none'">Cancel</button>
-          <button type="submit" class="btn-primary">Save Faculty</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; margin-top: 1.25rem;">
+          <button type="button" id="btn-modal-delete-faculty" class="btn-secondary" style="color: var(--color-error); border-color: rgba(225,29,72,0.3); display: none;">🗑️ Delete Faculty</button>
+          <div style="display: flex; gap: 0.75rem; margin-left: auto;">
+            <button type="button" class="btn-secondary" onclick="document.getElementById('modal-faculty').style.display='none'">Cancel</button>
+            <button type="submit" class="btn-primary">Save Faculty</button>
+          </div>
         </div>
       </form>
     </div>
@@ -1343,6 +1346,25 @@
         </div>
       </div>
 
+    </div>
+  </div>
+
+  <!-- MODAL: System Confirmation Dialog (Zero-native-dialog fallback for iFrames) -->
+  <div id="modal-app-confirm" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(5px); padding: 1rem;">
+    <div class="card" style="max-width: 480px; width: 100%; border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6); padding: 1.5rem; background: var(--bg-surface); border: 1px solid var(--border-subtle); animation: fadeIn 0.15s ease-out;">
+      <div style="display: flex; align-items: flex-start; gap: 0.85rem; margin-bottom: 1.25rem;">
+        <div id="app-confirm-icon" style="width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; background: rgba(225, 29, 72, 0.15); color: #E11D48;">
+          🗑️
+        </div>
+        <div style="flex: 1;">
+          <h3 id="app-confirm-title" style="margin: 0 0 0.35rem 0; font-size: 1.2rem; font-weight: 700; color: var(--text-primary);">Confirm Action</h3>
+          <div id="app-confirm-message" style="margin: 0; font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5; word-break: break-word;"></div>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.25rem;">
+        <button type="button" class="btn-secondary" id="app-confirm-cancel-btn" style="padding: 0.5rem 1.1rem; font-size: 0.88rem;">Cancel</button>
+        <button type="button" class="btn-primary" id="app-confirm-ok-btn" style="background: #E11D48; border-color: #E11D48; color: #fff; padding: 0.5rem 1.1rem; font-size: 0.88rem; font-weight: 600;">Confirm</button>
+      </div>
     </div>
   </div>
 

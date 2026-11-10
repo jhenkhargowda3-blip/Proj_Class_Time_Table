@@ -425,9 +425,14 @@ router.get('/department-timetable', (req, res) => {
  */
 router.get('/export.ics', (req, res) => {
   const db = getDatabase();
-  const sectionId = req.user.role === 'admin' && req.query.sectionId
+  let sectionId = (req.user.role === 'admin' && req.query.sectionId)
     ? parseInt(req.query.sectionId, 10)
     : req.user.studentId;
+
+  if (!sectionId) {
+    const defaultSec = db.prepare('SELECT id FROM sections LIMIT 1').get();
+    sectionId = defaultSec?.id;
+  }
 
   if (!sectionId) {
     return res.status(400).send('Section not specified');

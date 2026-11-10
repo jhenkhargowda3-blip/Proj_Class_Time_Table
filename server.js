@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 import config from './src/config/env.js';
 import { getDatabase } from './src/db/connection.js';
 import { seedDatabase } from './src/db/seed.js';
+import { registerTeacher } from './src/services/teacherService.js';
 import errorHandler from './src/middleware/errorHandler.js';
 
 // Route imports
@@ -112,6 +113,17 @@ try {
       seedDatabase(db, { clean: true });
     }
   }
+  // Ensure faculty profile & credentials for Mrs. Manjula H S are initialized
+  registerTeacher({
+    username: 'manjula',
+    password: 'man2112',
+    fullName: 'Mrs. Manjula H S',
+    email: 'manjula@gmail.com',
+    phone: '7374619852',
+    departmentCode: 'CSE',
+    departmentName: 'Computer Science & Engineering'
+  }, db);
+
   console.log(`[CTAS] SQLite database ready at ${config.dbPath}`);
 } catch (err) {
   console.error('[CTAS] Failed to initialize database:', err);

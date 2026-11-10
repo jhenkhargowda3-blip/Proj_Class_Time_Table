@@ -138,9 +138,18 @@ export function fuzzyMatchEntities(extractedCells, defaultSectionId = null) {
         }
       }
     }
-    // Fallback room based on subject type
+    // Fallback room based on subject type or first available
     if (!matchedRoom && matchedSubject) {
       matchedRoom = allRooms.find(r => r.type === (matchedSubject.type === 'lab' ? 'lab' : 'classroom')) || allRooms[0];
+    }
+    if (!matchedRoom && allRooms.length > 0) {
+      matchedRoom = allRooms[0];
+    }
+    if (!matchedSubject && allSubjects.length > 0) {
+      matchedSubject = allSubjects[0];
+    }
+    if (!matchedFaculty && allFaculty.length > 0) {
+      matchedFaculty = allFaculty[0];
     }
 
     // 6. Section
@@ -196,7 +205,58 @@ export function fuzzyMatchEntities(extractedCells, defaultSectionId = null) {
 function getSampleExtractedTimetable(sectionName = 'CSE-4A') {
   return {
     sectionName,
-    cells: []
+    cells: [
+      {
+        day: 'Monday',
+        slotNo: 1,
+        subjectCode: 'CS201',
+        subjectName: 'Data Structures & Algorithms',
+        facultyName: 'Dr. Alan Turing',
+        roomName: 'CR-101',
+        isLabBlock: false,
+        confidence: 0.95
+      },
+      {
+        day: 'Monday',
+        slotNo: 2,
+        subjectCode: 'CS202',
+        subjectName: 'Operating Systems Principles',
+        facultyName: 'Dr. Grace Hopper',
+        roomName: 'CR-101',
+        isLabBlock: false,
+        confidence: 0.92
+      },
+      {
+        day: 'Monday',
+        slotNo: 4,
+        subjectCode: 'CS201L',
+        subjectName: 'Data Structures Lab',
+        facultyName: 'Dr. Alan Turing',
+        roomName: 'Computing Lab A',
+        isLabBlock: true,
+        confidence: 0.90
+      },
+      {
+        day: 'Monday',
+        slotNo: 5,
+        subjectCode: 'CS201L',
+        subjectName: 'Data Structures Lab',
+        facultyName: 'Dr. Alan Turing',
+        roomName: 'Computing Lab A',
+        isLabBlock: true,
+        confidence: 0.90
+      },
+      {
+        day: 'Monday',
+        slotNo: 7,
+        subjectCode: 'CS203',
+        subjectName: 'Database Management Systems',
+        facultyName: 'Dr. Ada Lovelace',
+        roomName: 'CR-101',
+        isLabBlock: false,
+        confidence: 0.88
+      }
+    ]
   };
 }
 

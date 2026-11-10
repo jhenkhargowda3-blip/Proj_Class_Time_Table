@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { getDatabase } from '../db/connection.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
+import { registerTeacher } from '../services/teacherService.js';
 
 const router = Router();
 
@@ -153,16 +154,25 @@ router.get('/faculty', (req, res) => {
   });
 });
 
+router.post('/register-teacher', (req, res) => {
+  try {
+    const result = registerTeacher(req.body);
+    res.status(201).json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to register teacher' });
+  }
+});
+
 router.post('/faculty', (req, res) => {
-  const { name, departmentId, email, phone, maxPeriodsPerDay, maxPeriodsPerWeek, password } = req.body;
+  const { name, departmentId, email, phone, maxPeriodsPerDay, maxPeriodsPerWeek, password, username } = req.body;
   const db = getDatabase();
 
   const facPassword = password || 'Faculty@123';
   const passwordSaltRounds = 10;
   const passwordHash = bcrypt.hashSync(facPassword, passwordSaltRounds);
 
-  // Generate unique username from email prefix or name
-  let baseUsername = (email ? email.split('@')[0] : name.toLowerCase().replace(/[^a-z0-9]/g, '')).toLowerCase();
+  // Generate unique username from provided username or email prefix or name
+  let baseUsername = (username || (email ? email.split('@')[0] : name.toLowerCase().replace(/[^a-z0-9]/g, ''))).toLowerCase();
   if (!baseUsername || baseUsername.length < 2) baseUsername = 'faculty';
   let finalUsername = baseUsername;
   let counter = 1;
@@ -253,14 +263,32 @@ router.delete('/faculty/:id', (req, res) => {
     return res.status(404).json({ error: 'Faculty member not found' });
   }
 
+  const allowCascade = req.query.cascade === 'true' || req.query.force === 'true' || req.body?.cascade === true || req.body?.force === true;
+
+  // Reject delete if faculty has scheduled timetable classes unless cascade / force is requested
+  const assigned = db.prepare('SELECT count(*) as count FROM timetable_entries WHERE faculty_id = ?').get(facId);
+  if (!allowCascade && assigned && assigned.count > 0) {
+    return res.status(409).json({
+      error: `Cannot delete faculty member assigned to ${assigned.count} active timetable class(es). Please reassign or clear these classes first.`,
+      assignedCount: assigned.count,
+      canForce: true
+    });
+  }
+
   const deleteTx = db.transaction(() => {
+    db.prepare(`
+      DELETE FROM substitutions 
+      WHERE substitute_faculty_id = ? 
+         OR absence_id IN (SELECT id FROM absences WHERE faculty_id = ?)
+         OR timetable_entry_id IN (SELECT id FROM timetable_entries WHERE faculty_id = ?)
+    `).run(facId, facId, facId);
     db.prepare('DELETE FROM timetable_entries WHERE faculty_id = ?').run(facId);
-    db.prepare('DELETE FROM substitutions WHERE substitute_faculty_id = ? OR absence_id IN (SELECT id FROM absences WHERE faculty_id = ?)').run(facId, facId);
     db.prepare('DELETE FROM absences WHERE faculty_id = ?').run(facId);
     db.prepare('DELETE FROM faculty_availability WHERE faculty_id = ?').run(facId);
     db.prepare('DELETE FROM section_subjects WHERE faculty_id = ?').run(facId);
     db.prepare('DELETE FROM faculty_subjects WHERE faculty_id = ?').run(facId);
-    db.prepare('DELETE FROM users WHERE faculty_id = ?').run(facId);
+    db.prepare('UPDATE faculty SET user_id = NULL WHERE id = ?').run(facId);
+    db.prepare('DELETE FROM users WHERE faculty_id = ? OR id = ?').run(facId, fac.user_id || -1);
     db.prepare('DELETE FROM faculty WHERE id = ?').run(facId);
 
     db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)')

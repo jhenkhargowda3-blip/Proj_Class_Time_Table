@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import bcrypt from 'bcryptjs';
 import { getDatabase } from '../db/connection.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
@@ -153,27 +154,65 @@ router.get('/faculty', (req, res) => {
 });
 
 router.post('/faculty', (req, res) => {
-  const { name, departmentId, email, phone, maxPeriodsPerDay, maxPeriodsPerWeek } = req.body;
+  const { name, departmentId, email, phone, maxPeriodsPerDay, maxPeriodsPerWeek, password } = req.body;
   const db = getDatabase();
 
-  const result = db.prepare(`
-    INSERT INTO faculty (name, department_id, email, phone, max_periods_per_day, max_periods_per_week, is_active)
-    VALUES (?, ?, ?, ?, ?, ?, 1)
-  `).run(name, departmentId, email, phone, maxPeriodsPerDay || 4, maxPeriodsPerWeek || 18);
+  const facPassword = password || 'Faculty@123';
+  const passwordSaltRounds = 10;
+  const passwordHash = bcrypt.hashSync(facPassword, passwordSaltRounds);
 
-  const facId = result.lastInsertRowid;
-
-  // Initialize faculty availability for active working days & non-break slots
-  const days = db.prepare('SELECT id FROM working_days WHERE is_active = 1').all();
-  const slots = db.prepare('SELECT id FROM time_slots WHERE is_break = 0').all();
-  const insertAvail = db.prepare('INSERT INTO faculty_availability (faculty_id, day_id, slot_id, is_available) VALUES (?, ?, ?, 1)');
-  for (const d of days) {
-    for (const s of slots) {
-      insertAvail.run(facId, d.id, s.id);
-    }
+  // Generate unique username from email prefix or name
+  let baseUsername = (email ? email.split('@')[0] : name.toLowerCase().replace(/[^a-z0-9]/g, '')).toLowerCase();
+  if (!baseUsername || baseUsername.length < 2) baseUsername = 'faculty';
+  let finalUsername = baseUsername;
+  let counter = 1;
+  while (db.prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?)').get(finalUsername)) {
+    finalUsername = `${baseUsername}${counter++}`;
   }
 
-  res.status(201).json({ success: true, id: facId, message: 'Faculty created successfully' });
+  const tx = db.transaction(() => {
+    const result = db.prepare(`
+      INSERT INTO faculty (name, department_id, email, phone, max_periods_per_day, max_periods_per_week, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, 1)
+    `).run(name, departmentId, email, phone, maxPeriodsPerDay || 4, maxPeriodsPerWeek || 18);
+
+    const facId = result.lastInsertRowid;
+
+    // Create user login account for the faculty member
+    const userResult = db.prepare(`
+      INSERT INTO users (username, password_hash, role, full_name, email, faculty_id)
+      VALUES (?, ?, 'faculty', ?, ?, ?)
+    `).run(finalUsername, passwordHash, name, email, facId);
+
+    const userId = userResult.lastInsertRowid;
+    db.prepare('UPDATE faculty SET user_id = ? WHERE id = ?').run(userId, facId);
+
+    // Initialize faculty availability for active working days & non-break slots
+    const days = db.prepare('SELECT id FROM working_days WHERE is_active = 1').all();
+    const slots = db.prepare('SELECT id FROM time_slots WHERE is_break = 0').all();
+    const insertAvail = db.prepare('INSERT INTO faculty_availability (faculty_id, day_id, slot_id, is_available) VALUES (?, ?, ?, 1)');
+    for (const d of days) {
+      for (const s of slots) {
+        insertAvail.run(facId, d.id, s.id);
+      }
+    }
+
+    return { facId, userId, username: finalUsername, defaultPassword: facPassword };
+  });
+
+  try {
+    const created = tx();
+    res.status(201).json({
+      success: true,
+      id: created.facId,
+      userId: created.userId,
+      username: created.username,
+      defaultPassword: created.defaultPassword,
+      message: `Faculty created successfully with login username '${created.username}' (Password: ${created.defaultPassword})`
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to create faculty member' });
+  }
 });
 
 router.put('/faculty/:id', (req, res) => {
@@ -181,30 +220,59 @@ router.put('/faculty/:id', (req, res) => {
   const { name, departmentId, email, phone, maxPeriodsPerDay, maxPeriodsPerWeek, isActive } = req.body;
   const db = getDatabase();
 
-  db.prepare(`
-    UPDATE faculty
-    SET name = ?, department_id = ?, email = ?, phone = ?,
-        max_periods_per_day = ?, max_periods_per_week = ?, is_active = ?
-    WHERE id = ?
-  `).run(name, departmentId, email, phone, maxPeriodsPerDay, maxPeriodsPerWeek, isActive ?? 1, facId);
+  const updateTx = db.transaction(() => {
+    db.prepare(`
+      UPDATE faculty
+      SET name = ?, department_id = ?, email = ?, phone = ?,
+          max_periods_per_day = ?, max_periods_per_week = ?, is_active = ?
+      WHERE id = ?
+    `).run(name, departmentId, email, phone, maxPeriodsPerDay, maxPeriodsPerWeek, isActive ?? 1, facId);
 
-  res.json({ success: true, message: 'Faculty updated successfully' });
+    // Sync full_name and email to users table if account exists
+    db.prepare(`
+      UPDATE users
+      SET full_name = ?, email = ?
+      WHERE faculty_id = ?
+    `).run(name, email, facId);
+  });
+
+  try {
+    updateTx();
+    res.json({ success: true, message: 'Faculty updated successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to update faculty member' });
+  }
 });
 
 router.delete('/faculty/:id', (req, res) => {
   const facId = parseInt(req.params.id, 10);
   const db = getDatabase();
 
-  // Delete-safety check: warn if used in timetable entries
-  const usage = db.prepare('SELECT COUNT(*) as count FROM timetable_entries WHERE faculty_id = ?').get(facId).count;
-  if (usage > 0 && req.query.force !== 'true') {
-    return res.status(409).json({
-      error: `Faculty is assigned to ${usage} timetable class(es). Remove or reassign them before deleting, or confirm force delete.`
-    });
+  const fac = db.prepare('SELECT * FROM faculty WHERE id = ?').get(facId);
+  if (!fac) {
+    return res.status(404).json({ error: 'Faculty member not found' });
   }
 
-  db.prepare('DELETE FROM faculty WHERE id = ?').run(facId);
-  res.json({ success: true, message: 'Faculty deleted successfully' });
+  const deleteTx = db.transaction(() => {
+    db.prepare('DELETE FROM timetable_entries WHERE faculty_id = ?').run(facId);
+    db.prepare('DELETE FROM substitutions WHERE substitute_faculty_id = ? OR absence_id IN (SELECT id FROM absences WHERE faculty_id = ?)').run(facId, facId);
+    db.prepare('DELETE FROM absences WHERE faculty_id = ?').run(facId);
+    db.prepare('DELETE FROM faculty_availability WHERE faculty_id = ?').run(facId);
+    db.prepare('DELETE FROM section_subjects WHERE faculty_id = ?').run(facId);
+    db.prepare('DELETE FROM faculty_subjects WHERE faculty_id = ?').run(facId);
+    db.prepare('DELETE FROM users WHERE faculty_id = ?').run(facId);
+    db.prepare('DELETE FROM faculty WHERE id = ?').run(facId);
+
+    db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)')
+      .run(req.user?.id || null, 'FACULTY_DELETED', JSON.stringify({ facultyId: facId, name: fac.name }));
+  });
+
+  try {
+    deleteTx();
+    res.json({ success: true, message: `Faculty ${fac.name} deleted successfully` });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to delete faculty member' });
+  }
 });
 
 // 4. Subjects CRUD
@@ -239,15 +307,27 @@ router.delete('/subjects/:id', (req, res) => {
   const subId = parseInt(req.params.id, 10);
   const db = getDatabase();
 
-  const usage = db.prepare('SELECT COUNT(*) as count FROM timetable_entries WHERE subject_id = ?').get(subId).count;
-  if (usage > 0 && req.query.force !== 'true') {
-    return res.status(409).json({
-      error: `Subject is scheduled in ${usage} timetable entry/entries. Remove entries before deleting.`
-    });
+  const sub = db.prepare('SELECT * FROM subjects WHERE id = ?').get(subId);
+  if (!sub) {
+    return res.status(404).json({ error: 'Subject not found' });
   }
 
-  db.prepare('DELETE FROM subjects WHERE id = ?').run(subId);
-  res.json({ success: true, message: 'Subject deleted successfully' });
+  const deleteTx = db.transaction(() => {
+    db.prepare('DELETE FROM timetable_entries WHERE subject_id = ?').run(subId);
+    db.prepare('DELETE FROM section_subjects WHERE subject_id = ?').run(subId);
+    db.prepare('DELETE FROM faculty_subjects WHERE subject_id = ?').run(subId);
+    db.prepare('DELETE FROM subjects WHERE id = ?').run(subId);
+
+    db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)')
+      .run(req.user?.id || null, 'SUBJECT_DELETED', JSON.stringify({ subjectId: subId, code: sub.code, name: sub.name }));
+  });
+
+  try {
+    deleteTx();
+    res.json({ success: true, message: `Subject ${sub.code} deleted successfully` });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to delete subject' });
+  }
 });
 
 // 5. Sections CRUD
@@ -281,15 +361,27 @@ router.delete('/sections/:id', (req, res) => {
   const secId = parseInt(req.params.id, 10);
   const db = getDatabase();
 
-  const usage = db.prepare('SELECT COUNT(*) as count FROM timetable_entries WHERE section_id = ?').get(secId).count;
-  if (usage > 0 && req.query.force !== 'true') {
-    return res.status(409).json({
-      error: `Section is scheduled in ${usage} timetable entry/entries. Remove entries before deleting.`
-    });
+  const sec = db.prepare('SELECT * FROM sections WHERE id = ?').get(secId);
+  if (!sec) {
+    return res.status(404).json({ error: 'Section not found' });
   }
 
-  db.prepare('DELETE FROM sections WHERE id = ?').run(secId);
-  res.json({ success: true, message: 'Section deleted successfully' });
+  const deleteTx = db.transaction(() => {
+    db.prepare('DELETE FROM timetable_entries WHERE section_id = ?').run(secId);
+    db.prepare('DELETE FROM section_subjects WHERE section_id = ?').run(secId);
+    db.prepare('UPDATE users SET student_id = NULL WHERE student_id = ?').run(secId);
+    db.prepare('DELETE FROM sections WHERE id = ?').run(secId);
+
+    db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)')
+      .run(req.user?.id || null, 'SECTION_DELETED', JSON.stringify({ sectionId: secId, name: sec.name }));
+  });
+
+  try {
+    deleteTx();
+    res.json({ success: true, message: `Section ${sec.name} and associated records deleted successfully` });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to delete section' });
+  }
 });
 
 // 6. Rooms CRUD
@@ -323,15 +415,25 @@ router.delete('/rooms/:id', (req, res) => {
   const roomId = parseInt(req.params.id, 10);
   const db = getDatabase();
 
-  const usage = db.prepare('SELECT COUNT(*) as count FROM timetable_entries WHERE room_id = ?').get(roomId).count;
-  if (usage > 0 && req.query.force !== 'true') {
-    return res.status(409).json({
-      error: `Room is booked in ${usage} timetable entry/entries. Reassign classes before deleting.`
-    });
+  const room = db.prepare('SELECT * FROM rooms WHERE id = ?').get(roomId);
+  if (!room) {
+    return res.status(404).json({ error: 'Room not found' });
   }
 
-  db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId);
-  res.json({ success: true, message: 'Room deleted successfully' });
+  const deleteTx = db.transaction(() => {
+    db.prepare('DELETE FROM timetable_entries WHERE room_id = ?').run(roomId);
+    db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId);
+
+    db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)')
+      .run(req.user?.id || null, 'ROOM_DELETED', JSON.stringify({ roomId, name: room.name }));
+  });
+
+  try {
+    deleteTx();
+    res.json({ success: true, message: `Room ${room.name} deleted successfully` });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to delete room' });
+  }
 });
 
 // 7. Holidays CRUD
@@ -350,8 +452,16 @@ router.post('/holidays', (req, res) => {
 router.delete('/holidays/:id', (req, res) => {
   const holidayId = parseInt(req.params.id, 10);
   const db = getDatabase();
+
+  const hol = db.prepare('SELECT * FROM holidays WHERE id = ?').get(holidayId);
+  if (!hol) {
+    return res.status(404).json({ error: 'Holiday not found' });
+  }
+
   db.prepare('DELETE FROM holidays WHERE id = ?').run(holidayId);
-  res.json({ success: true, message: 'Holiday removed' });
+  db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)')
+    .run(req.user?.id || null, 'HOLIDAY_DELETED', JSON.stringify({ holidayId, date: hol.date, description: hol.description }));
+  res.json({ success: true, message: `Holiday removed successfully` });
 });
 
 // 7b. Departments CRUD
@@ -385,19 +495,56 @@ router.delete('/departments/:id', (req, res) => {
   const deptId = parseInt(req.params.id, 10);
   const db = getDatabase();
 
-  const facUsage = db.prepare('SELECT COUNT(*) as count FROM faculty WHERE department_id = ?').get(deptId).count;
-  const subUsage = db.prepare('SELECT COUNT(*) as count FROM subjects WHERE department_id = ?').get(deptId).count;
-  const secUsage = db.prepare('SELECT COUNT(*) as count FROM sections WHERE department_id = ?').get(deptId).count;
-  const total = facUsage + subUsage + secUsage;
-
-  if (total > 0 && req.query.force !== 'true') {
-    return res.status(409).json({
-      error: `Department has ${facUsage} faculty, ${subUsage} subjects, and ${secUsage} sections attached. Cannot delete without force.`
-    });
+  const dept = db.prepare('SELECT * FROM departments WHERE id = ?').get(deptId);
+  if (!dept) {
+    return res.status(404).json({ error: 'Department not found' });
   }
 
-  db.prepare('DELETE FROM departments WHERE id = ?').run(deptId);
-  res.json({ success: true, message: 'Department deleted successfully' });
+  const deleteTx = db.transaction(() => {
+    // 1. Cascade delete all sections belonging to this department
+    const sections = db.prepare('SELECT id FROM sections WHERE department_id = ?').all(deptId);
+    for (const sec of sections) {
+      db.prepare('DELETE FROM timetable_entries WHERE section_id = ?').run(sec.id);
+      db.prepare('DELETE FROM section_subjects WHERE section_id = ?').run(sec.id);
+      db.prepare('UPDATE users SET student_id = NULL WHERE student_id = ?').run(sec.id);
+      db.prepare('DELETE FROM sections WHERE id = ?').run(sec.id);
+    }
+
+    // 2. Cascade delete all subjects belonging to this department
+    const subjects = db.prepare('SELECT id FROM subjects WHERE department_id = ?').all(deptId);
+    for (const sub of subjects) {
+      db.prepare('DELETE FROM timetable_entries WHERE subject_id = ?').run(sub.id);
+      db.prepare('DELETE FROM section_subjects WHERE subject_id = ?').run(sub.id);
+      db.prepare('DELETE FROM faculty_subjects WHERE subject_id = ?').run(sub.id);
+      db.prepare('DELETE FROM subjects WHERE id = ?').run(sub.id);
+    }
+
+    // 3. Cascade delete all faculty belonging to this department
+    const facultyList = db.prepare('SELECT id FROM faculty WHERE department_id = ?').all(deptId);
+    for (const f of facultyList) {
+      db.prepare('DELETE FROM timetable_entries WHERE faculty_id = ?').run(f.id);
+      db.prepare('DELETE FROM substitutions WHERE substitute_faculty_id = ? OR absence_id IN (SELECT id FROM absences WHERE faculty_id = ?)').run(f.id, f.id);
+      db.prepare('DELETE FROM absences WHERE faculty_id = ?').run(f.id);
+      db.prepare('DELETE FROM faculty_availability WHERE faculty_id = ?').run(f.id);
+      db.prepare('DELETE FROM section_subjects WHERE faculty_id = ?').run(f.id);
+      db.prepare('DELETE FROM faculty_subjects WHERE faculty_id = ?').run(f.id);
+      db.prepare('DELETE FROM users WHERE faculty_id = ?').run(f.id);
+      db.prepare('DELETE FROM faculty WHERE id = ?').run(f.id);
+    }
+
+    // 4. Delete department
+    db.prepare('DELETE FROM departments WHERE id = ?').run(deptId);
+
+    db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)')
+      .run(req.user?.id || null, 'DEPARTMENT_DELETED', JSON.stringify({ departmentId: deptId, name: dept.name, code: dept.code }));
+  });
+
+  try {
+    deleteTx();
+    res.json({ success: true, message: `Department ${dept.code} and all associated records deleted successfully` });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to delete department' });
+  }
 });
 
 // 8. Faculty Availability Grid (Weekly Matrix)

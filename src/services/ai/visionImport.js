@@ -191,30 +191,12 @@ export function fuzzyMatchEntities(extractedCells, defaultSectionId = null) {
 }
 
 /**
- * Generate high-fidelity sample timetable extraction when Grok Vision API key is not configured
+ * Clean timetable extraction template when no file is uploaded or OCR is not active
  */
 function getSampleExtractedTimetable(sectionName = 'CSE-4A') {
   return {
     sectionName,
-    cells: [
-      { day: 'Monday', slotNo: 1, subjectCode: 'CS201', subjectName: 'Data Structures & Algorithms', facultyName: 'Dr. Alan Turing', roomName: 'CR-101', sectionName, isLabBlock: false, confidence: 0.96 },
-      { day: 'Monday', slotNo: 2, subjectCode: 'CS202', subjectName: 'Operating Systems Principles', facultyName: 'Dr. Grace Hopper', roomName: 'CR-101', sectionName, isLabBlock: false, confidence: 0.94 },
-      { day: 'Monday', slotNo: 4, subjectCode: 'CS201L', subjectName: 'Data Structures Lab', facultyName: 'Dr. Alan Turing', roomName: 'Computing Lab A', sectionName, isLabBlock: true, confidence: 0.92 },
-      { day: 'Monday', slotNo: 5, subjectCode: 'CS201L', subjectName: 'Data Structures Lab', facultyName: 'Dr. Alan Turing', roomName: 'Computing Lab A', sectionName, isLabBlock: true, confidence: 0.92 },
-      { day: 'Monday', slotNo: 7, subjectCode: 'CS203', subjectName: 'Database Management Systems', facultyName: 'Dr. Ada Lovelace', roomName: 'CR-101', sectionName, isLabBlock: false, confidence: 0.88 },
-      { day: 'Tuesday', slotNo: 1, subjectCode: 'CS204', subjectName: 'Computer Networks & Protocols', facultyName: 'Prof. Claude Shannon', roomName: 'CR-101', sectionName, isLabBlock: false, confidence: 0.95 },
-      { day: 'Tuesday', slotNo: 2, subjectCode: 'CS205', subjectName: 'Discrete Mathematics', facultyName: 'Prof. Donald Knuth', roomName: 'CR-101', sectionName, isLabBlock: false, confidence: 0.91 },
-      { day: 'Tuesday', slotNo: 4, subjectCode: 'CS201', subjectName: 'Data Structures & Algorithms', facultyName: 'Dr. Alan Turing', roomName: 'CR-101', sectionName, isLabBlock: false, confidence: 0.89 },
-      { day: 'Wednesday', slotNo: 1, subjectCode: 'CS206', subjectName: 'Software Engineering', facultyName: 'Dr. Barbara Liskov', roomName: 'CR-101', sectionName, isLabBlock: false, confidence: 0.93 },
-      { day: 'Wednesday', slotNo: 2, subjectCode: 'CS202', subjectName: 'Operating Systems Principles', facultyName: 'Dr. Grace Hopper', roomName: 'CR-101', sectionName, isLabBlock: false, confidence: 0.90 },
-      { day: 'Wednesday', slotNo: 4, subjectCode: 'CS203L', subjectName: 'Database Systems Lab', facultyName: 'Dr. Ada Lovelace', roomName: 'Computing Lab B', sectionName, isLabBlock: true, confidence: 0.94 },
-      { day: 'Wednesday', slotNo: 5, subjectCode: 'CS203L', subjectName: 'Database Systems Lab', facultyName: 'Dr. Ada Lovelace', roomName: 'Computing Lab B', sectionName, isLabBlock: true, confidence: 0.94 },
-      { day: 'Thursday', slotNo: 1, subjectCode: 'CS203', subjectName: 'Database Management Systems', facultyName: 'Dr. Ada Lovelace', roomName: 'CR-101', sectionName, isLabBlock: false, confidence: 0.89 },
-      { day: 'Thursday', slotNo: 2, subjectCode: 'CS204', subjectName: 'Computer Networks & Protocols', facultyName: 'Prof. Claude Shannon', roomName: 'CR-101', sectionName, isLabBlock: false, confidence: 0.92 },
-      { day: 'Thursday', slotNo: 4, subjectCode: 'CS205', subjectName: 'Discrete Mathematics', facultyName: 'Prof. Donald Knuth', roomName: 'CR-101', sectionName, isLabBlock: false, confidence: 0.87 },
-      { day: 'Friday', slotNo: 1, subjectCode: 'CS201', subjectName: 'Data Structures & Algorithms', facultyName: 'Dr. Alan Turing', roomName: 'CR-101', sectionName, isLabBlock: false, confidence: 0.93 },
-      { day: 'Friday', slotNo: 2, subjectCode: 'CS206', subjectName: 'Software Engineering', facultyName: 'Dr. Barbara Liskov', roomName: 'CR-101', sectionName, isLabBlock: false, confidence: 0.91 }
-    ]
+    cells: []
   };
 }
 

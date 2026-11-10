@@ -19,11 +19,20 @@ router.get('/schedule', (req, res) => {
     ? parseInt(req.query.sectionId, 10)
     : req.user.studentId;
 
+  const queryDate = req.query.date || new Date().toISOString().slice(0, 10);
+
   if (!sectionId) {
-    return res.status(400).json({ error: 'Section not linked to this student account' });
+    return res.json({
+      date: queryDate,
+      isHoliday: false,
+      holiday: null,
+      section: null,
+      todaySchedule: [],
+      fullWeeklySchedule: [],
+      message: 'No section assigned to this student account yet.'
+    });
   }
 
-  const queryDate = req.query.date || new Date().toISOString().slice(0, 10);
   const [y, m, d] = queryDate.split('-').map(Number);
   const dateObj = new Date(Date.UTC(y, m - 1, d));
   const dayOfWeek = dateObj.getUTCDay(); // 0=Sun..6=Sat
@@ -36,7 +45,15 @@ router.get('/schedule', (req, res) => {
   `).get(sectionId);
 
   if (!section) {
-    return res.status(404).json({ error: 'Section not found' });
+    return res.json({
+      date: queryDate,
+      isHoliday: false,
+      holiday: null,
+      section: null,
+      todaySchedule: [],
+      fullWeeklySchedule: [],
+      message: 'Section not found or removed.'
+    });
   }
 
   // Check if date is a holiday

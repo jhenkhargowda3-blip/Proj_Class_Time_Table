@@ -101,15 +101,15 @@ app.get('/', (req, res) => {
 // Centralized error handler
 app.use(errorHandler);
 
-// Initialize DB on boot & auto-seed if empty
+// Initialize DB on boot & initialize clean structure if empty
 try {
   const db = getDatabase();
   const userTable = db.prepare("SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='users'").get();
   if (userTable && userTable.count > 0) {
-    const userCount = db.prepare("SELECT count(*) as count FROM users").get();
-    if (!userCount || userCount.count === 0) {
-      console.log('[CTAS] Database empty - auto-seeding sample college data...');
-      seedDatabase(db);
+    const adminCount = db.prepare("SELECT count(*) as count FROM users WHERE role = 'admin'").get();
+    if (!adminCount || adminCount.count === 0) {
+      console.log('[CTAS] Database empty - initializing clean college structure...');
+      seedDatabase(db, { clean: true });
     }
   }
   console.log(`[CTAS] SQLite database ready at ${config.dbPath}`);

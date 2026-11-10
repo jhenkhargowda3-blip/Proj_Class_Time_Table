@@ -1076,8 +1076,8 @@ function renderFacultyTable(facultyList = masterData?.faculty || []) {
     const queryDesc = searchInput?.value?.trim() || deptSelect?.value || '';
     facTable.innerHTML = `
       <tr style="border-bottom: 1px solid var(--border-subtle);">
-        <td colspan="6" style="padding: 2rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle);">
-          🔍 No faculty members match "<strong>${escapeHtml(queryDesc)}</strong>".
+        <td colspan="6" style="padding: 2.5rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle);">
+          ${queryDesc ? `🔍 No faculty members match "<strong>${escapeHtml(queryDesc)}</strong>".` : 'No faculty records found. Click "+ Add Faculty" above to add department faculty.'}
         </td>
       </tr>
     `;
@@ -1131,83 +1131,133 @@ function renderMasterDataTables() {
   // 2. Subjects
   const subTable = document.getElementById('table-subjects-body');
   if (subTable) {
-    subTable.innerHTML = masterData.subjects.map(s => `
-      <tr style="border-bottom: 1px solid var(--border-subtle);">
-        <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--color-brand-primary);">${s.code}</td>
-        <td style="padding: 0.6rem 0.75rem; font-weight: 600;">${s.name}</td>
-        <td style="padding: 0.6rem 0.75rem;">${s.department_code}</td>
-        <td style="padding: 0.6rem 0.75rem;">Sem ${s.semester}</td>
-        <td style="padding: 0.6rem 0.75rem;"><span style="text-transform: capitalize; background: var(--bg-surface-subtle); padding: 0.15rem 0.45rem; border-radius: 4px;">${s.type}</span> ${s.type === 'lab' ? `(${s.lab_block_length}p block)` : ''}</td>
-        <td style="padding: 0.6rem 0.75rem;" class="tabular-nums">${s.weekly_periods} periods</td>
-        <td style="padding: 0.6rem 0.75rem; text-align: right;">
-          <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editSubject(${s.id})">Edit</button>
-          <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteSubject(${s.id})">Delete</button>
-        </td>
-      </tr>
-    `).join('');
+    if (!masterData.subjects || masterData.subjects.length === 0) {
+      subTable.innerHTML = `
+        <tr style="border-bottom: 1px solid var(--border-subtle);">
+          <td colspan="7" style="padding: 2.5rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle);">
+            No curriculum subjects found. Click "+ Add Subject" above to add courses/subjects.
+          </td>
+        </tr>
+      `;
+    } else {
+      subTable.innerHTML = masterData.subjects.map(s => `
+        <tr style="border-bottom: 1px solid var(--border-subtle);">
+          <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--color-brand-primary);">${s.code}</td>
+          <td style="padding: 0.6rem 0.75rem; font-weight: 600;">${s.name}</td>
+          <td style="padding: 0.6rem 0.75rem;">${s.department_code}</td>
+          <td style="padding: 0.6rem 0.75rem;">Sem ${s.semester}</td>
+          <td style="padding: 0.6rem 0.75rem;"><span style="text-transform: capitalize; background: var(--bg-surface-subtle); padding: 0.15rem 0.45rem; border-radius: 4px;">${s.type}</span> ${s.type === 'lab' ? `(${s.lab_block_length}p block)` : ''}</td>
+          <td style="padding: 0.6rem 0.75rem;" class="tabular-nums">${s.weekly_periods} periods</td>
+          <td style="padding: 0.6rem 0.75rem; text-align: right;">
+            <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editSubject(${s.id})">Edit</button>
+            <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteSubject(${s.id})">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    }
   }
 
   // 3. Rooms
   const roomTable = document.getElementById('table-rooms-body');
   if (roomTable) {
-    roomTable.innerHTML = masterData.rooms.map(r => `
-      <tr style="border-bottom: 1px solid var(--border-subtle);">
-        <td style="padding: 0.6rem 0.75rem; font-weight: 600;">${r.name}</td>
-        <td style="padding: 0.6rem 0.75rem;"><span style="text-transform: capitalize; background: var(--bg-surface-subtle); padding: 0.15rem 0.45rem; border-radius: 4px;">${r.type}</span></td>
-        <td style="padding: 0.6rem 0.75rem;" class="tabular-nums">${r.capacity} seats</td>
-        <td style="padding: 0.6rem 0.75rem;"><span style="color: var(--color-success); font-weight: 600;">● Active</span></td>
-        <td style="padding: 0.6rem 0.75rem; text-align: right;">
-          <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editRoom(${r.id})">Edit</button>
-          <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteRoom(${r.id})">Delete</button>
-        </td>
-      </tr>
-    `).join('');
+    if (!masterData.rooms || masterData.rooms.length === 0) {
+      roomTable.innerHTML = `
+        <tr style="border-bottom: 1px solid var(--border-subtle);">
+          <td colspan="5" style="padding: 2.5rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle);">
+            No rooms or laboratories configured. Click "+ Add Room" above to register classrooms and labs.
+          </td>
+        </tr>
+      `;
+    } else {
+      roomTable.innerHTML = masterData.rooms.map(r => `
+        <tr style="border-bottom: 1px solid var(--border-subtle);">
+          <td style="padding: 0.6rem 0.75rem; font-weight: 600;">${r.name}</td>
+          <td style="padding: 0.6rem 0.75rem;"><span style="text-transform: capitalize; background: var(--bg-surface-subtle); padding: 0.15rem 0.45rem; border-radius: 4px;">${r.type}</span></td>
+          <td style="padding: 0.6rem 0.75rem;" class="tabular-nums">${r.capacity} seats</td>
+          <td style="padding: 0.6rem 0.75rem;"><span style="color: var(--color-success); font-weight: 600;">● Active</span></td>
+          <td style="padding: 0.6rem 0.75rem; text-align: right;">
+            <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editRoom(${r.id})">Edit</button>
+            <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteRoom(${r.id})">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    }
   }
 
   // 4. Sections
   const secTable = document.getElementById('table-sections-body');
   if (secTable) {
-    secTable.innerHTML = (masterData.sections || []).map(sec => `
-      <tr style="border-bottom: 1px solid var(--border-subtle);">
-        <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--color-brand-primary);">${sec.name}</td>
-        <td style="padding: 0.6rem 0.75rem;">${sec.department_name} (${sec.department_code})</td>
-        <td style="padding: 0.6rem 0.75rem;">Semester ${sec.semester}</td>
-        <td style="padding: 0.6rem 0.75rem;" class="tabular-nums">${sec.strength} students</td>
-        <td style="padding: 0.6rem 0.75rem; text-align: right;">
-          <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editSection(${sec.id})">Edit</button>
-          <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteSection(${sec.id})">Delete</button>
-        </td>
-      </tr>
-    `).join('');
+    if (!masterData.sections || masterData.sections.length === 0) {
+      secTable.innerHTML = `
+        <tr style="border-bottom: 1px solid var(--border-subtle);">
+          <td colspan="5" style="padding: 2.5rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle);">
+            No student sections found. Click "+ Add Section" above to create classes/sections.
+          </td>
+        </tr>
+      `;
+    } else {
+      secTable.innerHTML = (masterData.sections || []).map(sec => `
+        <tr style="border-bottom: 1px solid var(--border-subtle);">
+          <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--color-brand-primary);">${sec.name}</td>
+          <td style="padding: 0.6rem 0.75rem;">${sec.department_name} (${sec.department_code})</td>
+          <td style="padding: 0.6rem 0.75rem;">Semester ${sec.semester}</td>
+          <td style="padding: 0.6rem 0.75rem;" class="tabular-nums">${sec.strength} students</td>
+          <td style="padding: 0.6rem 0.75rem; text-align: right;">
+            <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editSection(${sec.id})">Edit</button>
+            <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteSection(${sec.id})">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    }
   }
 
   // 5. Holidays
   const holTable = document.getElementById('table-holidays-body');
   if (holTable) {
-    holTable.innerHTML = (masterData.holidays || []).map(h => `
-      <tr style="border-bottom: 1px solid var(--border-subtle);">
-        <td style="padding: 0.6rem 0.75rem; font-weight: 600; color: var(--color-brand-primary);">${h.date}</td>
-        <td style="padding: 0.6rem 0.75rem;">${h.description}</td>
-        <td style="padding: 0.6rem 0.75rem; text-align: right;">
-          <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteHoliday(${h.id})">Remove</button>
-        </td>
-      </tr>
-    `).join('');
+    if (!masterData.holidays || masterData.holidays.length === 0) {
+      holTable.innerHTML = `
+        <tr style="border-bottom: 1px solid var(--border-subtle);">
+          <td colspan="3" style="padding: 2.5rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle);">
+            No academic holidays scheduled. Click "+ Add Holiday" above to register holidays.
+          </td>
+        </tr>
+      `;
+    } else {
+      holTable.innerHTML = (masterData.holidays || []).map(h => `
+        <tr style="border-bottom: 1px solid var(--border-subtle);">
+          <td style="padding: 0.6rem 0.75rem; font-weight: 600; color: var(--color-brand-primary);">${h.date}</td>
+          <td style="padding: 0.6rem 0.75rem;">${h.description}</td>
+          <td style="padding: 0.6rem 0.75rem; text-align: right;">
+            <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteHoliday(${h.id})">Remove</button>
+          </td>
+        </tr>
+      `).join('');
+    }
   }
 
   // 6. Departments
   const deptTable = document.getElementById('table-departments-body');
   if (deptTable) {
-    deptTable.innerHTML = (masterData.departments || []).map(d => `
-      <tr style="border-bottom: 1px solid var(--border-subtle);">
-        <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--color-brand-primary);">${d.code}</td>
-        <td style="padding: 0.6rem 0.75rem; font-weight: 600;">${d.name}</td>
-        <td style="padding: 0.6rem 0.75rem; text-align: right;">
-          <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editDepartment(${d.id})">Edit</button>
-          <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteDepartment(${d.id})">Delete</button>
-        </td>
-      </tr>
-    `).join('');
+    if (!masterData.departments || masterData.departments.length === 0) {
+      deptTable.innerHTML = `
+        <tr style="border-bottom: 1px solid var(--border-subtle);">
+          <td colspan="3" style="padding: 2.5rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle);">
+            No academic departments found. Click "+ Add Department" above to create departments.
+          </td>
+        </tr>
+      `;
+    } else {
+      deptTable.innerHTML = (masterData.departments || []).map(d => `
+        <tr style="border-bottom: 1px solid var(--border-subtle);">
+          <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--color-brand-primary);">${d.code}</td>
+          <td style="padding: 0.6rem 0.75rem; font-weight: 600;">${d.name}</td>
+          <td style="padding: 0.6rem 0.75rem; text-align: right;">
+            <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editDepartment(${d.id})">Edit</button>
+            <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteDepartment(${d.id})">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    }
   }
 }
 
@@ -2103,15 +2153,19 @@ function populateStudioEntitySelector() {
   if (!entitySelector || !masterData) return;
 
   if (studioMode === 'section') {
-    entitySelector.innerHTML = masterData.sections.map(s => `
+    entitySelector.innerHTML = (masterData.sections || []).map(s => `
       <option value="${s.id}">Section: ${s.name} (Sem ${s.semester})</option>
     `).join('');
   } else if (studioMode === 'faculty') {
-    entitySelector.innerHTML = masterData.faculty.map(f => `
-      <option value="${f.id}">Faculty: ${f.name} (${f.department_code})</option>
-    `).join('');
+    if (!masterData.faculty || masterData.faculty.length === 0) {
+      entitySelector.innerHTML = '<option value="">No faculty added yet</option>';
+    } else {
+      entitySelector.innerHTML = masterData.faculty.map(f => `
+        <option value="${f.id}">Faculty: ${f.name} (${f.department_code})</option>
+      `).join('');
+    }
   } else if (studioMode === 'room') {
-    entitySelector.innerHTML = masterData.rooms.map(r => `
+    entitySelector.innerHTML = (masterData.rooms || []).map(r => `
       <option value="${r.id}">Room: ${r.name} (${r.type})</option>
     `).join('');
   }
@@ -3123,6 +3177,7 @@ function setupModals() {
   document.getElementById('form-faculty')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = document.getElementById('fac-id').value;
+    const pwdInput = document.getElementById('fac-password');
     const body = {
       name: document.getElementById('fac-name').value,
       departmentId: parseInt(document.getElementById('fac-dept').value, 10),
@@ -3131,18 +3186,26 @@ function setupModals() {
       maxPeriodsPerDay: parseInt(document.getElementById('fac-max-day').value, 10),
       maxPeriodsPerWeek: parseInt(document.getElementById('fac-max-week').value, 10)
     };
+    if (!id && pwdInput && pwdInput.value.trim()) {
+      body.password = pwdInput.value.trim();
+    }
     try {
       if (id) {
         await apiRequest(`/api/admin/faculty/${id}`, { method: 'PUT', body });
         showToast('Faculty updated successfully', 'success');
       } else {
-        await apiRequest('/api/admin/faculty', { method: 'POST', body });
-        showToast('Faculty added successfully', 'success');
+        const res = await apiRequest('/api/admin/faculty', { method: 'POST', body });
+        showToast(res.message || 'Faculty added successfully', 'success');
       }
       document.getElementById('modal-faculty').style.display = 'none';
       await loadMasterData();
       renderMasterDataTables();
-    } catch (err) {}
+      if (typeof loadOverview === 'function') loadOverview();
+      populateStudioEntitySelector();
+      renderStudioGrid();
+    } catch (err) {
+      showToast(err.message || 'Failed to save faculty', 'error');
+    }
   });
 
   document.getElementById('form-subject')?.addEventListener('submit', async (e) => {
@@ -3353,16 +3416,24 @@ function openAddEntryModal(dayId, slotId) {
 
   const subSelect = document.getElementById('edit-entry-subject');
   if (subSelect && masterData.subjects) {
-    subSelect.innerHTML = masterData.subjects.map(s =>
-      `<option value="${s.id}">${s.code} - ${s.name} (${s.type === 'lab' ? 'Lab' : 'Theory'}, ${s.weekly_periods} hrs)</option>`
-    ).join('');
+    if (masterData.subjects.length === 0) {
+      subSelect.innerHTML = '<option value="">No subjects found (Add in Master Data first)</option>';
+    } else {
+      subSelect.innerHTML = masterData.subjects.map(s =>
+        `<option value="${s.id}">${s.code} - ${s.name} (${s.type === 'lab' ? 'Lab' : 'Theory'}, ${s.weekly_periods} hrs)</option>`
+      ).join('');
+    }
   }
 
   const facSelect = document.getElementById('edit-entry-faculty');
   if (facSelect && masterData.faculty) {
-    facSelect.innerHTML = masterData.faculty.map(f =>
-      `<option value="${f.id}" ${(studioMode === 'faculty' && f.id === studioEntityId) ? 'selected' : ''}>${f.name} (${f.department_code || 'Dept'}) - Max: ${f.max_periods_per_day || 4}/day</option>`
-    ).join('');
+    if (masterData.faculty.length === 0) {
+      facSelect.innerHTML = '<option value="">No faculty found (Add in Master Data first)</option>';
+    } else {
+      facSelect.innerHTML = masterData.faculty.map(f =>
+        `<option value="${f.id}" ${(studioMode === 'faculty' && f.id === studioEntityId) ? 'selected' : ''}>${f.name} (${f.department_code || 'Dept'}) - Max: ${f.max_periods_per_day || 4}/day</option>`
+      ).join('');
+    }
   }
 
   const roomSelect = document.getElementById('edit-entry-room');
@@ -3397,6 +3468,14 @@ async function loadAvailabilityEditor() {
     const prevSelected = select.value;
     if (filtered.length === 0) {
       select.innerHTML = `<option value="">No matching faculty found</option>`;
+      const container = document.getElementById('availability-grid-container');
+      if (container) {
+        container.innerHTML = `
+          <div style="padding: 2.5rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle); border-radius: var(--radius-md); border: 1px dashed var(--border-subtle);">
+            No faculty members available. Add faculty in Master Data first to configure their availability.
+          </div>
+        `;
+      }
       return;
     }
     select.innerHTML = filtered.map(f => `
@@ -3408,6 +3487,15 @@ async function loadAvailabilityEditor() {
     const selectedId = parseInt(select.value, 10);
     if (!isNaN(selectedId)) {
       renderFacultyAvailabilityGrid(selectedId);
+    } else {
+      const container = document.getElementById('availability-grid-container');
+      if (container) {
+        container.innerHTML = `
+          <div style="padding: 2.5rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle); border-radius: var(--radius-md); border: 1px dashed var(--border-subtle);">
+            No faculty members available. Add faculty in Master Data first to configure their availability.
+          </div>
+        `;
+      }
     }
   };
 
@@ -3684,11 +3772,11 @@ async function loadSubstitutionHistory() {
 
               return `
                 <tr style="border-bottom: 1px solid var(--border-subtle);">
-                  <td style="padding: 0.5rem 0.6rem; font-weight: 600;">${h.date}</td>
-                  <td style="padding: 0.5rem 0.6rem;">${h.slot_label || ('P' + h.slot_no)}</td>
+                  <td style="padding: 0.5rem 0.6rem; font-weight: 600;">${h.date || '—'}</td>
+                  <td style="padding: 0.5rem 0.6rem;">${h.slot_label || (h.slot_no ? 'P' + h.slot_no : '—')}</td>
                   <td style="padding: 0.5rem 0.6rem;">
-                    <strong>${escapeHtml(h.subject_name)}</strong>
-                    <div style="font-size: 0.72rem; color: var(--text-muted);">Sec ${escapeHtml(h.section_name)} · ${escapeHtml(h.room_name)}</div>
+                    <strong>${escapeHtml(h.subject_name || 'Class')}</strong>
+                    <div style="font-size: 0.72rem; color: var(--text-muted);">${h.section_name ? `Sec ${escapeHtml(h.section_name)}` : ''} ${h.room_name ? '· ' + escapeHtml(h.room_name) : ''}</div>
                   </td>
                   <td style="padding: 0.5rem 0.6rem;">${escapeHtml(h.absent_faculty_name || 'N/A')}</td>
                   <td style="padding: 0.5rem 0.6rem; font-weight: 600; color: var(--color-brand-primary);">
@@ -3849,9 +3937,14 @@ window.autoAssignAllPending = async () => {
 window.openFacultyModal = (id = null) => {
   const deptSelect = document.getElementById('fac-dept');
   if (deptSelect && masterData) {
-    deptSelect.innerHTML = (masterData.departments || []).map(d => `<option value="${d.id}">${d.name} (${d.code})</option>`).join('');
+    if (!masterData.departments || masterData.departments.length === 0) {
+      deptSelect.innerHTML = '<option value="">No departments found (Add department first)</option>';
+    } else {
+      deptSelect.innerHTML = masterData.departments.map(d => `<option value="${d.id}">${d.name} (${d.code})</option>`).join('');
+    }
   }
   const title = document.getElementById('modal-faculty-title');
+  const pwdWrap = document.getElementById('fac-password-wrap');
   if (id) {
     const f = masterData.faculty.find(x => x.id === id);
     if (!f) return;
@@ -3862,10 +3955,12 @@ window.openFacultyModal = (id = null) => {
     document.getElementById('fac-phone').value = f.phone || '';
     document.getElementById('fac-max-day').value = f.max_periods_per_day;
     document.getElementById('fac-max-week').value = f.max_periods_per_week;
+    if (pwdWrap) pwdWrap.style.display = 'none';
     if (title) title.textContent = 'Edit Faculty Member';
   } else {
     document.getElementById('form-faculty')?.reset();
     document.getElementById('fac-id').value = '';
+    if (pwdWrap) pwdWrap.style.display = 'block';
     if (title) title.textContent = 'Add Faculty Member';
   }
   document.getElementById('modal-faculty').style.display = 'flex';
@@ -3874,19 +3969,28 @@ window.openFacultyModal = (id = null) => {
 window.editFaculty = (id) => window.openFacultyModal(id);
 
 window.deleteFaculty = async (id) => {
-  if (!confirm('Are you sure you want to delete this faculty member?')) return;
+  if (!confirm('Are you sure you want to delete this faculty member? All associated assignments and availability will be removed.')) return;
   try {
-    await apiRequest(`/api/admin/faculty/${id}`, { method: 'DELETE' });
-    showToast('Faculty deleted', 'info');
+    const res = await apiRequest(`/api/admin/faculty/${id}`, { method: 'DELETE' });
+    showToast(res.message || 'Faculty deleted', 'success');
     await loadMasterData();
     renderMasterDataTables();
-  } catch (err) {}
+    if (typeof loadOverview === 'function') loadOverview();
+    populateStudioEntitySelector();
+    renderStudioGrid();
+  } catch (err) {
+    showToast(err.message || 'Failed to delete faculty member', 'error');
+  }
 };
 
 window.openSubjectModal = (id = null) => {
   const deptSelect = document.getElementById('sub-dept');
   if (deptSelect && masterData) {
-    deptSelect.innerHTML = (masterData.departments || []).map(d => `<option value="${d.id}">${d.name} (${d.code})</option>`).join('');
+    if (!masterData.departments || masterData.departments.length === 0) {
+      deptSelect.innerHTML = '<option value="">No departments found (Add department first)</option>';
+    } else {
+      deptSelect.innerHTML = masterData.departments.map(d => `<option value="${d.id}">${d.name} (${d.code})</option>`).join('');
+    }
   }
   const title = document.getElementById('modal-subject-title');
   if (id) {
@@ -3912,13 +4016,18 @@ window.openSubjectModal = (id = null) => {
 window.editSubject = (id) => window.openSubjectModal(id);
 
 window.deleteSubject = async (id) => {
-  if (!confirm('Are you sure you want to delete this subject?')) return;
+  if (!confirm('Are you sure you want to delete this subject? All associated timetable entries and mappings will be removed.')) return;
   try {
-    await apiRequest(`/api/admin/subjects/${id}`, { method: 'DELETE' });
-    showToast('Subject deleted', 'info');
+    const res = await apiRequest(`/api/admin/subjects/${id}`, { method: 'DELETE' });
+    showToast(res.message || 'Subject deleted', 'success');
     await loadMasterData();
     renderMasterDataTables();
-  } catch (err) {}
+    if (typeof loadOverview === 'function') loadOverview();
+    populateStudioEntitySelector();
+    renderStudioGrid();
+  } catch (err) {
+    showToast(err.message || 'Failed to delete subject', 'error');
+  }
 };
 
 window.openRoomModal = (id = null) => {
@@ -3942,19 +4051,28 @@ window.openRoomModal = (id = null) => {
 window.editRoom = (id) => window.openRoomModal(id);
 
 window.deleteRoom = async (id) => {
-  if (!confirm('Are you sure you want to delete this room?')) return;
+  if (!confirm('Are you sure you want to delete this room? Any classes scheduled here will be cleared.')) return;
   try {
-    await apiRequest(`/api/admin/rooms/${id}`, { method: 'DELETE' });
-    showToast('Room deleted', 'info');
+    const res = await apiRequest(`/api/admin/rooms/${id}`, { method: 'DELETE' });
+    showToast(res.message || 'Room deleted', 'success');
     await loadMasterData();
     renderMasterDataTables();
-  } catch (err) {}
+    if (typeof loadOverview === 'function') loadOverview();
+    populateStudioEntitySelector();
+    renderStudioGrid();
+  } catch (err) {
+    showToast(err.message || 'Failed to delete room', 'error');
+  }
 };
 
 window.openSectionModal = (id = null) => {
   const deptSelect = document.getElementById('sec-dept');
   if (deptSelect && masterData) {
-    deptSelect.innerHTML = (masterData.departments || []).map(d => `<option value="${d.id}">${d.name} (${d.code})</option>`).join('');
+    if (!masterData.departments || masterData.departments.length === 0) {
+      deptSelect.innerHTML = '<option value="">No departments found (Add department first)</option>';
+    } else {
+      deptSelect.innerHTML = masterData.departments.map(d => `<option value="${d.id}">${d.name} (${d.code})</option>`).join('');
+    }
   }
   const title = document.getElementById('modal-section-title');
   if (id) {
@@ -3977,13 +4095,18 @@ window.openSectionModal = (id = null) => {
 window.editSection = (id) => window.openSectionModal(id);
 
 window.deleteSection = async (id) => {
-  if (!confirm('Are you sure you want to delete this section?')) return;
+  if (!confirm('Are you sure you want to delete this section? All timetable entries and subject mappings for this section will be removed.')) return;
   try {
-    await apiRequest(`/api/admin/sections/${id}`, { method: 'DELETE' });
-    showToast('Section deleted', 'info');
+    const res = await apiRequest(`/api/admin/sections/${id}`, { method: 'DELETE' });
+    showToast(res.message || 'Section deleted', 'success');
     await loadMasterData();
     renderMasterDataTables();
-  } catch (err) {}
+    if (typeof loadOverview === 'function') loadOverview();
+    populateStudioEntitySelector();
+    renderStudioGrid();
+  } catch (err) {
+    showToast(err.message || 'Failed to delete section', 'error');
+  }
 };
 
 window.openHolidayModal = () => {
@@ -3996,11 +4119,14 @@ window.openHolidayModal = () => {
 window.deleteHoliday = async (id) => {
   if (!confirm('Are you sure you want to remove this academic holiday?')) return;
   try {
-    await apiRequest(`/api/admin/holidays/${id}`, { method: 'DELETE' });
-    showToast('Holiday removed', 'info');
+    const res = await apiRequest(`/api/admin/holidays/${id}`, { method: 'DELETE' });
+    showToast(res.message || 'Holiday removed', 'success');
     await loadMasterData();
     renderMasterDataTables();
-  } catch (err) {}
+    if (typeof loadOverview === 'function') loadOverview();
+  } catch (err) {
+    showToast(err.message || 'Failed to remove holiday', 'error');
+  }
 };
 
 window.openDepartmentModal = (id = null) => {
@@ -4023,13 +4149,18 @@ window.openDepartmentModal = (id = null) => {
 window.editDepartment = (id) => window.openDepartmentModal(id);
 
 window.deleteDepartment = async (id) => {
-  if (!confirm('Are you sure you want to delete this department?')) return;
+  if (!confirm('Are you sure you want to delete this department? All associated faculty, subjects, sections, and timetable records will also be removed.')) return;
   try {
-    await apiRequest(`/api/admin/departments/${id}`, { method: 'DELETE' });
-    showToast('Department deleted', 'info');
+    const res = await apiRequest(`/api/admin/departments/${id}`, { method: 'DELETE' });
+    showToast(res.message || 'Department deleted', 'success');
     await loadMasterData();
     renderMasterDataTables();
-  } catch (err) {}
+    if (typeof loadOverview === 'function') loadOverview();
+    populateStudioEntitySelector();
+    renderStudioGrid();
+  } catch (err) {
+    showToast(err.message || 'Failed to delete department', 'error');
+  }
 };
 
 // ============================================================================

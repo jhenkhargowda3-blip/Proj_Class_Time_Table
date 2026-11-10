@@ -400,16 +400,16 @@ function setupControls() {
       slotNo: 3,
       startTime: '11:15',
       endTime: '12:15',
-      roomName: 'LH-102',
-      subjectName: 'Operating Systems',
-      subjectCode: 'CS304',
-      originalFacultyName: 'Prof. Grace Hopper',
-      substituteFacultyName: 'Dr. Donald Knuth',
+      roomName: 'CR-101',
+      subjectName: 'Class Period',
+      subjectCode: 'CRS',
+      originalFacultyName: 'Assigned Faculty',
+      substituteFacultyName: 'Substitute Faculty',
       type: 'substitute',
       severity: 'amber',
-      title: 'Substitute: Dr. Donald Knuth',
-      subtitle: 'CS304 · Operating Systems',
-      message: 'Dr. Donald Knuth is substituting for Prof. Grace Hopper today in LH-102 (Period 3, 11:15-12:15).',
+      title: 'Substitute: Coverage Alert',
+      subtitle: 'Schedule Notice',
+      message: 'A colleague substitute is scheduled to conduct this class period.',
       badgeLabel: 'Substitute Confirmed'
     };
     cachedNotices.unshift(demoNotice);
@@ -754,31 +754,7 @@ export async function fetchAndRenderNotices(isLiveUpdate = false, isBackground =
     const data = await apiRequest(`/api/student/notices?date=${getLocalDateString(new Date())}`);
     let notices = Array.isArray(data.notices) ? data.notices : [];
 
-    // If database has no active notices, provide a realistic default substitute notice for CSE-4A
-    if (notices.length === 0 && (!window.__demoNoticesCleared)) {
-      const todayStr = getLocalDateString(new Date());
-      notices = [
-        {
-          id: 'notice-sample-sub-1',
-          date: todayStr,
-          slotNo: 2,
-          startTime: '10:00',
-          endTime: '11:00',
-          roomName: 'LH-101',
-          subjectName: 'Database Management Systems',
-          subjectCode: 'CS302',
-          originalFacultyName: 'Prof. Ada Lovelace',
-          substituteFacultyName: 'Dr. Alan Turing',
-          type: 'substitute',
-          severity: 'amber',
-          title: 'Substitute: Dr. Alan Turing',
-          subtitle: 'CS302 · Database Management Systems',
-          message: 'Prof. Alan Turing will conduct Database Management Systems today (Period 2, 10:00-11:00) in LH-101, covering for Prof. Ada Lovelace.',
-          badgeLabel: 'Substitute Confirmed',
-          isRead: false
-        }
-      ];
-    }
+    // Use live notices array from database (empty when no active substitutions or notices exist)
 
     // Merge read state from local persistence
     const localReadIds = new Set(getLocalReadNoticeIds());
@@ -1074,16 +1050,16 @@ window.triggerTestStudentNotice = function(customNotice = {}) {
     slotNo: customNotice.slotNo || 2,
     startTime: customNotice.startTime || '10:00',
     endTime: customNotice.endTime || '11:00',
-    roomName: customNotice.roomName || 'LH-101',
-    subjectName: customNotice.subjectName || 'Database Management Systems',
-    subjectCode: customNotice.subjectCode || 'CS302',
-    originalFacultyName: customNotice.originalFacultyName || 'Prof. Ada Lovelace',
-    substituteFacultyName: customNotice.substituteFacultyName || 'Dr. Alan Turing',
+    roomName: customNotice.roomName || 'CR-101',
+    subjectName: customNotice.subjectName || 'Course Lecture',
+    subjectCode: customNotice.subjectCode || 'CRS',
+    originalFacultyName: customNotice.originalFacultyName || 'Assigned Faculty',
+    substituteFacultyName: customNotice.substituteFacultyName || 'Substitute Faculty',
     type: customNotice.type || 'substitute',
     severity: customNotice.severity || 'amber',
-    title: customNotice.title || 'Substitute: Dr. Alan Turing',
-    subtitle: customNotice.subtitle || 'CS302 · Database Management Systems',
-    message: customNotice.message || `Prof. Alan Turing will conduct Database Management Systems today (Period 2, 10:00-11:00) in LH-101, covering for Prof. Ada Lovelace.`,
+    title: customNotice.title || 'Substitute: Coverage Alert',
+    subtitle: customNotice.subtitle || 'Class Schedule Notice',
+    message: customNotice.message || 'A colleague substitute is scheduled to cover this class period.',
     badgeLabel: customNotice.badgeLabel || 'Substitute Confirmed'
   };
   cachedNotices.unshift(testNotice);

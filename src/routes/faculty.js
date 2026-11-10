@@ -155,6 +155,67 @@ router.get('/availability', (req, res) => {
     ORDER BY wd.day_index, ts.slot_no
   `).all(facultyId);
 
+  // Requirement 3: Read busy/free slots from faculty_sessions (in addition to timetable_entries)
+  const dayCodeMap = { 1: 'MON', 2: 'TUE', 3: 'WED', 4: 'THU', 5: 'FRI', 6: 'SAT' };
+  const periodMap = { 1: 1, 2: 2, 4: 3, 5: 4, 7: 5, 8: 6, 9: 7 };
+
+  const facultyRow = db.prepare('SELECT id, code, name FROM faculty WHERE id = ?').get(facultyId);
+  const facSessions = db.prepare(`
+    SELECT * FROM faculty_sessions
+    WHERE faculty_id = ? OR faculty_id = ? OR faculty_id = ?
+  `).all(String(facultyId), facultyRow?.code || '', facultyRow?.name || '');
+
+  const activeEntries = db.prepare(`
+    SELECT te.*, s.name as subject_name, s.code as subject_code
+    FROM timetable_entries te
+    JOIN subjects s ON te.subject_id = s.id
+    WHERE te.faculty_id = ?
+  `).all(facultyId);
+
+  for (const item of availability) {
+    const dayCode = dayCodeMap[item.day_index];
+    const period = periodMap[item.slot_no];
+
+    let busySession = null;
+    if (dayCode && period) {
+      const matchSess = facSessions.find(fs =>
+        fs.day === dayCode &&
+        fs.period_start != null &&
+        fs.period_start <= period &&
+        (fs.period_end != null ? fs.period_end : fs.period_start) >= period
+      );
+      if (matchSess) {
+        busySession = {
+          subject: matchSess.subject_code,
+          type: matchSess.type,
+          batch: matchSess.batch,
+          section: matchSess.section,
+          semester: matchSess.semester,
+          source: 'faculty_sessions'
+        };
+      }
+    }
+
+    if (!busySession) {
+      const matchEntry = activeEntries.find(te => te.day_id === item.day_id && te.slot_id === item.slot_id);
+      if (matchEntry) {
+        busySession = {
+          subject: matchEntry.subject_code || matchEntry.subject_name,
+          type: matchEntry.is_lab_block ? 'lab' : 'theory',
+          source: 'timetable_entries'
+        };
+      }
+    }
+
+    if (busySession) {
+      item.is_available = 0;
+      item.is_busy = 1;
+      item.busy_session = busySession;
+    } else {
+      item.is_busy = 0;
+    }
+  }
+
   res.json({ availability });
 });
 

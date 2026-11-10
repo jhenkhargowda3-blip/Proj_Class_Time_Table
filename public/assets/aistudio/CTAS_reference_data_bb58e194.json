@@ -1,0 +1,7114 @@
+{
+ "academic_year": "2026-27",
+ "term": "Odd",
+ "days": [
+  "MON",
+  "TUE",
+  "WED",
+  "THU",
+  "FRI",
+  "SAT"
+ ],
+ "periods": [
+  {
+   "no": 1,
+   "start": "08:30",
+   "end": "09:30"
+  },
+  {
+   "no": 2,
+   "start": "09:30",
+   "end": "10:30"
+  },
+  {
+   "no": 3,
+   "start": "10:45",
+   "end": "11:45"
+  },
+  {
+   "no": 4,
+   "start": "11:45",
+   "end": "12:45"
+  },
+  {
+   "no": 5,
+   "start": "13:30",
+   "end": "14:30"
+  },
+  {
+   "no": 6,
+   "start": "14:30",
+   "end": "15:30"
+  },
+  {
+   "no": 7,
+   "start": "15:30",
+   "end": "16:30"
+  }
+ ],
+ "breaks": [
+  {
+   "name": "Tea Break",
+   "start": "10:30",
+   "end": "10:45"
+  },
+  {
+   "name": "Lunch Break",
+   "start": "12:45",
+   "end": "13:30"
+  }
+ ],
+ "sections": [
+  {
+   "name": "CSE-1A",
+   "department": "CSE",
+   "semester": 1,
+   "section": "A",
+   "batches": [
+    "A1",
+    "A2",
+    "A3"
+   ],
+   "capacity": null
+  },
+  {
+   "name": "CSE-1B",
+   "department": "CSE",
+   "semester": 1,
+   "section": "B",
+   "batches": [
+    "B1",
+    "B2",
+    "B3"
+   ],
+   "capacity": null
+  },
+  {
+   "name": "CSE-1C",
+   "department": "CSE",
+   "semester": 1,
+   "section": "C",
+   "batches": [
+    "C1",
+    "C2",
+    "C3"
+   ],
+   "capacity": null
+  },
+  {
+   "name": "CSE-1D",
+   "department": "CSE",
+   "semester": 1,
+   "section": "D",
+   "batches": [
+    "D1",
+    "D2",
+    "D3"
+   ],
+   "capacity": null
+  },
+  {
+   "name": "CSE-3A",
+   "department": "CSE",
+   "semester": 3,
+   "section": "A",
+   "batches": [
+    "A1",
+    "A2",
+    "A3"
+   ],
+   "capacity": null
+  },
+  {
+   "name": "CSE-3B",
+   "department": "CSE",
+   "semester": 3,
+   "section": "B",
+   "batches": [
+    "B1",
+    "B2",
+    "B3"
+   ],
+   "capacity": null
+  },
+  {
+   "name": "CSE-3C",
+   "department": "CSE",
+   "semester": 3,
+   "section": "C",
+   "batches": [
+    "C1",
+    "C2",
+    "C3"
+   ],
+   "capacity": null
+  },
+  {
+   "name": "CSE-3D",
+   "department": "CSE",
+   "semester": 3,
+   "section": "D",
+   "batches": [
+    "D1",
+    "D2",
+    "D3"
+   ],
+   "capacity": null
+  },
+  {
+   "name": "CSE-5A",
+   "department": "CSE",
+   "semester": 5,
+   "section": "A",
+   "batches": [
+    "A1",
+    "A2",
+    "A3"
+   ],
+   "capacity": null
+  },
+  {
+   "name": "CSE-5B",
+   "department": "CSE",
+   "semester": 5,
+   "section": "B",
+   "batches": [
+    "B1",
+    "B2",
+    "B3",
+    "B4",
+    "B5",
+    "B6",
+    "B7",
+    "B8",
+    "B9"
+   ],
+   "capacity": null
+  },
+  {
+   "name": "CSE-5C",
+   "department": "CSE",
+   "semester": 5,
+   "section": "C",
+   "batches": [
+    "C1",
+    "C2",
+    "C3"
+   ],
+   "capacity": null
+  },
+  {
+   "name": "CSE-5D",
+   "department": "CSE",
+   "semester": 5,
+   "section": "D",
+   "batches": [
+    "D1",
+    "D2",
+    "D3"
+   ],
+   "capacity": null
+  },
+  {
+   "name": "CSE-7A",
+   "department": "CSE",
+   "semester": 7,
+   "section": "A",
+   "batches": [
+    "A1",
+    "A2",
+    "A3"
+   ],
+   "capacity": null
+  },
+  {
+   "name": "CSE-7B",
+   "department": "CSE",
+   "semester": 7,
+   "section": "B",
+   "batches": [
+    "B1",
+    "B2",
+    "B3"
+   ],
+   "capacity": null
+  },
+  {
+   "name": "CSE-7C",
+   "department": "CSE",
+   "semester": 7,
+   "section": "C",
+   "batches": [
+    "C1",
+    "C2",
+    "C3"
+   ],
+   "capacity": null
+  }
+ ],
+ "faculty": [
+  {
+   "id": "F01",
+   "name": "Dr. Krishna A N",
+   "department": "CSE",
+   "classes_taught": "UG: 5th A,B,C&D",
+   "effective_from": "15/09/2026",
+   "weekly_hours": 3
+  },
+  {
+   "id": "F02",
+   "name": "Dr. Naveena C",
+   "department": "CSE",
+   "classes_taught": "UG: 7th A & C, I M. Tech",
+   "effective_from": "27/10/2026",
+   "weekly_hours": 10
+  },
+  {
+   "id": "F03",
+   "name": "Dr. Bindiya M K",
+   "department": "CSE",
+   "classes_taught": "UG: 5th A, I M. Tech",
+   "effective_from": "27/10/2026",
+   "weekly_hours": 12
+  },
+  {
+   "id": "F04",
+   "name": "Dr. Ajay B N",
+   "department": "CSE",
+   "classes_taught": "UG: 5th D, I M.Tech",
+   "effective_from": "27/10/2026",
+   "weekly_hours": 11
+  },
+  {
+   "id": "F05",
+   "name": "Dr. Prasad A Y",
+   "department": "CSE",
+   "classes_taught": "UG: 3rd A & B",
+   "effective_from": "07/09/2026",
+   "weekly_hours": 12
+  },
+  {
+   "id": "F06",
+   "name": "Dr. Shanthakumar H C",
+   "department": "CSE",
+   "classes_taught": "UG: 1st A & B",
+   "effective_from": "31/08/2026",
+   "weekly_hours": 12
+  },
+  {
+   "id": "F07",
+   "name": "Dr. Veena H N",
+   "department": "CSE",
+   "classes_taught": "UG: 7th A, I M. Tech",
+   "effective_from": "27/10/2026",
+   "weekly_hours": 12
+  },
+  {
+   "id": "F08",
+   "name": "Dr. Roopa M J",
+   "department": "CSE",
+   "classes_taught": "UG: 5th C, I M.Tech",
+   "effective_from": "27/10/2026",
+   "weekly_hours": 16
+  },
+  {
+   "id": "F09",
+   "name": "Dr. Prakruthi M K",
+   "department": "CSE",
+   "classes_taught": "UG: 5th C & 7th B",
+   "effective_from": "15/09/2026",
+   "weekly_hours": 15
+  },
+  {
+   "id": "F10",
+   "name": "Dr. Arun Kumar D R",
+   "department": "CSE",
+   "classes_taught": "UG: 3rd A & B, 5th A, 7th OE",
+   "effective_from": "07/09/2026",
+   "weekly_hours": 10
+  },
+  {
+   "id": "F11",
+   "name": "Mr. Dhananjaya M",
+   "department": "CSE",
+   "classes_taught": "UG: 3rd C & 5th C",
+   "effective_from": "07/09/2026",
+   "weekly_hours": 14
+  },
+  {
+   "id": "F12",
+   "name": "Mrs. Shubha T V",
+   "department": "CSE",
+   "classes_taught": "UG: 3rd A & 5th B",
+   "effective_from": "15/09/2026",
+   "weekly_hours": 14
+  },
+  {
+   "id": "F13",
+   "name": "Mr. Lochan Gowda M",
+   "department": "CSE",
+   "classes_taught": "UG: 5th B, I M. Tech",
+   "effective_from": "27/10/2026",
+   "weekly_hours": 15
+  },
+  {
+   "id": "F14",
+   "name": "Mrs. Srinidhi K S",
+   "department": "CSE",
+   "classes_taught": "UG: 3rd C, 5th A,B,C&D",
+   "effective_from": "15/09/2026",
+   "weekly_hours": 12
+  },
+  {
+   "id": "F15",
+   "name": "Mrs. Anusha M",
+   "department": "CSE",
+   "classes_taught": "UG: 3rd C & D",
+   "effective_from": "15/09/2026",
+   "weekly_hours": 14
+  },
+  {
+   "id": "F16",
+   "name": "Mrs. Rajeshwari G L",
+   "department": "CSE",
+   "classes_taught": "UG: 3rd C & D",
+   "effective_from": "07/09/2026",
+   "weekly_hours": 12
+  },
+  {
+   "id": "F17",
+   "name": "Mrs. Jyothi P K",
+   "department": "CSE",
+   "classes_taught": "UG: 3rd A, B, C&D, 5th B, 7th B",
+   "effective_from": "07/09/2026",
+   "weekly_hours": 13
+  },
+  {
+   "id": "F18",
+   "name": "Mrs. Vijayalakshmi B",
+   "department": "CSE",
+   "classes_taught": "UG: 3rd A, B, C & D, 5th A, B & 7th C",
+   "effective_from": "27/10/2026",
+   "weekly_hours": 11
+  },
+  {
+   "id": "F19",
+   "name": "Mrs. Rajani",
+   "department": "CSE",
+   "classes_taught": "UG: 5th A, B, & D",
+   "effective_from": "15/09/2026",
+   "weekly_hours": 12
+  },
+  {
+   "id": "F20",
+   "name": "Mrs. Chetana K N",
+   "department": "CSE",
+   "classes_taught": "UG: 5th A, B, C, & D, 7th A & B",
+   "effective_from": "15/09/2026",
+   "weekly_hours": 12
+  },
+  {
+   "id": "F21",
+   "name": "Mrs. Shilpashree S",
+   "department": "CSE",
+   "classes_taught": "UG: 3rd B, 7th B",
+   "effective_from": "07/09/2026",
+   "weekly_hours": 12
+  },
+  {
+   "id": "F22",
+   "name": "Mrs. Vinutha K",
+   "department": "CSE",
+   "classes_taught": "UG: 5th A, B, C, & D",
+   "effective_from": "15/09/2026",
+   "weekly_hours": 12
+  },
+  {
+   "id": "F23",
+   "name": "Mrs. Vijayalaxmi Joshi",
+   "department": "CSE",
+   "classes_taught": "UG: 3rd, 5th D & 7th A",
+   "effective_from": "07/09/2026",
+   "weekly_hours": 13
+  },
+  {
+   "id": "F24",
+   "name": "Mr. Santhosh K",
+   "department": "CSE",
+   "classes_taught": "UG: 3rd A & 7th C",
+   "effective_from": "07/09/2026",
+   "weekly_hours": 12
+  },
+  {
+   "id": "F25",
+   "name": "Mrs. Shreenagamanjula Rani",
+   "department": "CSE",
+   "classes_taught": "UG: 1st C & 3rd B",
+   "effective_from": "07/09/2026",
+   "weekly_hours": 14
+  },
+  {
+   "id": "F26",
+   "name": "Mrs. Bhanumathi H R",
+   "department": "CSE",
+   "classes_taught": "UG: 3rd B & D",
+   "effective_from": "07/09/2026",
+   "weekly_hours": 12
+  },
+  {
+   "id": "F27",
+   "name": "Ms. Archana V",
+   "department": "CSE",
+   "classes_taught": "UG: 1st D",
+   "effective_from": "07/09/2026",
+   "weekly_hours": 13
+  },
+  {
+   "id": "F28",
+   "name": "Mrs. Ganga B M",
+   "department": "CSE",
+   "classes_taught": "UG: 5th D & 7th C",
+   "effective_from": "15/09/2026",
+   "weekly_hours": 12
+  },
+  {
+   "id": "F29",
+   "name": "Mrs. Madhushree V",
+   "department": "CSE",
+   "classes_taught": "UG: 1st C &E",
+   "effective_from": "31/08/2026",
+   "weekly_hours": 15
+  },
+  {
+   "id": "F30",
+   "name": "Mrs. Meghana N R",
+   "department": "CSE",
+   "classes_taught": "UG: 1st B & 5th A",
+   "effective_from": "07/09/2026",
+   "weekly_hours": 15
+  },
+  {
+   "id": "F31",
+   "name": "Mrs. Manjula H S",
+   "department": "CSE",
+   "classes_taught": "UG: 3rd C & D, 5th B",
+   "effective_from": "07/09/2026",
+   "weekly_hours": 13
+  },
+  {
+   "id": "F32",
+   "name": "Mrs. Suma B N",
+   "department": "CSE",
+   "classes_taught": "UG: 3rd A & 5th B, C & D",
+   "effective_from": "07/09/2026",
+   "weekly_hours": 13
+  },
+  {
+   "id": "F33",
+   "name": "Mrs. Prakruthi G R",
+   "department": "CSE",
+   "classes_taught": "UG: 5th A, B, C & D",
+   "effective_from": "15/09/2026",
+   "weekly_hours": 15
+  }
+ ],
+ "subjects": [
+  {
+   "code": "DIP",
+   "name": "Digital Image Processing",
+   "short_name": "DIP",
+   "type": "theory",
+   "semester": "5",
+   "semester_candidates": [
+    "5"
+   ]
+  },
+  {
+   "code": "HPC",
+   "name": "High Performance Computing",
+   "short_name": "HPC",
+   "type": "theory",
+   "semester": "7",
+   "semester_candidates": [
+    "7"
+   ]
+  },
+  {
+   "code": "NLP",
+   "name": "Natural Language Processing",
+   "short_name": "NLP",
+   "type": "theory",
+   "semester": "7",
+   "semester_candidates": [
+    "7"
+   ]
+  },
+  {
+   "code": "NOSQL",
+   "name": "NoSQL Databases",
+   "short_name": "NoSql",
+   "type": "theory",
+   "semester": "5",
+   "semester_candidates": [
+    "5"
+   ]
+  },
+  {
+   "code": "DBMS",
+   "name": "Database Management Systems",
+   "short_name": "DBMS",
+   "type": "theory",
+   "semester": "5",
+   "semester_candidates": [
+    "5"
+   ]
+  },
+  {
+   "code": "DBMS-LAB",
+   "name": "Database Management Systems Lab",
+   "short_name": "DBMS Lab",
+   "type": "lab",
+   "semester": "5",
+   "semester_candidates": [
+    "5"
+   ]
+  },
+  {
+   "code": "RMIPR",
+   "name": "Research Methodology and IPR",
+   "short_name": "RM&IPR",
+   "type": "theory",
+   "semester": "5",
+   "semester_candidates": [
+    "5"
+   ]
+  },
+  {
+   "code": "CO",
+   "name": "Computer Organization",
+   "short_name": "CO",
+   "type": "theory",
+   "semester": "3",
+   "semester_candidates": [
+    "3"
+   ]
+  },
+  {
+   "code": "LD",
+   "name": null,
+   "short_name": "LD",
+   "type": "theory",
+   "semester": "3",
+   "semester_candidates": [
+    "3"
+   ]
+  },
+  {
+   "code": "LD-LAB",
+   "name": null,
+   "short_name": "LD Lab",
+   "type": "lab",
+   "semester": "3",
+   "semester_candidates": [
+    "3"
+   ]
+  },
+  {
+   "code": "PLT",
+   "name": null,
+   "short_name": "PLT",
+   "type": "theory",
+   "semester": "1",
+   "semester_candidates": [
+    "1"
+   ]
+  },
+  {
+   "code": "PLT-LAB",
+   "name": null,
+   "short_name": "PLT Lab",
+   "type": "lab",
+   "semester": "1",
+   "semester_candidates": [
+    "1"
+   ]
+  },
+  {
+   "code": "GAIPE",
+   "name": "Generative AI and Prompt Engineering",
+   "short_name": "GAI&PE",
+   "type": "theory",
+   "semester": "7",
+   "semester_candidates": [
+    "7"
+   ]
+  },
+  {
+   "code": "IPCV",
+   "name": "Image Processing and Computer Vision",
+   "short_name": "IP&CV",
+   "type": "theory",
+   "semester": "7",
+   "semester_candidates": [
+    "7"
+   ]
+  },
+  {
+   "code": "GAIPE-LAB",
+   "name": "Generative AI and Prompt Engineering Lab",
+   "short_name": "GAI&PE Lab",
+   "type": "lab",
+   "semester": "7",
+   "semester_candidates": [
+    "7"
+   ]
+  },
+  {
+   "code": "LA",
+   "name": null,
+   "short_name": "LA",
+   "type": "theory",
+   "semester": "5",
+   "semester_candidates": [
+    "5"
+   ]
+  },
+  {
+   "code": "ACTIVITY",
+   "name": null,
+   "short_name": "Sports/Cultural/Technical Activities",
+   "type": "activity",
+   "semester": "5",
+   "semester_candidates": [
+    "5"
+   ]
+  },
+  {
+   "code": "SEPM",
+   "name": "Software Engineering and Project Management",
+   "short_name": "SE&PM",
+   "type": "theory",
+   "semester": "5",
+   "semester_candidates": [
+    "5"
+   ]
+  },
+  {
+   "code": "SEPM-LAB",
+   "name": "Software Engineering and Project Management Lab",
+   "short_name": "SE&PM Lab",
+   "type": "lab",
+   "semester": "5",
+   "semester_candidates": [
+    "5"
+   ]
+  },
+  {
+   "code": "OE",
+   "name": "Open Elective",
+   "short_name": "OE",
+   "type": "theory",
+   "semester": null,
+   "semester_candidates": [
+    "3",
+    "5",
+    "7"
+   ]
+  },
+  {
+   "code": "LCS-LAB",
+   "name": null,
+   "short_name": "LCS Lab",
+   "type": "lab",
+   "semester": null,
+   "semester_candidates": [
+    "3",
+    "5"
+   ]
+  },
+  {
+   "code": "AJAVA",
+   "name": "Advanced Java",
+   "short_name": "A.JAVA",
+   "type": "theory",
+   "semester": "5",
+   "semester_candidates": [
+    "5"
+   ]
+  },
+  {
+   "code": "DSA-LAB",
+   "name": "Data Structures and Applications Lab",
+   "short_name": "DSA Lab",
+   "type": "lab",
+   "semester": "3",
+   "semester_candidates": [
+    "3"
+   ]
+  },
+  {
+   "code": "DSA-T",
+   "name": null,
+   "short_name": "DSA/T",
+   "type": "theory",
+   "semester": "3",
+   "semester_candidates": [
+    "3"
+   ]
+  },
+  {
+   "code": "DSA",
+   "name": "Data Structures and Applications",
+   "short_name": "DSA",
+   "type": "theory",
+   "semester": "3",
+   "semester_candidates": [
+    "3"
+   ]
+  },
+  {
+   "code": "CNS",
+   "name": "Cryptography and Network Security",
+   "short_name": "CNS",
+   "type": "theory",
+   "semester": "5",
+   "semester_candidates": [
+    "5"
+   ]
+  },
+  {
+   "code": "CN",
+   "name": "Computer Networks",
+   "short_name": "CN",
+   "type": "theory",
+   "semester": "5",
+   "semester_candidates": [
+    "5"
+   ]
+  },
+  {
+   "code": "CN-LAB",
+   "name": "Computer Networks Lab",
+   "short_name": "CN Lab",
+   "type": "lab",
+   "semester": "5",
+   "semester_candidates": [
+    "5"
+   ]
+  },
+  {
+   "code": "CNS-LAB",
+   "name": "Cryptography and Network Security Lab",
+   "short_name": "CNS Lab",
+   "type": "lab",
+   "semester": "5",
+   "semester_candidates": [
+    "5"
+   ]
+  },
+  {
+   "code": "OS",
+   "name": "Operating Systems",
+   "short_name": "OS",
+   "type": "theory",
+   "semester": "3",
+   "semester_candidates": [
+    "3"
+   ]
+  },
+  {
+   "code": "REACTJS",
+   "name": "React JS",
+   "short_name": "React JS",
+   "type": "theory",
+   "semester": null,
+   "semester_candidates": [
+    "3",
+    "5"
+   ]
+  },
+  {
+   "code": "CC-LAB",
+   "name": "Cloud Computing Lab",
+   "short_name": "CC Lab",
+   "type": "lab",
+   "semester": "5",
+   "semester_candidates": [
+    "5"
+   ]
+  },
+  {
+   "code": "ME",
+   "name": null,
+   "short_name": "ME",
+   "type": "theory",
+   "semester": null,
+   "semester_candidates": [
+    "3",
+    "5",
+    "7"
+   ]
+  },
+  {
+   "code": "WEB-LAB",
+   "name": null,
+   "short_name": "Web Lab",
+   "type": "lab",
+   "semester": null,
+   "semester_candidates": [
+    "3",
+    "5"
+   ]
+  },
+  {
+   "code": "NOSQL-LAB",
+   "name": "NoSQL Databases Lab",
+   "short_name": "NoSql Lab",
+   "type": "lab",
+   "semester": "5",
+   "semester_candidates": [
+    "5"
+   ]
+  },
+  {
+   "code": "LC-NC",
+   "name": null,
+   "short_name": "LC/NC",
+   "type": "theory",
+   "semester": null,
+   "semester_candidates": [
+    "5",
+    "7"
+   ]
+  },
+  {
+   "code": "DEVOPS",
+   "name": "DevOps",
+   "short_name": "Devops",
+   "type": "theory",
+   "semester": null,
+   "semester_candidates": [
+    "5",
+    "7"
+   ]
+  },
+  {
+   "code": "DVT",
+   "name": "Data Visualization Techniques",
+   "short_name": "DVT",
+   "type": "theory",
+   "semester": "5",
+   "semester_candidates": [
+    "5"
+   ]
+  },
+  {
+   "code": "FDW-LAB",
+   "name": null,
+   "short_name": "FDW Lab",
+   "type": "lab",
+   "semester": "1",
+   "semester_candidates": [
+    "1"
+   ]
+  },
+  {
+   "code": "VCG-LAB",
+   "name": null,
+   "short_name": "VCG Lab",
+   "type": "lab",
+   "semester": "5",
+   "semester_candidates": [
+    "5"
+   ]
+  }
+ ],
+ "sessions": [
+  {
+   "id": "F01-01",
+   "faculty_id": "F01",
+   "faculty": "Dr. Krishna A N",
+   "day": "MON",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "DIP",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F01-02",
+   "faculty_id": "F01",
+   "faculty": "Dr. Krishna A N",
+   "day": "THU",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "DIP",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F01-03",
+   "faculty_id": "F01",
+   "faculty": "Dr. Krishna A N",
+   "day": "FRI",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "DIP",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F02-01",
+   "faculty_id": "F02",
+   "faculty": "Dr. Naveena C",
+   "day": "MON",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "HPC",
+   "type": "theory",
+   "batch": "A",
+   "semester": "7",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "C"
+   ]
+  },
+  {
+   "id": "F02-02",
+   "faculty_id": "F02",
+   "faculty": "Dr. Naveena C",
+   "day": "MON",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "HPC",
+   "type": "theory",
+   "batch": "C",
+   "semester": "7",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "C"
+   ]
+  },
+  {
+   "id": "F02-03",
+   "faculty_id": "F02",
+   "faculty": "Dr. Naveena C",
+   "day": "TUE",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "NLP",
+   "type": "theory",
+   "batch": null,
+   "semester": "7",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "C"
+   ]
+  },
+  {
+   "id": "F02-04",
+   "faculty_id": "F02",
+   "faculty": "Dr. Naveena C",
+   "day": "TUE",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "HPC",
+   "type": "theory",
+   "batch": "C",
+   "semester": "7",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "C"
+   ]
+  },
+  {
+   "id": "F02-05",
+   "faculty_id": "F02",
+   "faculty": "Dr. Naveena C",
+   "day": "TUE",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "NLP",
+   "type": "theory",
+   "batch": null,
+   "semester": "7",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "C"
+   ]
+  },
+  {
+   "id": "F02-06",
+   "faculty_id": "F02",
+   "faculty": "Dr. Naveena C",
+   "day": "TUE",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "HPC",
+   "type": "theory",
+   "batch": "A",
+   "semester": "7",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "C"
+   ]
+  },
+  {
+   "id": "F02-07",
+   "faculty_id": "F02",
+   "faculty": "Dr. Naveena C",
+   "day": "WED",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "HPC",
+   "type": "theory",
+   "batch": "C",
+   "semester": "7",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "C"
+   ]
+  },
+  {
+   "id": "F02-08",
+   "faculty_id": "F02",
+   "faculty": "Dr. Naveena C",
+   "day": "WED",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "HPC",
+   "type": "theory",
+   "batch": "A",
+   "semester": "7",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "C"
+   ]
+  },
+  {
+   "id": "F02-09",
+   "faculty_id": "F02",
+   "faculty": "Dr. Naveena C",
+   "day": "THU",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "NLP",
+   "type": "theory",
+   "batch": null,
+   "semester": "7",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "C"
+   ]
+  },
+  {
+   "id": "F02-10",
+   "faculty_id": "F02",
+   "faculty": "Dr. Naveena C",
+   "day": "FRI",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "NLP",
+   "type": "theory",
+   "batch": null,
+   "semester": "7",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "C"
+   ]
+  },
+  {
+   "id": "F03-01",
+   "faculty_id": "F03",
+   "faculty": "Dr. Bindiya M K",
+   "day": "MON",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "NOSQL",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F03-02",
+   "faculty_id": "F03",
+   "faculty": "Dr. Bindiya M K",
+   "day": "MON",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "DBMS",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F03-03",
+   "faculty_id": "F03",
+   "faculty": "Dr. Bindiya M K",
+   "day": "MON",
+   "start": "3:30",
+   "end": "4:30",
+   "period_start": 7,
+   "period_end": 7,
+   "hours": 1,
+   "subject_code": "NOSQL",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F03-04",
+   "faculty_id": "F03",
+   "faculty": "Dr. Bindiya M K",
+   "day": "TUE",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "DBMS-LAB",
+   "type": "lab",
+   "batch": "A2",
+   "semester": "5",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F03-05",
+   "faculty_id": "F03",
+   "faculty": "Dr. Bindiya M K",
+   "day": "TUE",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "DBMS",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F03-06",
+   "faculty_id": "F03",
+   "faculty": "Dr. Bindiya M K",
+   "day": "THU",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "DBMS-LAB",
+   "type": "lab",
+   "batch": "A3",
+   "semester": "5",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F03-07",
+   "faculty_id": "F03",
+   "faculty": "Dr. Bindiya M K",
+   "day": "THU",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "DBMS",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F03-08",
+   "faculty_id": "F03",
+   "faculty": "Dr. Bindiya M K",
+   "day": "FRI",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "NOSQL",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "verify (overlaps another class of same section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F03-09",
+   "faculty_id": "F03",
+   "faculty": "Dr. Bindiya M K",
+   "day": "FRI",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "DBMS-LAB",
+   "type": "lab",
+   "batch": "A1",
+   "semester": "5",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F04-01",
+   "faculty_id": "F04",
+   "faculty": "Dr. Ajay B N",
+   "day": "MON",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "DBMS",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "D",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F04-02",
+   "faculty_id": "F04",
+   "faculty": "Dr. Ajay B N",
+   "day": "MON",
+   "start": "2:30",
+   "end": "3:30",
+   "period_start": 6,
+   "period_end": 6,
+   "hours": 1,
+   "subject_code": "RMIPR",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "verify (overlaps another class of same section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F04-03",
+   "faculty_id": "F04",
+   "faculty": "Dr. Ajay B N",
+   "day": "TUE",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "RMIPR",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "D",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F04-04",
+   "faculty_id": "F04",
+   "faculty": "Dr. Ajay B N",
+   "day": "TUE",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "DBMS-LAB",
+   "type": "lab",
+   "batch": "D2",
+   "semester": "5",
+   "section": "D",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F04-05",
+   "faculty_id": "F04",
+   "faculty": "Dr. Ajay B N",
+   "day": "TUE",
+   "start": "2:30",
+   "end": "3:30",
+   "period_start": 6,
+   "period_end": 6,
+   "hours": 1,
+   "subject_code": "DBMS",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "D",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F04-06",
+   "faculty_id": "F04",
+   "faculty": "Dr. Ajay B N",
+   "day": "WED",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "DBMS-LAB",
+   "type": "lab",
+   "batch": "D3",
+   "semester": "5",
+   "section": "D",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F04-07",
+   "faculty_id": "F04",
+   "faculty": "Dr. Ajay B N",
+   "day": "THU",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "DBMS",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "D",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F04-08",
+   "faculty_id": "F04",
+   "faculty": "Dr. Ajay B N",
+   "day": "FRI",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "DBMS-LAB",
+   "type": "lab",
+   "batch": "D1",
+   "semester": "5",
+   "section": "D",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F05-01",
+   "faculty_id": "F05",
+   "faculty": "Dr. Prasad A Y",
+   "day": "MON",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "CO",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F05-02",
+   "faculty_id": "F05",
+   "faculty": "Dr. Prasad A Y",
+   "day": "TUE",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "LD",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F05-03",
+   "faculty_id": "F05",
+   "faculty": "Dr. Prasad A Y",
+   "day": "TUE",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "CO",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F05-04",
+   "faculty_id": "F05",
+   "faculty": "Dr. Prasad A Y",
+   "day": "TUE",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "LD-LAB",
+   "type": "lab",
+   "batch": "B1",
+   "semester": "3",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F05-05",
+   "faculty_id": "F05",
+   "faculty": "Dr. Prasad A Y",
+   "day": "WED",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "LD-LAB",
+   "type": "lab",
+   "batch": "B2",
+   "semester": "3",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F05-06",
+   "faculty_id": "F05",
+   "faculty": "Dr. Prasad A Y",
+   "day": "WED",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "LD",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F05-07",
+   "faculty_id": "F05",
+   "faculty": "Dr. Prasad A Y",
+   "day": "THU",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "LD",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F05-08",
+   "faculty_id": "F05",
+   "faculty": "Dr. Prasad A Y",
+   "day": "FRI",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "CO",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F05-09",
+   "faculty_id": "F05",
+   "faculty": "Dr. Prasad A Y",
+   "day": "FRI",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "LD-LAB",
+   "type": "lab",
+   "batch": "B3",
+   "semester": "3",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F06-01",
+   "faculty_id": "F06",
+   "faculty": "Dr. Shanthakumar H C",
+   "day": "MON",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "PLT",
+   "type": "theory",
+   "batch": "A",
+   "semester": "1",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F06-02",
+   "faculty_id": "F06",
+   "faculty": "Dr. Shanthakumar H C",
+   "day": "MON",
+   "start": "1:30",
+   "end": "3:30",
+   "period_start": 5,
+   "period_end": 6,
+   "hours": 2,
+   "subject_code": "PLT-LAB",
+   "type": "lab",
+   "batch": "A3",
+   "semester": "1",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F06-03",
+   "faculty_id": "F06",
+   "faculty": "Dr. Shanthakumar H C",
+   "day": "TUE",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "PLT",
+   "type": "theory",
+   "batch": "B",
+   "semester": "1",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F06-04",
+   "faculty_id": "F06",
+   "faculty": "Dr. Shanthakumar H C",
+   "day": "WED",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "PLT",
+   "type": "theory",
+   "batch": "B",
+   "semester": "1",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F06-05",
+   "faculty_id": "F06",
+   "faculty": "Dr. Shanthakumar H C",
+   "day": "THU",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "PLT-LAB",
+   "type": "lab",
+   "batch": "A1",
+   "semester": "1",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F06-06",
+   "faculty_id": "F06",
+   "faculty": "Dr. Shanthakumar H C",
+   "day": "THU",
+   "start": "2:30",
+   "end": "3:30",
+   "period_start": 6,
+   "period_end": 6,
+   "hours": 1,
+   "subject_code": "PLT",
+   "type": "theory",
+   "batch": "A",
+   "semester": "1",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F06-07",
+   "faculty_id": "F06",
+   "faculty": "Dr. Shanthakumar H C",
+   "day": "FRI",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "PLT-LAB",
+   "type": "lab",
+   "batch": "A2",
+   "semester": "1",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F06-08",
+   "faculty_id": "F06",
+   "faculty": "Dr. Shanthakumar H C",
+   "day": "FRI",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "PLT",
+   "type": "theory",
+   "batch": "A",
+   "semester": "1",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F06-09",
+   "faculty_id": "F06",
+   "faculty": "Dr. Shanthakumar H C",
+   "day": "FRI",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "PLT",
+   "type": "theory",
+   "batch": "B",
+   "semester": "1",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F07-01",
+   "faculty_id": "F07",
+   "faculty": "Dr. Veena H N",
+   "day": "MON",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "GAIPE",
+   "type": "theory",
+   "batch": null,
+   "semester": "7",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F07-02",
+   "faculty_id": "F07",
+   "faculty": "Dr. Veena H N",
+   "day": "MON",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "IPCV",
+   "type": "theory",
+   "batch": null,
+   "semester": "7",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F07-03",
+   "faculty_id": "F07",
+   "faculty": "Dr. Veena H N",
+   "day": "MON",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "GAIPE-LAB",
+   "type": "lab",
+   "batch": "A1",
+   "semester": "7",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F07-04",
+   "faculty_id": "F07",
+   "faculty": "Dr. Veena H N",
+   "day": "TUE",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "GAIPE",
+   "type": "theory",
+   "batch": null,
+   "semester": "7",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F07-05",
+   "faculty_id": "F07",
+   "faculty": "Dr. Veena H N",
+   "day": "TUE",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "IPCV",
+   "type": "theory",
+   "batch": null,
+   "semester": "7",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F07-06",
+   "faculty_id": "F07",
+   "faculty": "Dr. Veena H N",
+   "day": "TUE",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "GAIPE-LAB",
+   "type": "lab",
+   "batch": "A2",
+   "semester": "7",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F07-07",
+   "faculty_id": "F07",
+   "faculty": "Dr. Veena H N",
+   "day": "WED",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "GAIPE",
+   "type": "theory",
+   "batch": null,
+   "semester": "7",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F07-08",
+   "faculty_id": "F07",
+   "faculty": "Dr. Veena H N",
+   "day": "WED",
+   "start": "1:30",
+   "end": "3:30",
+   "period_start": 5,
+   "period_end": 6,
+   "hours": 2,
+   "subject_code": "GAIPE-LAB",
+   "type": "lab",
+   "batch": "A3",
+   "semester": "7",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F07-09",
+   "faculty_id": "F07",
+   "faculty": "Dr. Veena H N",
+   "day": "FRI",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "IPCV",
+   "type": "theory",
+   "batch": null,
+   "semester": "7",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F08-01",
+   "faculty_id": "F08",
+   "faculty": "Dr. Roopa M J",
+   "day": "MON",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "DBMS",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F08-02",
+   "faculty_id": "F08",
+   "faculty": "Dr. Roopa M J",
+   "day": "MON",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "LA",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F08-03",
+   "faculty_id": "F08",
+   "faculty": "Dr. Roopa M J",
+   "day": "TUE",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "DBMS-LAB",
+   "type": "lab",
+   "batch": "C2",
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F08-04",
+   "faculty_id": "F08",
+   "faculty": "Dr. Roopa M J",
+   "day": "TUE",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "LA",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F08-05",
+   "faculty_id": "F08",
+   "faculty": "Dr. Roopa M J",
+   "day": "WED",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "DBMS",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F08-06",
+   "faculty_id": "F08",
+   "faculty": "Dr. Roopa M J",
+   "day": "WED",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "LA",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F08-07",
+   "faculty_id": "F08",
+   "faculty": "Dr. Roopa M J",
+   "day": "WED",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "ACTIVITY",
+   "type": "activity",
+   "batch": null,
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F08-08",
+   "faculty_id": "F08",
+   "faculty": "Dr. Roopa M J",
+   "day": "WED",
+   "start": "2:30",
+   "end": "3:30",
+   "period_start": 6,
+   "period_end": 6,
+   "hours": 1,
+   "subject_code": "ACTIVITY",
+   "type": "activity",
+   "batch": null,
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F08-09",
+   "faculty_id": "F08",
+   "faculty": "Dr. Roopa M J",
+   "day": "WED",
+   "start": "3:30",
+   "end": "4:30",
+   "period_start": 7,
+   "period_end": 7,
+   "hours": 1,
+   "subject_code": "ACTIVITY",
+   "type": "activity",
+   "batch": null,
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F08-10",
+   "faculty_id": "F08",
+   "faculty": "Dr. Roopa M J",
+   "day": "THU",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "DBMS-LAB",
+   "type": "lab",
+   "batch": "C3",
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F08-11",
+   "faculty_id": "F08",
+   "faculty": "Dr. Roopa M J",
+   "day": "THU",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "DBMS",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F08-12",
+   "faculty_id": "F08",
+   "faculty": "Dr. Roopa M J",
+   "day": "FRI",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "LA",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F08-13",
+   "faculty_id": "F08",
+   "faculty": "Dr. Roopa M J",
+   "day": "FRI",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "DBMS-LAB",
+   "type": "lab",
+   "batch": "C1",
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F09-01",
+   "faculty_id": "F09",
+   "faculty": "Dr. Prakruthi M K",
+   "day": "MON",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "HPC",
+   "type": "theory",
+   "batch": null,
+   "semester": "7",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F09-02",
+   "faculty_id": "F09",
+   "faculty": "Dr. Prakruthi M K",
+   "day": "MON",
+   "start": "2:30",
+   "end": "3:30",
+   "period_start": 6,
+   "period_end": 6,
+   "hours": 1,
+   "subject_code": "SEPM",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F09-03",
+   "faculty_id": "F09",
+   "faculty": "Dr. Prakruthi M K",
+   "day": "TUE",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "SEPM-LAB",
+   "type": "lab",
+   "batch": "C1",
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F09-04",
+   "faculty_id": "F09",
+   "faculty": "Dr. Prakruthi M K",
+   "day": "TUE",
+   "start": "3:30",
+   "end": "4:30",
+   "period_start": 7,
+   "period_end": 7,
+   "hours": 1,
+   "subject_code": "SEPM",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F09-05",
+   "faculty_id": "F09",
+   "faculty": "Dr. Prakruthi M K",
+   "day": "WED",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "HPC",
+   "type": "theory",
+   "batch": null,
+   "semester": "7",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F09-06",
+   "faculty_id": "F09",
+   "faculty": "Dr. Prakruthi M K",
+   "day": "WED",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "HPC",
+   "type": "theory",
+   "batch": null,
+   "semester": "7",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F09-07",
+   "faculty_id": "F09",
+   "faculty": "Dr. Prakruthi M K",
+   "day": "WED",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "ACTIVITY",
+   "type": "activity",
+   "batch": null,
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F09-08",
+   "faculty_id": "F09",
+   "faculty": "Dr. Prakruthi M K",
+   "day": "WED",
+   "start": "2:30",
+   "end": "3:30",
+   "period_start": 6,
+   "period_end": 6,
+   "hours": 1,
+   "subject_code": "ACTIVITY",
+   "type": "activity",
+   "batch": null,
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F09-09",
+   "faculty_id": "F09",
+   "faculty": "Dr. Prakruthi M K",
+   "day": "WED",
+   "start": "3:30",
+   "end": "4:30",
+   "period_start": 7,
+   "period_end": 7,
+   "hours": 1,
+   "subject_code": "ACTIVITY",
+   "type": "activity",
+   "batch": null,
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F09-10",
+   "faculty_id": "F09",
+   "faculty": "Dr. Prakruthi M K",
+   "day": "THU",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "SEPM-LAB",
+   "type": "lab",
+   "batch": "C2",
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F09-11",
+   "faculty_id": "F09",
+   "faculty": "Dr. Prakruthi M K",
+   "day": "FRI",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "SEPM",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F09-12",
+   "faculty_id": "F09",
+   "faculty": "Dr. Prakruthi M K",
+   "day": "FRI",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "SEPM-LAB",
+   "type": "lab",
+   "batch": "C3",
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F10-01",
+   "faculty_id": "F10",
+   "faculty": "Dr. Arun Kumar D R",
+   "day": "MON",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "OE",
+   "type": "theory",
+   "batch": null,
+   "semester": null,
+   "section": null,
+   "section_status": "none",
+   "candidate_sections": []
+  },
+  {
+   "id": "F10-02",
+   "faculty_id": "F10",
+   "faculty": "Dr. Arun Kumar D R",
+   "day": "MON",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "LCS-LAB",
+   "type": "lab",
+   "batch": "B1",
+   "semester": null,
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": []
+  },
+  {
+   "id": "F10-03",
+   "faculty_id": "F10",
+   "faculty": "Dr. Arun Kumar D R",
+   "day": "TUE",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "OE",
+   "type": "theory",
+   "batch": null,
+   "semester": null,
+   "section": null,
+   "section_status": "none",
+   "candidate_sections": []
+  },
+  {
+   "id": "F10-04",
+   "faculty_id": "F10",
+   "faculty": "Dr. Arun Kumar D R",
+   "day": "TUE",
+   "start": "2:30",
+   "end": "3:30",
+   "period_start": 6,
+   "period_end": 6,
+   "hours": 1,
+   "subject_code": "AJAVA",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F10-05",
+   "faculty_id": "F10",
+   "faculty": "Dr. Arun Kumar D R",
+   "day": "WED",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "AJAVA",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F10-06",
+   "faculty_id": "F10",
+   "faculty": "Dr. Arun Kumar D R",
+   "day": "WED",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "OE",
+   "type": "theory",
+   "batch": null,
+   "semester": null,
+   "section": null,
+   "section_status": "none",
+   "candidate_sections": []
+  },
+  {
+   "id": "F10-07",
+   "faculty_id": "F10",
+   "faculty": "Dr. Arun Kumar D R",
+   "day": "WED",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "LCS-LAB",
+   "type": "lab",
+   "batch": "B2",
+   "semester": null,
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": []
+  },
+  {
+   "id": "F10-08",
+   "faculty_id": "F10",
+   "faculty": "Dr. Arun Kumar D R",
+   "day": "FRI",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "AJAVA",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "verify (overlaps another class of same section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F11-01",
+   "faculty_id": "F11",
+   "faculty": "Mr. Dhananjaya M",
+   "day": "MON",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "AJAVA",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F11-02",
+   "faculty_id": "F11",
+   "faculty": "Mr. Dhananjaya M",
+   "day": "MON",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "DSA-LAB",
+   "type": "lab",
+   "batch": "C2",
+   "semester": "3",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F11-03",
+   "faculty_id": "F11",
+   "faculty": "Mr. Dhananjaya M",
+   "day": "MON",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "DSA-T",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F11-04",
+   "faculty_id": "F11",
+   "faculty": "Mr. Dhananjaya M",
+   "day": "TUE",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "DSA",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F11-05",
+   "faculty_id": "F11",
+   "faculty": "Mr. Dhananjaya M",
+   "day": "TUE",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "DSA-LAB",
+   "type": "lab",
+   "batch": "C3",
+   "semester": "3",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F11-06",
+   "faculty_id": "F11",
+   "faculty": "Mr. Dhananjaya M",
+   "day": "WED",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "AJAVA",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F11-07",
+   "faculty_id": "F11",
+   "faculty": "Mr. Dhananjaya M",
+   "day": "WED",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "DSA-T",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F11-08",
+   "faculty_id": "F11",
+   "faculty": "Mr. Dhananjaya M",
+   "day": "THU",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "DSA-LAB",
+   "type": "lab",
+   "batch": "C1",
+   "semester": "3",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F11-09",
+   "faculty_id": "F11",
+   "faculty": "Mr. Dhananjaya M",
+   "day": "THU",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "DSA",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F11-10",
+   "faculty_id": "F11",
+   "faculty": "Mr. Dhananjaya M",
+   "day": "THU",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "AJAVA",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F11-11",
+   "faculty_id": "F11",
+   "faculty": "Mr. Dhananjaya M",
+   "day": "FRI",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "DSA",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F12-01",
+   "faculty_id": "F12",
+   "faculty": "Mrs. Shubha T V",
+   "day": "MON",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "SEPM",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F12-02",
+   "faculty_id": "F12",
+   "faculty": "Mrs. Shubha T V",
+   "day": "MON",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "DSA",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F12-03",
+   "faculty_id": "F12",
+   "faculty": "Mrs. Shubha T V",
+   "day": "TUE",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "SEPM",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F12-04",
+   "faculty_id": "F12",
+   "faculty": "Mrs. Shubha T V",
+   "day": "TUE",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "DSA",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F12-05",
+   "faculty_id": "F12",
+   "faculty": "Mrs. Shubha T V",
+   "day": "TUE",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "DSA-LAB",
+   "type": "lab",
+   "batch": "A2",
+   "semester": "3",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F12-06",
+   "faculty_id": "F12",
+   "faculty": "Mrs. Shubha T V",
+   "day": "WED",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "DSA-LAB",
+   "type": "lab",
+   "batch": "A3",
+   "semester": "3",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F12-07",
+   "faculty_id": "F12",
+   "faculty": "Mrs. Shubha T V",
+   "day": "WED",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "DSA-T",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F12-08",
+   "faculty_id": "F12",
+   "faculty": "Mrs. Shubha T V",
+   "day": "THU",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "DSA",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F12-09",
+   "faculty_id": "F12",
+   "faculty": "Mrs. Shubha T V",
+   "day": "THU",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "SEPM",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "verify (overlaps another class of same section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F12-10",
+   "faculty_id": "F12",
+   "faculty": "Mrs. Shubha T V",
+   "day": "FRI",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "DSA-LAB",
+   "type": "lab",
+   "batch": "A1",
+   "semester": "3",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F12-11",
+   "faculty_id": "F12",
+   "faculty": "Mrs. Shubha T V",
+   "day": "FRI",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "DSA-T",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F13-01",
+   "faculty_id": "F13",
+   "faculty": "Mr. Lochan Gowda M",
+   "day": "MON",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "CNS",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F13-02",
+   "faculty_id": "F13",
+   "faculty": "Mr. Lochan Gowda M",
+   "day": "MON",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "CNS",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F13-03",
+   "faculty_id": "F13",
+   "faculty": "Mr. Lochan Gowda M",
+   "day": "MON",
+   "start": "2:30",
+   "end": "3:30",
+   "period_start": 6,
+   "period_end": 6,
+   "hours": 1,
+   "subject_code": "CN",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "verify (overlaps another class of same section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F13-04",
+   "faculty_id": "F13",
+   "faculty": "Mr. Lochan Gowda M",
+   "day": "TUE",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "CN",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F13-05",
+   "faculty_id": "F13",
+   "faculty": "Mr. Lochan Gowda M",
+   "day": "TUE",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "CN-LAB",
+   "type": "lab",
+   "batch": "B3",
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F13-06",
+   "faculty_id": "F13",
+   "faculty": "Mr. Lochan Gowda M",
+   "day": "WED",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "CN-LAB",
+   "type": "lab",
+   "batch": "B1",
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F13-07",
+   "faculty_id": "F13",
+   "faculty": "Mr. Lochan Gowda M",
+   "day": "WED",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "CNS",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "verify (overlaps another class of same section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F13-08",
+   "faculty_id": "F13",
+   "faculty": "Mr. Lochan Gowda M",
+   "day": "THU",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "CNS",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F13-09",
+   "faculty_id": "F13",
+   "faculty": "Mr. Lochan Gowda M",
+   "day": "THU",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "CNS-LAB",
+   "type": "lab",
+   "batch": null,
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F13-10",
+   "faculty_id": "F13",
+   "faculty": "Mr. Lochan Gowda M",
+   "day": "THU",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "CNS-LAB",
+   "type": "lab",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "verify (overlaps another class of same section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F13-11",
+   "faculty_id": "F13",
+   "faculty": "Mr. Lochan Gowda M",
+   "day": "FRI",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "CN-LAB",
+   "type": "lab",
+   "batch": "B2",
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F13-12",
+   "faculty_id": "F13",
+   "faculty": "Mr. Lochan Gowda M",
+   "day": "FRI",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "CN",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F14-01",
+   "faculty_id": "F14",
+   "faculty": "Mrs. Srinidhi K S",
+   "day": "MON",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "OS",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F14-02",
+   "faculty_id": "F14",
+   "faculty": "Mrs. Srinidhi K S",
+   "day": "MON",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "REACTJS",
+   "type": "theory",
+   "batch": null,
+   "semester": null,
+   "section": null,
+   "section_status": "none",
+   "candidate_sections": []
+  },
+  {
+   "id": "F14-03",
+   "faculty_id": "F14",
+   "faculty": "Mrs. Srinidhi K S",
+   "day": "WED",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "OS",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F14-04",
+   "faculty_id": "F14",
+   "faculty": "Mrs. Srinidhi K S",
+   "day": "WED",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "CC-LAB",
+   "type": "lab",
+   "batch": "B7",
+   "semester": "5",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F14-05",
+   "faculty_id": "F14",
+   "faculty": "Mrs. Srinidhi K S",
+   "day": "THU",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "REACTJS",
+   "type": "theory",
+   "batch": null,
+   "semester": null,
+   "section": null,
+   "section_status": "none",
+   "candidate_sections": []
+  },
+  {
+   "id": "F14-06",
+   "faculty_id": "F14",
+   "faculty": "Mrs. Srinidhi K S",
+   "day": "THU",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "CC-LAB",
+   "type": "lab",
+   "batch": "B8",
+   "semester": "5",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F14-07",
+   "faculty_id": "F14",
+   "faculty": "Mrs. Srinidhi K S",
+   "day": "FRI",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "OS",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F14-08",
+   "faculty_id": "F14",
+   "faculty": "Mrs. Srinidhi K S",
+   "day": "FRI",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "REACTJS",
+   "type": "theory",
+   "batch": null,
+   "semester": null,
+   "section": null,
+   "section_status": "none",
+   "candidate_sections": []
+  },
+  {
+   "id": "F14-09",
+   "faculty_id": "F14",
+   "faculty": "Mrs. Srinidhi K S",
+   "day": "FRI",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "CC-LAB",
+   "type": "lab",
+   "batch": "B9",
+   "semester": "5",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F15-01",
+   "faculty_id": "F15",
+   "faculty": "Mrs. Anusha M",
+   "day": "MON",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "DSA-LAB",
+   "type": "lab",
+   "batch": "D2",
+   "semester": "3",
+   "section": "D",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F15-02",
+   "faculty_id": "F15",
+   "faculty": "Mrs. Anusha M",
+   "day": "MON",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "DSA-T",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F15-03",
+   "faculty_id": "F15",
+   "faculty": "Mrs. Anusha M",
+   "day": "TUE",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "DSA",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F15-04",
+   "faculty_id": "F15",
+   "faculty": "Mrs. Anusha M",
+   "day": "TUE",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "DSA-LAB",
+   "type": "lab",
+   "batch": "D3",
+   "semester": "3",
+   "section": "D",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F15-05",
+   "faculty_id": "F15",
+   "faculty": "Mrs. Anusha M",
+   "day": "TUE",
+   "start": "3:30",
+   "end": "4:30",
+   "period_start": 7,
+   "period_end": 7,
+   "hours": 1,
+   "subject_code": "CO",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F15-06",
+   "faculty_id": "F15",
+   "faculty": "Mrs. Anusha M",
+   "day": "WED",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "CO",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F15-07",
+   "faculty_id": "F15",
+   "faculty": "Mrs. Anusha M",
+   "day": "WED",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "DSA-T",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F15-08",
+   "faculty_id": "F15",
+   "faculty": "Mrs. Anusha M",
+   "day": "THU",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "DSA-LAB",
+   "type": "lab",
+   "batch": "D1",
+   "semester": "3",
+   "section": "D",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F15-09",
+   "faculty_id": "F15",
+   "faculty": "Mrs. Anusha M",
+   "day": "THU",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "DSA",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F15-10",
+   "faculty_id": "F15",
+   "faculty": "Mrs. Anusha M",
+   "day": "FRI",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "DSA",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F15-11",
+   "faculty_id": "F15",
+   "faculty": "Mrs. Anusha M",
+   "day": "FRI",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "CO",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F16-01",
+   "faculty_id": "F16",
+   "faculty": "Mrs. Rajeshwari G L",
+   "day": "MON",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "LD-LAB",
+   "type": "lab",
+   "batch": "C1",
+   "semester": "3",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F16-02",
+   "faculty_id": "F16",
+   "faculty": "Mrs. Rajeshwari G L",
+   "day": "TUE",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "LD",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F16-03",
+   "faculty_id": "F16",
+   "faculty": "Mrs. Rajeshwari G L",
+   "day": "TUE",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "LD-LAB",
+   "type": "lab",
+   "batch": "C2",
+   "semester": "3",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F16-04",
+   "faculty_id": "F16",
+   "faculty": "Mrs. Rajeshwari G L",
+   "day": "TUE",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "CO",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F16-05",
+   "faculty_id": "F16",
+   "faculty": "Mrs. Rajeshwari G L",
+   "day": "WED",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "CO",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F16-06",
+   "faculty_id": "F16",
+   "faculty": "Mrs. Rajeshwari G L",
+   "day": "WED",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "LD",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F16-07",
+   "faculty_id": "F16",
+   "faculty": "Mrs. Rajeshwari G L",
+   "day": "THU",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "LD-LAB",
+   "type": "lab",
+   "batch": "C3",
+   "semester": "3",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F16-08",
+   "faculty_id": "F16",
+   "faculty": "Mrs. Rajeshwari G L",
+   "day": "FRI",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "CO",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F16-09",
+   "faculty_id": "F16",
+   "faculty": "Mrs. Rajeshwari G L",
+   "day": "FRI",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "LD",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F17-01",
+   "faculty_id": "F17",
+   "faculty": "Mrs. Jyothi P K",
+   "day": "MON",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "ME",
+   "type": "theory",
+   "batch": null,
+   "semester": null,
+   "section": null,
+   "section_status": "none",
+   "candidate_sections": []
+  },
+  {
+   "id": "F17-02",
+   "faculty_id": "F17",
+   "faculty": "Mrs. Jyothi P K",
+   "day": "MON",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "LCS-LAB",
+   "type": "lab",
+   "batch": "B3",
+   "semester": null,
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": []
+  },
+  {
+   "id": "F17-03",
+   "faculty_id": "F17",
+   "faculty": "Mrs. Jyothi P K",
+   "day": "TUE",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "ME",
+   "type": "theory",
+   "batch": null,
+   "semester": null,
+   "section": null,
+   "section_status": "none",
+   "candidate_sections": []
+  },
+  {
+   "id": "F17-04",
+   "faculty_id": "F17",
+   "faculty": "Mrs. Jyothi P K",
+   "day": "TUE",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "DBMS-LAB",
+   "type": "lab",
+   "batch": "B2",
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F17-05",
+   "faculty_id": "F17",
+   "faculty": "Mrs. Jyothi P K",
+   "day": "TUE",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "DBMS",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F17-06",
+   "faculty_id": "F17",
+   "faculty": "Mrs. Jyothi P K",
+   "day": "WED",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "DBMS-LAB",
+   "type": "lab",
+   "batch": "B3",
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F17-07",
+   "faculty_id": "F17",
+   "faculty": "Mrs. Jyothi P K",
+   "day": "THU",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "DBMS",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F17-08",
+   "faculty_id": "F17",
+   "faculty": "Mrs. Jyothi P K",
+   "day": "FRI",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "DBMS-LAB",
+   "type": "lab",
+   "batch": "B1",
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F17-09",
+   "faculty_id": "F17",
+   "faculty": "Mrs. Jyothi P K",
+   "day": "FRI",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "DBMS",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F18-01",
+   "faculty_id": "F18",
+   "faculty": "Mrs. Vijayalakshmi B",
+   "day": "MON",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "ME",
+   "type": "theory",
+   "batch": null,
+   "semester": null,
+   "section": null,
+   "section_status": "none",
+   "candidate_sections": []
+  },
+  {
+   "id": "F18-02",
+   "faculty_id": "F18",
+   "faculty": "Mrs. Vijayalakshmi B",
+   "day": "MON",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "REACTJS",
+   "type": "theory",
+   "batch": null,
+   "semester": null,
+   "section": null,
+   "section_status": "none",
+   "candidate_sections": []
+  },
+  {
+   "id": "F18-03",
+   "faculty_id": "F18",
+   "faculty": "Mrs. Vijayalakshmi B",
+   "day": "MON",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "WEB-LAB",
+   "type": "lab",
+   "batch": "B1",
+   "semester": null,
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": []
+  },
+  {
+   "id": "F18-04",
+   "faculty_id": "F18",
+   "faculty": "Mrs. Vijayalakshmi B",
+   "day": "TUE",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "ME",
+   "type": "theory",
+   "batch": null,
+   "semester": null,
+   "section": null,
+   "section_status": "none",
+   "candidate_sections": []
+  },
+  {
+   "id": "F18-05",
+   "faculty_id": "F18",
+   "faculty": "Mrs. Vijayalakshmi B",
+   "day": "WED",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "NOSQL-LAB",
+   "type": "lab",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F18-06",
+   "faculty_id": "F18",
+   "faculty": "Mrs. Vijayalakshmi B",
+   "day": "WED",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "NOSQL-LAB",
+   "type": "lab",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B"
+   ]
+  },
+  {
+   "id": "F18-07",
+   "faculty_id": "F18",
+   "faculty": "Mrs. Vijayalakshmi B",
+   "day": "WED",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "WEB-LAB",
+   "type": "lab",
+   "batch": "B2",
+   "semester": null,
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": []
+  },
+  {
+   "id": "F18-08",
+   "faculty_id": "F18",
+   "faculty": "Mrs. Vijayalakshmi B",
+   "day": "THU",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "REACTJS",
+   "type": "theory",
+   "batch": null,
+   "semester": null,
+   "section": null,
+   "section_status": "none",
+   "candidate_sections": []
+  },
+  {
+   "id": "F18-09",
+   "faculty_id": "F18",
+   "faculty": "Mrs. Vijayalakshmi B",
+   "day": "FRI",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "REACTJS",
+   "type": "theory",
+   "batch": null,
+   "semester": null,
+   "section": null,
+   "section_status": "none",
+   "candidate_sections": []
+  },
+  {
+   "id": "F19-01",
+   "faculty_id": "F19",
+   "faculty": "Mrs. Rajani",
+   "day": "MON",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "AJAVA",
+   "type": "theory",
+   "batch": "B",
+   "semester": "5",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "B",
+    "D"
+   ]
+  },
+  {
+   "id": "F19-02",
+   "faculty_id": "F19",
+   "faculty": "Mrs. Rajani",
+   "day": "MON",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "AJAVA",
+   "type": "theory",
+   "batch": "D",
+   "semester": "5",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "B",
+    "D"
+   ]
+  },
+  {
+   "id": "F19-03",
+   "faculty_id": "F19",
+   "faculty": "Mrs. Rajani",
+   "day": "TUE",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "AJAVA",
+   "type": "theory",
+   "batch": "D",
+   "semester": "5",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "B",
+    "D"
+   ]
+  },
+  {
+   "id": "F19-04",
+   "faculty_id": "F19",
+   "faculty": "Mrs. Rajani",
+   "day": "TUE",
+   "start": "3:30",
+   "end": "4:30",
+   "period_start": 7,
+   "period_end": 7,
+   "hours": 1,
+   "subject_code": "AJAVA",
+   "type": "theory",
+   "batch": "B",
+   "semester": "5",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "B",
+    "D"
+   ]
+  },
+  {
+   "id": "F19-05",
+   "faculty_id": "F19",
+   "faculty": "Mrs. Rajani",
+   "day": "WED",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "CC-LAB",
+   "type": "lab",
+   "batch": "B1",
+   "semester": "5",
+   "section": null,
+   "section_status": "verify (overlaps another class of same section)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "D"
+   ]
+  },
+  {
+   "id": "F19-06",
+   "faculty_id": "F19",
+   "faculty": "Mrs. Rajani",
+   "day": "THU",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "AJAVA",
+   "type": "theory",
+   "batch": "B",
+   "semester": "5",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "B",
+    "D"
+   ]
+  },
+  {
+   "id": "F19-07",
+   "faculty_id": "F19",
+   "faculty": "Mrs. Rajani",
+   "day": "THU",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "CC-LAB",
+   "type": "lab",
+   "batch": "B2",
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "D"
+   ]
+  },
+  {
+   "id": "F19-08",
+   "faculty_id": "F19",
+   "faculty": "Mrs. Rajani",
+   "day": "FRI",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "AJAVA",
+   "type": "theory",
+   "batch": "D",
+   "semester": "5",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "B",
+    "D"
+   ]
+  },
+  {
+   "id": "F19-09",
+   "faculty_id": "F19",
+   "faculty": "Mrs. Rajani",
+   "day": "FRI",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "CC-LAB",
+   "type": "lab",
+   "batch": "B3",
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "D"
+   ]
+  },
+  {
+   "id": "F20-01",
+   "faculty_id": "F20",
+   "faculty": "Mrs. Chetana K N",
+   "day": "MON",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "LC-NC",
+   "type": "theory",
+   "batch": "B",
+   "semester": null,
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": []
+  },
+  {
+   "id": "F20-02",
+   "faculty_id": "F20",
+   "faculty": "Mrs. Chetana K N",
+   "day": "MON",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "LC-NC",
+   "type": "theory",
+   "batch": "A",
+   "semester": null,
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": []
+  },
+  {
+   "id": "F20-03",
+   "faculty_id": "F20",
+   "faculty": "Mrs. Chetana K N",
+   "day": "TUE",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "LC-NC",
+   "type": "theory",
+   "batch": "B",
+   "semester": null,
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": []
+  },
+  {
+   "id": "F20-04",
+   "faculty_id": "F20",
+   "faculty": "Mrs. Chetana K N",
+   "day": "TUE",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "LC-NC",
+   "type": "theory",
+   "batch": "A",
+   "semester": null,
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": []
+  },
+  {
+   "id": "F20-05",
+   "faculty_id": "F20",
+   "faculty": "Mrs. Chetana K N",
+   "day": "TUE",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "LC-NC",
+   "type": "theory",
+   "batch": "B",
+   "semester": null,
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": []
+  },
+  {
+   "id": "F20-06",
+   "faculty_id": "F20",
+   "faculty": "Mrs. Chetana K N",
+   "day": "WED",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "LC-NC",
+   "type": "theory",
+   "batch": "A",
+   "semester": null,
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": []
+  },
+  {
+   "id": "F20-07",
+   "faculty_id": "F20",
+   "faculty": "Mrs. Chetana K N",
+   "day": "WED",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "DEVOPS",
+   "type": "theory",
+   "batch": "B1",
+   "semester": null,
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": []
+  },
+  {
+   "id": "F20-08",
+   "faculty_id": "F20",
+   "faculty": "Mrs. Chetana K N",
+   "day": "THU",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "DEVOPS",
+   "type": "theory",
+   "batch": "B2",
+   "semester": null,
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": []
+  },
+  {
+   "id": "F20-09",
+   "faculty_id": "F20",
+   "faculty": "Mrs. Chetana K N",
+   "day": "FRI",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "DEVOPS",
+   "type": "theory",
+   "batch": "B3",
+   "semester": null,
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": []
+  },
+  {
+   "id": "F21-01",
+   "faculty_id": "F21",
+   "faculty": "Mrs. Shilpashree S",
+   "day": "MON",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "OS",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F21-02",
+   "faculty_id": "F21",
+   "faculty": "Mrs. Shilpashree S",
+   "day": "MON",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "GAIPE",
+   "type": "theory",
+   "batch": null,
+   "semester": "7",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F21-03",
+   "faculty_id": "F21",
+   "faculty": "Mrs. Shilpashree S",
+   "day": "MON",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "GAIPE-LAB",
+   "type": "lab",
+   "batch": "B1",
+   "semester": "7",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F21-04",
+   "faculty_id": "F21",
+   "faculty": "Mrs. Shilpashree S",
+   "day": "TUE",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "OS",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F21-05",
+   "faculty_id": "F21",
+   "faculty": "Mrs. Shilpashree S",
+   "day": "TUE",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "GAIPE",
+   "type": "theory",
+   "batch": null,
+   "semester": "7",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F21-06",
+   "faculty_id": "F21",
+   "faculty": "Mrs. Shilpashree S",
+   "day": "TUE",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "GAIPE-LAB",
+   "type": "lab",
+   "batch": "B2",
+   "semester": "7",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F21-07",
+   "faculty_id": "F21",
+   "faculty": "Mrs. Shilpashree S",
+   "day": "WED",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "GAIPE",
+   "type": "theory",
+   "batch": null,
+   "semester": "7",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F21-08",
+   "faculty_id": "F21",
+   "faculty": "Mrs. Shilpashree S",
+   "day": "WED",
+   "start": "1:30",
+   "end": "3:30",
+   "period_start": 5,
+   "period_end": 6,
+   "hours": 2,
+   "subject_code": "GAIPE-LAB",
+   "type": "lab",
+   "batch": "B3",
+   "semester": "7",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F21-09",
+   "faculty_id": "F21",
+   "faculty": "Mrs. Shilpashree S",
+   "day": "THU",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "OS",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F22-01",
+   "faculty_id": "F22",
+   "faculty": "Mrs. Vinutha K",
+   "day": "MON",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "CN",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F22-02",
+   "faculty_id": "F22",
+   "faculty": "Mrs. Vinutha K",
+   "day": "MON",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "DVT",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F22-03",
+   "faculty_id": "F22",
+   "faculty": "Mrs. Vinutha K",
+   "day": "TUE",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "CN-LAB",
+   "type": "lab",
+   "batch": "C3",
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F22-04",
+   "faculty_id": "F22",
+   "faculty": "Mrs. Vinutha K",
+   "day": "TUE",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "CN",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F22-05",
+   "faculty_id": "F22",
+   "faculty": "Mrs. Vinutha K",
+   "day": "THU",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "CN-LAB",
+   "type": "lab",
+   "batch": "C1",
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F22-06",
+   "faculty_id": "F22",
+   "faculty": "Mrs. Vinutha K",
+   "day": "THU",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "DVT",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F22-07",
+   "faculty_id": "F22",
+   "faculty": "Mrs. Vinutha K",
+   "day": "FRI",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "CN",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F22-08",
+   "faculty_id": "F22",
+   "faculty": "Mrs. Vinutha K",
+   "day": "FRI",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "CN-LAB",
+   "type": "lab",
+   "batch": "C2",
+   "semester": "5",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F22-09",
+   "faculty_id": "F22",
+   "faculty": "Mrs. Vinutha K",
+   "day": "FRI",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "DVT",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F23-01",
+   "faculty_id": "F23",
+   "faculty": "Mrs. Vijayalaxmi Joshi",
+   "day": "MON",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "SEPM",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "D",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F23-02",
+   "faculty_id": "F23",
+   "faculty": "Mrs. Vijayalaxmi Joshi",
+   "day": "MON",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "ME",
+   "type": "theory",
+   "batch": null,
+   "semester": null,
+   "section": null,
+   "section_status": "none",
+   "candidate_sections": []
+  },
+  {
+   "id": "F23-03",
+   "faculty_id": "F23",
+   "faculty": "Mrs. Vijayalaxmi Joshi",
+   "day": "TUE",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "ME",
+   "type": "theory",
+   "batch": null,
+   "semester": null,
+   "section": null,
+   "section_status": "none",
+   "candidate_sections": []
+  },
+  {
+   "id": "F23-04",
+   "faculty_id": "F23",
+   "faculty": "Mrs. Vijayalaxmi Joshi",
+   "day": "TUE",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "SEPM",
+   "type": "theory",
+   "batch": "D1",
+   "semester": "5",
+   "section": "D",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F23-05",
+   "faculty_id": "F23",
+   "faculty": "Mrs. Vijayalaxmi Joshi",
+   "day": "TUE",
+   "start": "3:30",
+   "end": "4:30",
+   "period_start": 7,
+   "period_end": 7,
+   "hours": 1,
+   "subject_code": "SEPM",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "D",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F23-06",
+   "faculty_id": "F23",
+   "faculty": "Mrs. Vijayalaxmi Joshi",
+   "day": "WED",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "SEPM",
+   "type": "theory",
+   "batch": "D2",
+   "semester": "5",
+   "section": "D",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F23-07",
+   "faculty_id": "F23",
+   "faculty": "Mrs. Vijayalaxmi Joshi",
+   "day": "WED",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "LCS-LAB",
+   "type": "lab",
+   "batch": "B4",
+   "semester": null,
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": []
+  },
+  {
+   "id": "F23-08",
+   "faculty_id": "F23",
+   "faculty": "Mrs. Vijayalaxmi Joshi",
+   "day": "THU",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "SEPM",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "D",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F23-09",
+   "faculty_id": "F23",
+   "faculty": "Mrs. Vijayalaxmi Joshi",
+   "day": "FRI",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "SEPM",
+   "type": "theory",
+   "batch": "D3",
+   "semester": "5",
+   "section": "D",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F24-01",
+   "faculty_id": "F24",
+   "faculty": "Mr. Santhosh K",
+   "day": "MON",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "GAIPE",
+   "type": "theory",
+   "batch": null,
+   "semester": "7",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F24-02",
+   "faculty_id": "F24",
+   "faculty": "Mr. Santhosh K",
+   "day": "MON",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "GAIPE-LAB",
+   "type": "lab",
+   "batch": "C1",
+   "semester": "7",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F24-03",
+   "faculty_id": "F24",
+   "faculty": "Mr. Santhosh K",
+   "day": "TUE",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "OS",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F24-04",
+   "faculty_id": "F24",
+   "faculty": "Mr. Santhosh K",
+   "day": "TUE",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "GAIPE",
+   "type": "theory",
+   "batch": null,
+   "semester": "7",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F24-05",
+   "faculty_id": "F24",
+   "faculty": "Mr. Santhosh K",
+   "day": "TUE",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "GAIPE-LAB",
+   "type": "lab",
+   "batch": "C2",
+   "semester": "7",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F24-06",
+   "faculty_id": "F24",
+   "faculty": "Mr. Santhosh K",
+   "day": "WED",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "GAIPE",
+   "type": "theory",
+   "batch": null,
+   "semester": "7",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F24-07",
+   "faculty_id": "F24",
+   "faculty": "Mr. Santhosh K",
+   "day": "WED",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "OS",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F24-08",
+   "faculty_id": "F24",
+   "faculty": "Mr. Santhosh K",
+   "day": "WED",
+   "start": "1:30",
+   "end": "3:30",
+   "period_start": 5,
+   "period_end": 6,
+   "hours": 2,
+   "subject_code": "GAIPE-LAB",
+   "type": "lab",
+   "batch": "C3",
+   "semester": "7",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F24-09",
+   "faculty_id": "F24",
+   "faculty": "Mr. Santhosh K",
+   "day": "THU",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "OS",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F25-01",
+   "faculty_id": "F25",
+   "faculty": "Mrs. Shreenagamanjula Rani",
+   "day": "MON",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "DSA",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F25-02",
+   "faculty_id": "F25",
+   "faculty": "Mrs. Shreenagamanjula Rani",
+   "day": "MON",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "PLT",
+   "type": "theory",
+   "batch": null,
+   "semester": "1",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F25-03",
+   "faculty_id": "F25",
+   "faculty": "Mrs. Shreenagamanjula Rani",
+   "day": "TUE",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "DSA",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F25-04",
+   "faculty_id": "F25",
+   "faculty": "Mrs. Shreenagamanjula Rani",
+   "day": "TUE",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "DSA-LAB",
+   "type": "lab",
+   "batch": "B2",
+   "semester": "3",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F25-05",
+   "faculty_id": "F25",
+   "faculty": "Mrs. Shreenagamanjula Rani",
+   "day": "WED",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "DSA-LAB",
+   "type": "lab",
+   "batch": "B3",
+   "semester": "3",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F25-06",
+   "faculty_id": "F25",
+   "faculty": "Mrs. Shreenagamanjula Rani",
+   "day": "WED",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "DSA-T",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F25-07",
+   "faculty_id": "F25",
+   "faculty": "Mrs. Shreenagamanjula Rani",
+   "day": "THU",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "DSA",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F25-08",
+   "faculty_id": "F25",
+   "faculty": "Mrs. Shreenagamanjula Rani",
+   "day": "THU",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "PLT",
+   "type": "theory",
+   "batch": null,
+   "semester": "1",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F25-09",
+   "faculty_id": "F25",
+   "faculty": "Mrs. Shreenagamanjula Rani",
+   "day": "FRI",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "PLT",
+   "type": "theory",
+   "batch": null,
+   "semester": "1",
+   "section": "C",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F25-10",
+   "faculty_id": "F25",
+   "faculty": "Mrs. Shreenagamanjula Rani",
+   "day": "FRI",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "DSA-LAB",
+   "type": "lab",
+   "batch": "B1",
+   "semester": "3",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F25-11",
+   "faculty_id": "F25",
+   "faculty": "Mrs. Shreenagamanjula Rani",
+   "day": "FRI",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "DSA-T",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "B",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F26-01",
+   "faculty_id": "F26",
+   "faculty": "Mrs. Bhanumathi H R",
+   "day": "MON",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "LD-LAB",
+   "type": "lab",
+   "batch": "D1",
+   "semester": "3",
+   "section": "D",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B",
+    "D"
+   ]
+  },
+  {
+   "id": "F26-02",
+   "faculty_id": "F26",
+   "faculty": "Mrs. Bhanumathi H R",
+   "day": "TUE",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "LD-LAB",
+   "type": "lab",
+   "batch": "D2",
+   "semester": "3",
+   "section": "D",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B",
+    "D"
+   ]
+  },
+  {
+   "id": "F26-03",
+   "faculty_id": "F26",
+   "faculty": "Mrs. Bhanumathi H R",
+   "day": "TUE",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "CO",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "B",
+    "D"
+   ]
+  },
+  {
+   "id": "F26-04",
+   "faculty_id": "F26",
+   "faculty": "Mrs. Bhanumathi H R",
+   "day": "TUE",
+   "start": "3:30",
+   "end": "4:30",
+   "period_start": 7,
+   "period_end": 7,
+   "hours": 1,
+   "subject_code": "LD",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "B",
+    "D"
+   ]
+  },
+  {
+   "id": "F26-05",
+   "faculty_id": "F26",
+   "faculty": "Mrs. Bhanumathi H R",
+   "day": "WED",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "LD",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "B",
+    "D"
+   ]
+  },
+  {
+   "id": "F26-06",
+   "faculty_id": "F26",
+   "faculty": "Mrs. Bhanumathi H R",
+   "day": "WED",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "CO",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "B",
+    "D"
+   ]
+  },
+  {
+   "id": "F26-07",
+   "faculty_id": "F26",
+   "faculty": "Mrs. Bhanumathi H R",
+   "day": "THU",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "LD-LAB",
+   "type": "lab",
+   "batch": "D3",
+   "semester": "3",
+   "section": "D",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B",
+    "D"
+   ]
+  },
+  {
+   "id": "F26-08",
+   "faculty_id": "F26",
+   "faculty": "Mrs. Bhanumathi H R",
+   "day": "FRI",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "CO",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "B",
+    "D"
+   ]
+  },
+  {
+   "id": "F26-09",
+   "faculty_id": "F26",
+   "faculty": "Mrs. Bhanumathi H R",
+   "day": "FRI",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "LD",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "B",
+    "D"
+   ]
+  },
+  {
+   "id": "F27-01",
+   "faculty_id": "F27",
+   "faculty": "Ms. Archana V",
+   "day": "MON",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "PLT",
+   "type": "theory",
+   "batch": null,
+   "semester": "1",
+   "section": "D",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F27-02",
+   "faculty_id": "F27",
+   "faculty": "Ms. Archana V",
+   "day": "MON",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "FDW-LAB",
+   "type": "lab",
+   "batch": "B1",
+   "semester": "1",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F27-03",
+   "faculty_id": "F27",
+   "faculty": "Ms. Archana V",
+   "day": "TUE",
+   "start": "1:30",
+   "end": "3:30",
+   "period_start": 5,
+   "period_end": 6,
+   "hours": 2,
+   "subject_code": "PLT-LAB",
+   "type": "lab",
+   "batch": "D3",
+   "semester": "1",
+   "section": "D",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F27-04",
+   "faculty_id": "F27",
+   "faculty": "Ms. Archana V",
+   "day": "WED",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "PLT-LAB",
+   "type": "lab",
+   "batch": "D1",
+   "semester": "1",
+   "section": "D",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F27-05",
+   "faculty_id": "F27",
+   "faculty": "Ms. Archana V",
+   "day": "WED",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "FDW-LAB",
+   "type": "lab",
+   "batch": "B2",
+   "semester": "1",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F27-06",
+   "faculty_id": "F27",
+   "faculty": "Ms. Archana V",
+   "day": "THU",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "PLT",
+   "type": "theory",
+   "batch": null,
+   "semester": "1",
+   "section": "D",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F27-07",
+   "faculty_id": "F27",
+   "faculty": "Ms. Archana V",
+   "day": "FRI",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "PLT",
+   "type": "theory",
+   "batch": null,
+   "semester": "1",
+   "section": "D",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F27-08",
+   "faculty_id": "F27",
+   "faculty": "Ms. Archana V",
+   "day": "FRI",
+   "start": "1:30",
+   "end": "3:30",
+   "period_start": 5,
+   "period_end": 6,
+   "hours": 2,
+   "subject_code": "PLT-LAB",
+   "type": "lab",
+   "batch": "D2",
+   "semester": "1",
+   "section": "D",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F28-01",
+   "faculty_id": "F28",
+   "faculty": "Mrs. Ganga B M",
+   "day": "MON",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "LC-NC",
+   "type": "theory",
+   "batch": null,
+   "semester": null,
+   "section": null,
+   "section_status": "none",
+   "candidate_sections": []
+  },
+  {
+   "id": "F28-02",
+   "faculty_id": "F28",
+   "faculty": "Mrs. Ganga B M",
+   "day": "MON",
+   "start": "2:30",
+   "end": "3:30",
+   "period_start": 6,
+   "period_end": 6,
+   "hours": 1,
+   "subject_code": "CN",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "verify (overlaps another class of same section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F28-03",
+   "faculty_id": "F28",
+   "faculty": "Mrs. Ganga B M",
+   "day": "TUE",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "LC-NC",
+   "type": "theory",
+   "batch": null,
+   "semester": null,
+   "section": null,
+   "section_status": "none",
+   "candidate_sections": []
+  },
+  {
+   "id": "F28-04",
+   "faculty_id": "F28",
+   "faculty": "Mrs. Ganga B M",
+   "day": "TUE",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "CN-LAB",
+   "type": "lab",
+   "batch": "D3",
+   "semester": "5",
+   "section": "D",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F28-05",
+   "faculty_id": "F28",
+   "faculty": "Mrs. Ganga B M",
+   "day": "TUE",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "CN",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "D",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F28-06",
+   "faculty_id": "F28",
+   "faculty": "Mrs. Ganga B M",
+   "day": "WED",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "CN-LAB",
+   "type": "lab",
+   "batch": "D1",
+   "semester": "5",
+   "section": "D",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F28-07",
+   "faculty_id": "F28",
+   "faculty": "Mrs. Ganga B M",
+   "day": "WED",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "LC-NC",
+   "type": "theory",
+   "batch": null,
+   "semester": null,
+   "section": null,
+   "section_status": "none",
+   "candidate_sections": []
+  },
+  {
+   "id": "F28-08",
+   "faculty_id": "F28",
+   "faculty": "Mrs. Ganga B M",
+   "day": "FRI",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "CN-LAB",
+   "type": "lab",
+   "batch": "D2",
+   "semester": "5",
+   "section": "D",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F28-09",
+   "faculty_id": "F28",
+   "faculty": "Mrs. Ganga B M",
+   "day": "FRI",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "CN",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "D",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "D"
+   ]
+  },
+  {
+   "id": "F29-01",
+   "faculty_id": "F29",
+   "faculty": "Mrs. Madhushree V",
+   "day": "MON",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "PLT-LAB",
+   "type": "lab",
+   "batch": "C3",
+   "semester": "1",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F29-02",
+   "faculty_id": "F29",
+   "faculty": "Mrs. Madhushree V",
+   "day": "MON",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "PLT-LAB",
+   "type": "lab",
+   "batch": "E3",
+   "semester": "1",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F29-03",
+   "faculty_id": "F29",
+   "faculty": "Mrs. Madhushree V",
+   "day": "MON",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "PLT",
+   "type": "theory",
+   "batch": null,
+   "semester": "1",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F29-04",
+   "faculty_id": "F29",
+   "faculty": "Mrs. Madhushree V",
+   "day": "TUE",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "PLT",
+   "type": "theory",
+   "batch": null,
+   "semester": "1",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F29-05",
+   "faculty_id": "F29",
+   "faculty": "Mrs. Madhushree V",
+   "day": "TUE",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "PLT-LAB",
+   "type": "lab",
+   "batch": "C1",
+   "semester": "1",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F29-06",
+   "faculty_id": "F29",
+   "faculty": "Mrs. Madhushree V",
+   "day": "WED",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "PLT-LAB",
+   "type": "lab",
+   "batch": "E1",
+   "semester": "1",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F29-07",
+   "faculty_id": "F29",
+   "faculty": "Mrs. Madhushree V",
+   "day": "THU",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "PLT",
+   "type": "theory",
+   "batch": null,
+   "semester": "1",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F29-08",
+   "faculty_id": "F29",
+   "faculty": "Mrs. Madhushree V",
+   "day": "FRI",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "PLT-LAB",
+   "type": "lab",
+   "batch": "E2",
+   "semester": "1",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F29-09",
+   "faculty_id": "F29",
+   "faculty": "Mrs. Madhushree V",
+   "day": "FRI",
+   "start": "1:30",
+   "end": "3:30",
+   "period_start": 5,
+   "period_end": 6,
+   "hours": 2,
+   "subject_code": "PLT-LAB",
+   "type": "lab",
+   "batch": "C2",
+   "semester": "1",
+   "section": "C",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "C"
+   ]
+  },
+  {
+   "id": "F30-01",
+   "faculty_id": "F30",
+   "faculty": "Mrs. Meghana N R",
+   "day": "MON",
+   "start": "10:45",
+   "end": "11:45",
+   "period_start": 3,
+   "period_end": 3,
+   "hours": 1,
+   "subject_code": "SEPM",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F30-02",
+   "faculty_id": "F30",
+   "faculty": "Mrs. Meghana N R",
+   "day": "MON",
+   "start": "1:30",
+   "end": "3:30",
+   "period_start": 5,
+   "period_end": 6,
+   "hours": 2,
+   "subject_code": "PLT-LAB",
+   "type": "lab",
+   "batch": "B3",
+   "semester": "1",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F30-03",
+   "faculty_id": "F30",
+   "faculty": "Mrs. Meghana N R",
+   "day": "TUE",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "SEPM-LAB",
+   "type": "lab",
+   "batch": "A1",
+   "semester": "5",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F30-04",
+   "faculty_id": "F30",
+   "faculty": "Mrs. Meghana N R",
+   "day": "TUE",
+   "start": "3:30",
+   "end": "4:30",
+   "period_start": 7,
+   "period_end": 7,
+   "hours": 1,
+   "subject_code": "SEPM",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F30-05",
+   "faculty_id": "F30",
+   "faculty": "Mrs. Meghana N R",
+   "day": "THU",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "SEPM-LAB",
+   "type": "lab",
+   "batch": "A2",
+   "semester": "5",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F30-06",
+   "faculty_id": "F30",
+   "faculty": "Mrs. Meghana N R",
+   "day": "THU",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "SEPM",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F30-07",
+   "faculty_id": "F30",
+   "faculty": "Mrs. Meghana N R",
+   "day": "THU",
+   "start": "1:30",
+   "end": "3:30",
+   "period_start": 5,
+   "period_end": 6,
+   "hours": 2,
+   "subject_code": "PLT-LAB",
+   "type": "lab",
+   "batch": "B1",
+   "semester": "1",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F30-08",
+   "faculty_id": "F30",
+   "faculty": "Mrs. Meghana N R",
+   "day": "FRI",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "PLT-LAB",
+   "type": "lab",
+   "batch": "B2",
+   "semester": "1",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F30-09",
+   "faculty_id": "F30",
+   "faculty": "Mrs. Meghana N R",
+   "day": "FRI",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "SEPM-LAB",
+   "type": "lab",
+   "batch": "A3",
+   "semester": "5",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F31-01",
+   "faculty_id": "F31",
+   "faculty": "Mrs. Manjula H S",
+   "day": "MON",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "OS",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F31-02",
+   "faculty_id": "F31",
+   "faculty": "Mrs. Manjula H S",
+   "day": "MON",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "LCS-LAB",
+   "type": "lab",
+   "batch": "B5",
+   "semester": null,
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": []
+  },
+  {
+   "id": "F31-03",
+   "faculty_id": "F31",
+   "faculty": "Mrs. Manjula H S",
+   "day": "TUE",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "SEPM-LAB",
+   "type": "lab",
+   "batch": "B1",
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F31-04",
+   "faculty_id": "F31",
+   "faculty": "Mrs. Manjula H S",
+   "day": "TUE",
+   "start": "3:30",
+   "end": "4:30",
+   "period_start": 7,
+   "period_end": 7,
+   "hours": 1,
+   "subject_code": "OS",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F31-05",
+   "faculty_id": "F31",
+   "faculty": "Mrs. Manjula H S",
+   "day": "WED",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "SEPM-LAB",
+   "type": "lab",
+   "batch": "B2",
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F31-06",
+   "faculty_id": "F31",
+   "faculty": "Mrs. Manjula H S",
+   "day": "WED",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "LCS-LAB",
+   "type": "lab",
+   "batch": "B6",
+   "semester": null,
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": []
+  },
+  {
+   "id": "F31-07",
+   "faculty_id": "F31",
+   "faculty": "Mrs. Manjula H S",
+   "day": "FRI",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "SEPM-LAB",
+   "type": "lab",
+   "batch": "B3",
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B"
+   ]
+  },
+  {
+   "id": "F31-08",
+   "faculty_id": "F31",
+   "faculty": "Mrs. Manjula H S",
+   "day": "FRI",
+   "start": "1:30",
+   "end": "2:30",
+   "period_start": 5,
+   "period_end": 5,
+   "hours": 1,
+   "subject_code": "OS",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F32-01",
+   "faculty_id": "F32",
+   "faculty": "Mrs. Suma B N",
+   "day": "MON",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "VCG-LAB",
+   "type": "lab",
+   "batch": "B1",
+   "semester": "5",
+   "section": null,
+   "section_status": "verify (overlaps another class of same section)",
+   "candidate_sections": [
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F32-02",
+   "faculty_id": "F32",
+   "faculty": "Mrs. Suma B N",
+   "day": "TUE",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "LD",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F32-03",
+   "faculty_id": "F32",
+   "faculty": "Mrs. Suma B N",
+   "day": "TUE",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "LD-LAB",
+   "type": "lab",
+   "batch": "A1",
+   "semester": "3",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F32-04",
+   "faculty_id": "F32",
+   "faculty": "Mrs. Suma B N",
+   "day": "WED",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "LD-LAB",
+   "type": "lab",
+   "batch": "A2",
+   "semester": "3",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F32-05",
+   "faculty_id": "F32",
+   "faculty": "Mrs. Suma B N",
+   "day": "WED",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "VCG-LAB",
+   "type": "lab",
+   "batch": "B2",
+   "semester": "5",
+   "section": "B",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F32-06",
+   "faculty_id": "F32",
+   "faculty": "Mrs. Suma B N",
+   "day": "THU",
+   "start": "8:30",
+   "end": "9:30",
+   "period_start": 1,
+   "period_end": 1,
+   "hours": 1,
+   "subject_code": "LD",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F32-07",
+   "faculty_id": "F32",
+   "faculty": "Mrs. Suma B N",
+   "day": "FRI",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "LD",
+   "type": "theory",
+   "batch": null,
+   "semester": "3",
+   "section": "A",
+   "section_status": "certain (faculty teaches only this section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F32-08",
+   "faculty_id": "F32",
+   "faculty": "Mrs. Suma B N",
+   "day": "FRI",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "LD-LAB",
+   "type": "lab",
+   "batch": "A3",
+   "semester": "3",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A"
+   ]
+  },
+  {
+   "id": "F33-01",
+   "faculty_id": "F33",
+   "faculty": "Mrs. Prakruthi G R",
+   "day": "MON",
+   "start": "2:30",
+   "end": "3:30",
+   "period_start": 6,
+   "period_end": 6,
+   "hours": 1,
+   "subject_code": "CN",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F33-02",
+   "faculty_id": "F33",
+   "faculty": "Mrs. Prakruthi G R",
+   "day": "TUE",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "CN-LAB",
+   "type": "lab",
+   "batch": "A3",
+   "semester": "5",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F33-03",
+   "faculty_id": "F33",
+   "faculty": "Mrs. Prakruthi G R",
+   "day": "TUE",
+   "start": "11:45",
+   "end": "12:45",
+   "period_start": 4,
+   "period_end": 4,
+   "hours": 1,
+   "subject_code": "CN",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F33-04",
+   "faculty_id": "F33",
+   "faculty": "Mrs. Prakruthi G R",
+   "day": "WED",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "CC-LAB",
+   "type": "lab",
+   "batch": "B4",
+   "semester": "5",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F33-05",
+   "faculty_id": "F33",
+   "faculty": "Mrs. Prakruthi G R",
+   "day": "THU",
+   "start": "8:30",
+   "end": "10:30",
+   "period_start": 1,
+   "period_end": 2,
+   "hours": 2,
+   "subject_code": "CN-LAB",
+   "type": "lab",
+   "batch": "A1",
+   "semester": "5",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F33-06",
+   "faculty_id": "F33",
+   "faculty": "Mrs. Prakruthi G R",
+   "day": "THU",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "CC-LAB",
+   "type": "lab",
+   "batch": "B5",
+   "semester": "5",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F33-07",
+   "faculty_id": "F33",
+   "faculty": "Mrs. Prakruthi G R",
+   "day": "FRI",
+   "start": "9:30",
+   "end": "10:30",
+   "period_start": 2,
+   "period_end": 2,
+   "hours": 1,
+   "subject_code": "CN",
+   "type": "theory",
+   "batch": null,
+   "semester": "5",
+   "section": null,
+   "section_status": "ambiguous (faculty teaches several sections)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F33-08",
+   "faculty_id": "F33",
+   "faculty": "Mrs. Prakruthi G R",
+   "day": "FRI",
+   "start": "10:45",
+   "end": "12:45",
+   "period_start": 3,
+   "period_end": 4,
+   "hours": 2,
+   "subject_code": "CN-LAB",
+   "type": "lab",
+   "batch": "A2",
+   "semester": "5",
+   "section": "A",
+   "section_status": "certain (batch letter = section)",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  {
+   "id": "F33-09",
+   "faculty_id": "F33",
+   "faculty": "Mrs. Prakruthi G R",
+   "day": "FRI",
+   "start": "2:30",
+   "end": "4:30",
+   "period_start": 6,
+   "period_end": 7,
+   "hours": 2,
+   "subject_code": "CC-LAB",
+   "type": "lab",
+   "batch": "B6",
+   "semester": "5",
+   "section": null,
+   "section_status": "batch code does not map to a section",
+   "candidate_sections": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  }
+ ]
+}

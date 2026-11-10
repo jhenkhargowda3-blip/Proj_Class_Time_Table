@@ -414,6 +414,41 @@ router.delete('/sections/:id', (req, res) => {
 });
 
 // 6. Rooms CRUD
+router.post('/rooms/restore-defaults', (req, res) => {
+  const db = getDatabase();
+  const defaultRooms = [
+    { id: 1, name: 'CR-101', type: 'classroom', capacity: 50, is_active: 1 },
+    { id: 2, name: 'CR-102', type: 'classroom', capacity: 50, is_active: 1 },
+    { id: 3, name: 'CR-103', type: 'classroom', capacity: 50, is_active: 1 },
+    { id: 4, name: 'CR-104', type: 'classroom', capacity: 50, is_active: 1 },
+    { id: 5, name: 'CR-201', type: 'classroom', capacity: 60, is_active: 1 },
+    { id: 6, name: 'CR-202', type: 'classroom', capacity: 60, is_active: 1 },
+    { id: 7, name: 'CR-203', type: 'classroom', capacity: 60, is_active: 1 },
+    { id: 8, name: 'CR-204', type: 'classroom', capacity: 60, is_active: 1 },
+    { id: 9, name: 'Computing Lab A', type: 'lab', capacity: 45, is_active: 1 },
+    { id: 10, name: 'Computing Lab B', type: 'lab', capacity: 45, is_active: 1 },
+    { id: 11, name: 'Advanced Systems Lab', type: 'lab', capacity: 40, is_active: 1 }
+  ];
+
+  const insert = db.prepare('INSERT OR REPLACE INTO rooms (id, name, type, capacity, is_active) VALUES (?, ?, ?, ?, ?)');
+
+  const restoreTx = db.transaction(() => {
+    for (const r of defaultRooms) {
+      insert.run(r.id, r.name, r.type, r.capacity, r.is_active);
+    }
+    db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)')
+      .run(req.user?.id || 1, 'ROOMS_RESTORED', JSON.stringify({ count: defaultRooms.length, restoredAt: new Date().toISOString() }));
+  });
+
+  try {
+    restoreTx();
+    const allRooms = db.prepare('SELECT * FROM rooms ORDER BY id').all();
+    res.json({ success: true, message: 'All 11 default rooms restored successfully', rooms: allRooms });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to restore default rooms' });
+  }
+});
+
 router.post('/rooms', (req, res) => {
   const { name, type, capacity, isActive } = req.body;
   const db = getDatabase();
@@ -589,6 +624,67 @@ router.get('/faculty/:id/availability', (req, res) => {
     WHERE fa.faculty_id = ?
     ORDER BY wd.day_index, ts.slot_no
   `).all(facId);
+
+  // Requirement 3: Read busy/free slots from faculty_sessions (in addition to timetable_entries)
+  const dayCodeMap = { 1: 'MON', 2: 'TUE', 3: 'WED', 4: 'THU', 5: 'FRI', 6: 'SAT' };
+  const periodMap = { 1: 1, 2: 2, 4: 3, 5: 4, 7: 5, 8: 6, 9: 7 };
+
+  const facultyRow = db.prepare('SELECT id, code, name FROM faculty WHERE id = ?').get(facId);
+  const facSessions = db.prepare(`
+    SELECT * FROM faculty_sessions
+    WHERE faculty_id = ? OR faculty_id = ? OR faculty_id = ?
+  `).all(String(facId), facultyRow?.code || '', facultyRow?.name || '');
+
+  const activeEntries = db.prepare(`
+    SELECT te.*, s.name as subject_name, s.code as subject_code
+    FROM timetable_entries te
+    JOIN subjects s ON te.subject_id = s.id
+    WHERE te.faculty_id = ?
+  `).all(facId);
+
+  for (const item of availability) {
+    const dayCode = dayCodeMap[item.day_index];
+    const period = periodMap[item.slot_no];
+
+    let busySession = null;
+    if (dayCode && period) {
+      const matchSess = facSessions.find(fs => 
+        fs.day === dayCode && 
+        fs.period_start != null && 
+        fs.period_start <= period && 
+        (fs.period_end != null ? fs.period_end : fs.period_start) >= period
+      );
+      if (matchSess) {
+        busySession = {
+          subject: matchSess.subject_code,
+          type: matchSess.type,
+          batch: matchSess.batch,
+          section: matchSess.section,
+          semester: matchSess.semester,
+          source: 'faculty_sessions'
+        };
+      }
+    }
+
+    if (!busySession) {
+      const matchEntry = activeEntries.find(te => te.day_id === item.day_id && te.slot_id === item.slot_id);
+      if (matchEntry) {
+        busySession = {
+          subject: matchEntry.subject_code || matchEntry.subject_name,
+          type: matchEntry.is_lab_block ? 'lab' : 'theory',
+          source: 'timetable_entries'
+        };
+      }
+    }
+
+    if (busySession) {
+      item.is_available = 0;
+      item.is_busy = 1;
+      item.busy_session = busySession;
+    } else {
+      item.is_busy = 0;
+    }
+  }
 
   res.json({ availability });
 });
@@ -884,7 +980,7 @@ function validateTimetablePayload(data, db) {
   return { errors, warnings };
 }
 
-// 11. Import Timetable from JSON Endpoint
+// 11. Import Timetable from JSON Endpoint (Requirements 1, 2, 4, 5)
 router.post('/import-timetable', (req, res) => {
   const db = getDatabase();
   const importData = req.body?.data || req.body;
@@ -893,311 +989,216 @@ router.post('/import-timetable', (req, res) => {
     return res.status(400).json({ error: 'Invalid import payload: faculty, subjects, or sessions array expected.' });
   }
 
-  // Server-side validation
-  const { errors, warnings } = validateTimetablePayload(importData, db);
-  if (errors.length > 0) {
-    return res.status(400).json({
-      error: 'Import blocked due to validation errors',
-      errors,
-      warnings
-    });
-  }
-
-  // 1. Take snapshot of current state before applying changes
+  // 1. Take pre-import snapshot for Undo (Requirement 6)
   const snapshot = {
     timestamp: new Date().toISOString(),
-    faculty: db.prepare('SELECT * FROM faculty').all(),
-    subjects: db.prepare('SELECT * FROM subjects').all(),
-    sections: db.prepare('SELECT * FROM sections').all(),
-    rooms: db.prepare('SELECT * FROM rooms').all(),
-    timetable_entries: db.prepare('SELECT * FROM timetable_entries').all(),
-    timetable_versions: db.prepare('SELECT * FROM timetable_versions').all(),
-    faculty_availability: db.prepare('SELECT * FROM faculty_availability').all(),
-    faculty_subjects: db.prepare('SELECT * FROM faculty_subjects').all(),
-    section_subjects: db.prepare('SELECT * FROM section_subjects').all(),
-    users: db.prepare("SELECT * FROM users WHERE role = 'faculty'").all()
+    facultyIdsBefore: db.prepare('SELECT id FROM faculty').all().map(r => r.id),
+    subjectCodesBefore: db.prepare('SELECT code FROM subjects').all().map(r => r.code),
+    sessionIdsBefore: db.prepare('SELECT id FROM faculty_sessions').all().map(r => r.id),
+    facultyBefore: db.prepare('SELECT * FROM faculty').all(),
+    subjectsBefore: db.prepare('SELECT * FROM subjects').all(),
+    usersBefore: db.prepare("SELECT id FROM users WHERE role = 'faculty'").all().map(r => r.id)
   };
 
   db.prepare('INSERT INTO import_snapshots (snapshot_json) VALUES (?)').run(JSON.stringify(snapshot));
 
-  // 2. Perform import within transaction
   let importedFacultyCount = 0;
   let importedSubjectsCount = 0;
   let importedSessionsCount = 0;
 
-  db.transaction(() => {
-    // A. Ensure CSE Department exists
-    let cseDept = db.prepare("SELECT id FROM departments WHERE code = 'CSE' LIMIT 1").get();
-    if (!cseDept) {
-      cseDept = db.prepare("SELECT id FROM departments ORDER BY id ASC LIMIT 1").get();
-    }
-    const defaultDeptId = cseDept ? cseDept.id : 1;
-
-    // B. Upsert Faculty
-    const facultyIdMap = {};
-    const inputFaculty = Array.isArray(importData.faculty) ? importData.faculty : [];
-
-    inputFaculty.forEach(f => {
-      const facName = String(f.name || 'Unnamed Faculty').trim();
-      const facEmail = f.email ? String(f.email).trim() : null;
-      const facPhone = f.phone ? String(f.phone).trim() : null;
-      const classesTaught = f.classes_taught != null ? String(f.classes_taught) : null;
-      const effectiveFrom = f.effective_from != null ? String(f.effective_from) : null;
-      const weeklyHours = f.weekly_hours != null ? Number(f.weekly_hours) : null;
-
-      // Check matching by ID or email
-      let existingFac = null;
-      if (f.id != null) {
-        existingFac = db.prepare('SELECT * FROM faculty WHERE id = ?').get(f.id);
+  try {
+    // Requirement 2: All in ONE database transaction. If anything fails, rollback everything and show the real error.
+    const importTx = db.transaction(() => {
+      // Find or default to CSE department (NEVER create new departments or clear existing ones - Requirement 5)
+      let cseDept = db.prepare("SELECT id FROM departments WHERE code = 'CSE' LIMIT 1").get();
+      if (!cseDept) {
+        cseDept = db.prepare("SELECT id FROM departments ORDER BY id ASC LIMIT 1").get();
       }
-      if (!existingFac && facEmail) {
-        existingFac = db.prepare('SELECT * FROM faculty WHERE email = ?').get(facEmail);
-      }
-      if (!existingFac && facName) {
-        existingFac = db.prepare('SELECT * FROM faculty WHERE name = ?').get(facName);
-      }
+      const defaultDeptId = cseDept ? cseDept.id : 1;
 
-      if (existingFac) {
-        // Update existing record, preserving ID, user_id, credentials
-        db.prepare(`
-          UPDATE faculty
-          SET name = ?, email = COALESCE(?, email), phone = COALESCE(?, phone),
-              classes_taught = ?, effective_from = ?, weekly_hours = ?
-          WHERE id = ?
-        `).run(facName, facEmail, facPhone, classesTaught, effectiveFrom, weeklyHours, existingFac.id);
+      // Helper to normalize faculty name for matching (Requirement 4)
+      const normalizeFacultyName = (name) => {
+        if (!name) return '';
+        return String(name).trim().toLowerCase().replace(/^(dr|prof|mrs|mr|ms)\.?\s+/i, '');
+      };
 
-        facultyIdMap[String(f.id ?? existingFac.id)] = existingFac.id;
-        importedFacultyCount++;
-      } else {
-        // Create new faculty record with Max Load = 18 for new faculty
-        let usernameBase = (facEmail ? facEmail.split('@')[0] : facName.toLowerCase().replace(/[^a-z0-9]/g, '')).slice(0, 20);
-        let username = usernameBase || 'faculty_' + Math.floor(Math.random() * 10000);
-        let uCheck = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
-        let counter = 1;
-        while (uCheck) {
-          username = `${usernameBase}${counter++}`;
-          uCheck = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
+      // A. Upsert Faculty (Requirement 4: Match imported faculty by name and update rather than duplicate. Keep Mrs. Manjula H S!)
+      const currentFaculty = db.prepare('SELECT * FROM faculty').all();
+      const inputFaculty = Array.isArray(importData.faculty) ? importData.faculty : [];
+
+      for (const f of inputFaculty) {
+        const facName = String(f.name || 'Unnamed Faculty').trim();
+        const facCode = f.id != null ? String(f.id).trim() : null;
+        const facEmail = f.email ? String(f.email).trim() : null;
+        const facPhone = f.phone ? String(f.phone).trim() : null;
+        const classesTaught = f.classes_taught != null ? String(f.classes_taught) : null;
+        const effectiveFrom = f.effective_from != null ? String(f.effective_from) : null;
+        const weeklyHours = f.weekly_hours != null ? Number(f.weekly_hours) : null;
+
+        let existingFac = null;
+        if (facName) {
+          const norm = normalizeFacultyName(facName);
+          existingFac = currentFaculty.find(ef => normalizeFacultyName(ef.name) === norm);
+        }
+        if (!existingFac && facCode) {
+          existingFac = currentFaculty.find(ef => ef.code === facCode);
+        }
+        if (!existingFac && facEmail) {
+          existingFac = currentFaculty.find(ef => ef.email && ef.email.toLowerCase() === facEmail.toLowerCase());
         }
 
-        const hashedPw = bcrypt.hashSync(config.facultySeedPassword || 'man2112', 10);
-        const userRes = db.prepare(`
-          INSERT INTO users (username, password_hash, role, full_name, email)
-          VALUES (?, ?, 'faculty', ?, ?)
-        `).run(username, hashedPw, facName, facEmail || `${username}@college.edu`);
+        if (existingFac) {
+          // Update existing faculty record, preserving ID, user account, credentials
+          db.prepare(`
+            UPDATE faculty
+            SET name = ?,
+                code = COALESCE(?, code),
+                email = COALESCE(?, email),
+                phone = COALESCE(?, phone),
+                classes_taught = COALESCE(?, classes_taught),
+                effective_from = COALESCE(?, effective_from),
+                weekly_hours = COALESCE(?, weekly_hours)
+            WHERE id = ?
+          `).run(existingFac.name, facCode, facEmail, facPhone, classesTaught, effectiveFrom, weeklyHours, existingFac.id);
 
-        const facRes = db.prepare(`
-          INSERT INTO faculty (user_id, name, department_id, email, phone, max_periods_per_day, max_periods_per_week, is_active, classes_taught, effective_from, weekly_hours)
-          VALUES (?, ?, ?, ?, ?, 4, 18, 1, ?, ?, ?)
-        `).run(userRes.lastInsertRowid, facName, defaultDeptId, facEmail || `${username}@college.edu`, facPhone || '-', classesTaught, effectiveFrom, weeklyHours);
-
-        const newFacId = facRes.lastInsertRowid;
-        db.prepare('UPDATE users SET faculty_id = ? WHERE id = ?').run(newFacId, userRes.lastInsertRowid);
-        facultyIdMap[String(f.id ?? newFacId)] = newFacId;
-
-        // Initialize faculty availability (available for all slots by default)
-        const allDays = db.prepare('SELECT id FROM working_days').all();
-        const allSlots = db.prepare('SELECT id FROM time_slots').all();
-        const insAvail = db.prepare('INSERT OR IGNORE INTO faculty_availability (faculty_id, day_id, slot_id, is_available) VALUES (?, ?, ?, 1)');
-        for (const d of allDays) {
-          for (const sl of allSlots) {
-            insAvail.run(newFacId, d.id, sl.id);
-          }
-        }
-
-        importedFacultyCount++;
-      }
-    });
-
-    // C. Upsert Subjects
-    const subjectIdMap = {};
-    const inputSubjects = Array.isArray(importData.subjects) ? importData.subjects : [];
-
-    inputSubjects.forEach(s => {
-      const subCode = String(s.code || '').trim().toUpperCase();
-      if (!subCode) return;
-      const subName = String(s.full_name || s.name || subCode).trim();
-      const subType = (String(s.type || '').toLowerCase() === 'lab') ? 'lab' : 'theory';
-      const sem = Number(s.semester) || 1;
-      const weeklyPeriods = (subType === 'lab') ? 2 : 4;
-      const labBlockLength = (subType === 'lab') ? 2 : 1;
-
-      let existingSub = db.prepare('SELECT id FROM subjects WHERE code = ?').get(subCode);
-      if (existingSub) {
-        db.prepare(`
-          UPDATE subjects
-          SET name = ?, type = ?, semester = ?
-          WHERE id = ?
-        `).run(subName, subType, sem, existingSub.id);
-        subjectIdMap[subCode] = existingSub.id;
-      } else {
-        const subRes = db.prepare(`
-          INSERT INTO subjects (code, name, type, weekly_periods, lab_block_length, department_id, semester)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-        `).run(subCode, subName, subType, weeklyPeriods, labBlockLength, defaultDeptId, sem);
-        subjectIdMap[subCode] = subRes.lastInsertRowid;
-      }
-      importedSubjectsCount++;
-    });
-
-    // D. Ensure default rooms exist
-    let defaultClassroom = db.prepare("SELECT id FROM rooms WHERE type = 'classroom' AND is_active = 1 LIMIT 1").get();
-    if (!defaultClassroom) {
-      const r = db.prepare("INSERT INTO rooms (name, type, capacity, is_active) VALUES ('Classroom 101', 'classroom', 60, 1)").run();
-      defaultClassroom = { id: r.lastInsertRowid };
-    }
-    let defaultLab = db.prepare("SELECT id FROM rooms WHERE type = 'lab' AND is_active = 1 LIMIT 1").get();
-    if (!defaultLab) {
-      const l = db.prepare("INSERT INTO rooms (name, type, capacity, is_active) VALUES ('Computing Lab A', 'lab', 30, 1)").run();
-      defaultLab = { id: l.lastInsertRowid };
-    }
-
-    // E. Ensure active timetable version exists
-    let activeVer = db.prepare("SELECT id FROM timetable_versions WHERE status = 'active' LIMIT 1").get();
-    if (!activeVer) {
-      const vRes = db.prepare("INSERT INTO timetable_versions (name, status, notes) VALUES ('Master Academic Timetable', 'active', 'Imported Timetable')").run();
-      activeVer = { id: vRes.lastInsertRowid };
-    }
-
-    // F. Map Sections
-    const sectionIdMap = {};
-    const inputSessions = Array.isArray(importData.sessions) ? importData.sessions : [];
-
-    inputSessions.forEach(sess => {
-      const secName = sess.section ? String(sess.section).trim() : (sess.semester ? (`Sem ${sess.semester}` + (sess.batch ? `-${sess.batch}` : '')) : 'Section A');
-      if (!sectionIdMap[secName]) {
-        let existingSec = db.prepare('SELECT id FROM sections WHERE name = ?').get(secName);
-        if (!existingSec) {
-          const semNum = Number(sess.semester) || 1;
-          const sRes = db.prepare('INSERT INTO sections (name, semester, department_id, strength) VALUES (?, ?, ?, 40)').run(secName, semNum, defaultDeptId);
-          existingSec = { id: sRes.lastInsertRowid };
-        }
-        sectionIdMap[secName] = existingSec.id;
-      }
-    });
-
-    // G. Map Sessions into timetable_entries
-    const dayIndexMap = { 'MON': 1, 'TUE': 2, 'WED': 3, 'THU': 4, 'FRI': 5, 'SAT': 6 };
-    // Non-break period slots
-    const periodSlotMap = { 1: 1, 2: 2, 3: 4, 4: 5, 5: 7, 6: 8, 7: 9 };
-    const nonBreakSlots = db.prepare('SELECT * FROM time_slots WHERE is_break = 0 ORDER BY slot_no ASC').all();
-
-    inputSessions.forEach(sess => {
-      // Resolve faculty
-      const rawFacId = sess.faculty_id != null ? String(sess.faculty_id) : '';
-      let facId = facultyIdMap[rawFacId];
-      if (!facId && rawFacId) {
-        const facRow = db.prepare('SELECT id FROM faculty WHERE id = ?').get(rawFacId);
-        facId = facRow ? facRow.id : null;
-      }
-      if (!facId) return; // skip if cannot resolve
-
-      // Resolve subject
-      const subCode = String(sess.subject || '').trim().toUpperCase();
-      let subId = subjectIdMap[subCode];
-      if (!subId && subCode) {
-        const subRow = db.prepare('SELECT id FROM subjects WHERE code = ?').get(subCode);
-        if (subRow) {
-          subId = subRow.id;
+          importedFacultyCount++;
         } else {
-          // Auto create subject if needed
-          const isLab = String(sess.type || '').toLowerCase() === 'lab';
-          const subRes = db.prepare('INSERT INTO subjects (code, name, type, weekly_periods, lab_block_length, department_id, semester) VALUES (?, ?, ?, ?, ?, ?, ?)').run(subCode, subCode, isLab ? 'lab' : 'theory', isLab ? 2 : 4, isLab ? 2 : 1, defaultDeptId, Number(sess.semester) || 1);
-          subId = subRes.lastInsertRowid;
-          subjectIdMap[subCode] = subId;
-        }
-      }
-      if (!subId) return;
-
-      // Resolve section
-      const secName = sess.section ? String(sess.section).trim() : (sess.semester ? (`Sem ${sess.semester}` + (sess.batch ? `-${sess.batch}` : '')) : 'Section A');
-      const secId = sectionIdMap[secName];
-      if (!secId) return;
-
-      // Resolve day
-      const dayCode = normalizeDayCode(sess.day);
-      const dayIdx = dayIndexMap[dayCode] || 1;
-      const dayRow = db.prepare('SELECT id FROM working_days WHERE day_index = ?').get(dayIdx);
-      const dayId = dayRow ? dayRow.id : 1;
-
-      // Resolve room
-      const isLab = String(sess.type || '').toLowerCase() === 'lab';
-      const roomId = isLab ? defaultLab.id : defaultClassroom.id;
-
-      // Determine slots
-      const targetSlots = [];
-      if (sess.period_start != null) {
-        const pStart = Number(sess.period_start);
-        const pEnd = Number(sess.period_end ?? sess.period_start);
-        for (let p = pStart; p <= pEnd; p++) {
-          if (periodSlotMap[p]) targetSlots.push(periodSlotMap[p]);
-        }
-      } else if (sess.start && sess.end) {
-        const sStart = parseTimeMinutes(sess.start);
-        const sEnd = parseTimeMinutes(sess.end);
-        nonBreakSlots.forEach(sl => {
-          const slStart = parseTimeMinutes(sl.start_time);
-          const slEnd = parseTimeMinutes(sl.end_time);
-          if (sStart < slEnd && slStart < sEnd) {
-            targetSlots.push(sl.id);
+          // Insert new faculty record
+          let usernameBase = (facEmail ? facEmail.split('@')[0] : facName.toLowerCase().replace(/[^a-z0-9]/g, '')).slice(0, 20);
+          let username = usernameBase || 'faculty_' + Math.floor(Math.random() * 10000);
+          let uCheck = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
+          let counter = 1;
+          while (uCheck) {
+            username = `${usernameBase}${counter++}`;
+            uCheck = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
           }
-        });
+
+          const hashedPw = bcrypt.hashSync(config.facultySeedPassword || 'man2112', 10);
+          const userRes = db.prepare(`
+            INSERT INTO users (username, password_hash, role, full_name, email)
+            VALUES (?, ?, 'faculty', ?, ?)
+          `).run(username, hashedPw, facName, facEmail || `${username}@college.edu`);
+
+          const facRes = db.prepare(`
+            INSERT INTO faculty (user_id, code, name, department_id, email, phone, max_periods_per_day, max_periods_per_week, is_active, classes_taught, effective_from, weekly_hours)
+            VALUES (?, ?, ?, ?, ?, ?, 4, 18, 1, ?, ?, ?)
+          `).run(userRes.lastInsertRowid, facCode, facName, defaultDeptId, facEmail || `${username}@college.edu`, facPhone || '-', classesTaught, effectiveFrom, weeklyHours);
+
+          const newFacId = facRes.lastInsertRowid;
+          db.prepare('UPDATE users SET faculty_id = ? WHERE id = ?').run(newFacId, userRes.lastInsertRowid);
+
+          // Initialize availability
+          const allDays = db.prepare('SELECT id FROM working_days').all();
+          const allSlots = db.prepare('SELECT id FROM time_slots').all();
+          const insAvail = db.prepare('INSERT OR IGNORE INTO faculty_availability (faculty_id, day_id, slot_id, is_available) VALUES (?, ?, ?, 1)');
+          for (const d of allDays) {
+            for (const sl of allSlots) {
+              insAvail.run(newFacId, d.id, sl.id);
+            }
+          }
+
+          importedFacultyCount++;
+        }
       }
 
-      // If no slots matched, fallback to period 1
-      if (targetSlots.length === 0) {
-        targetSlots.push(1);
+      // B. Upsert Subjects (Requirement 4)
+      const inputSubjects = Array.isArray(importData.subjects) ? importData.subjects : [];
+      for (const s of inputSubjects) {
+        const subCode = String(s.code || '').trim().toUpperCase();
+        if (!subCode) continue;
+        const subName = String(s.full_name || s.name || subCode).trim();
+        const subType = (String(s.type || '').toLowerCase() === 'lab') ? 'lab' : 'theory';
+        const sem = Number(s.semester) || 1;
+        const weeklyPeriods = (subType === 'lab') ? 2 : 4;
+        const labBlockLength = (subType === 'lab') ? 2 : 1;
+
+        const existingSub = db.prepare('SELECT id FROM subjects WHERE code = ?').get(subCode);
+        if (existingSub) {
+          db.prepare(`
+            UPDATE subjects
+            SET name = COALESCE(?, name), type = ?, semester = ?
+            WHERE id = ?
+          `).run(subName, subType, sem, existingSub.id);
+        } else {
+          db.prepare(`
+            INSERT INTO subjects (code, name, type, weekly_periods, lab_block_length, department_id, semester)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `).run(subCode, subName, subType, weeklyPeriods, labBlockLength, defaultDeptId, sem);
+        }
+        importedSubjectsCount++;
       }
 
-      targetSlots.forEach(slotId => {
-        // Remove any conflicting entry for this slot in active version to ensure re-import is clean and without duplicates
-        db.prepare('DELETE FROM timetable_entries WHERE version_id = ? AND section_id = ? AND day_id = ? AND slot_id = ?').run(activeVer.id, secId, dayId, slotId);
-        db.prepare('DELETE FROM timetable_entries WHERE version_id = ? AND faculty_id = ? AND day_id = ? AND slot_id = ?').run(activeVer.id, facId, dayId, slotId);
-        db.prepare('DELETE FROM timetable_entries WHERE version_id = ? AND room_id = ? AND day_id = ? AND slot_id = ?').run(activeVer.id, roomId, dayId, slotId);
+      // C. Upsert Sessions into faculty_sessions table (Requirements 1, 2, 4, 5)
+      // DO NOT write imported sessions into timetable_entries. No room column. Never touch rooms, sections, holidays, or departments.
+      const inputSessions = Array.isArray(importData.sessions) ? importData.sessions : [];
+      const insSession = db.prepare(`
+        INSERT INTO faculty_sessions (id, faculty_id, day, start, end, period_start, period_end, subject_code, type, batch, section, semester)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          faculty_id = excluded.faculty_id,
+          day = excluded.day,
+          start = excluded.start,
+          end = excluded.end,
+          period_start = excluded.period_start,
+          period_end = excluded.period_end,
+          subject_code = excluded.subject_code,
+          type = excluded.type,
+          batch = excluded.batch,
+          section = excluded.section,
+          semester = excluded.semester
+      `);
 
-        db.prepare(`
-          INSERT INTO timetable_entries (version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, is_draft)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
-        `).run(activeVer.id, secId, subId, facId, roomId, dayId, slotId, isLab ? 1 : 0);
-
-        // Ensure relational mappings
-        db.prepare('INSERT OR IGNORE INTO faculty_subjects (faculty_id, subject_id) VALUES (?, ?)').run(facId, subId);
-        db.prepare(`
-          INSERT INTO section_subjects (section_id, subject_id, faculty_id)
-          VALUES (?, ?, ?)
-          ON CONFLICT(section_id, subject_id) DO UPDATE SET faculty_id = excluded.faculty_id
-        `).run(secId, subId, facId);
-
+      for (const sess of inputSessions) {
+        if (!sess.id) continue;
+        insSession.run(
+          String(sess.id),
+          String(sess.faculty_id ?? ''),
+          String(sess.day || 'MON').trim().toUpperCase(),
+          sess.start ? String(sess.start) : null,
+          sess.end ? String(sess.end) : null,
+          sess.period_start != null ? Number(sess.period_start) : null,
+          sess.period_end != null ? Number(sess.period_end) : null,
+          sess.subject ? String(sess.subject) : (sess.subject_code ? String(sess.subject_code) : null),
+          sess.type ? String(sess.type) : 'theory',
+          sess.batch ? String(sess.batch) : null,
+          sess.section ? String(sess.section) : null,
+          sess.semester != null ? String(sess.semester) : null
+        );
         importedSessionsCount++;
-      });
+      }
     });
-  })();
 
-  // Log in audit trail
-  db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)').run(
-    req.user.id,
-    'IMPORT_TIMETABLE_JSON',
-    JSON.stringify({
-      facultyCount: importedFacultyCount,
-      subjectsCount: importedSubjectsCount,
-      sessionsCount: importedSessionsCount,
-      warningsCount: warnings.length
-    })
-  );
+    importTx();
 
-  res.json({
-    success: true,
-    message: 'Timetable data successfully imported',
-    stats: {
-      faculty: importedFacultyCount,
-      subjects: importedSubjectsCount,
-      sessions: importedSessionsCount
-    },
-    warnings,
-    canUndo: true
-  });
+    // Audit log
+    db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)').run(
+      req.user?.id || 1,
+      'IMPORT_TIMETABLE_JSON',
+      JSON.stringify({
+        facultyCount: importedFacultyCount,
+        subjectsCount: importedSubjectsCount,
+        sessionsCount: importedSessionsCount
+      })
+    );
+
+    res.json({
+      success: true,
+      message: 'Timetable data successfully imported into faculty_sessions',
+      stats: {
+        faculty: importedFacultyCount,
+        subjects: importedSubjectsCount,
+        sessions: importedSessionsCount
+      },
+      canUndo: true
+    });
+  } catch (err) {
+    // If anything fails, transaction rolls back automatically
+    console.error('[CTAS Import Error]', err);
+    res.status(500).json({ error: err.message || 'Import failed' });
+  }
 });
 
-// 12. Undo Last Timetable Import Endpoint
+// 12. Undo Last Timetable Import Endpoint (Requirements 5, 6)
 router.post('/undo-import', (req, res) => {
   const db = getDatabase();
   const snapshotRow = db.prepare('SELECT * FROM import_snapshots ORDER BY id DESC LIMIT 1').get();
@@ -1213,103 +1214,93 @@ router.post('/undo-import', (req, res) => {
     return res.status(500).json({ error: 'Failed to read snapshot data: ' + err.message });
   }
 
-  db.transaction(() => {
-    db.pragma('foreign_keys = OFF');
-    try {
-      // 1. Clear affected tables
-      db.exec('DELETE FROM timetable_entries');
-      db.exec('DELETE FROM section_subjects');
-      db.exec('DELETE FROM faculty_subjects');
-      db.exec('DELETE FROM faculty_availability');
-      db.exec('DELETE FROM faculty');
-      db.exec('DELETE FROM subjects');
-      db.exec('DELETE FROM sections');
-      db.exec('DELETE FROM rooms');
-      db.exec('DELETE FROM timetable_versions');
-
-      // 2. Restore rooms
-      const insRoom = db.prepare('INSERT INTO rooms (id, name, type, capacity, is_active) VALUES (?, ?, ?, ?, ?)');
-      for (const r of snapshot.rooms || []) {
-        insRoom.run(r.id, r.name, r.type, r.capacity, r.is_active);
+  try {
+    const undoTx = db.transaction(() => {
+      // 1. Remove rows added to faculty_sessions that were not in snapshot
+      if (snapshot.sessionIdsBefore) {
+        const existingSessionIds = new Set(snapshot.sessionIdsBefore);
+        const currentSessions = db.prepare('SELECT id FROM faculty_sessions').all();
+        for (const s of currentSessions) {
+          if (!existingSessionIds.has(s.id)) {
+            db.prepare('DELETE FROM faculty_sessions WHERE id = ?').run(s.id);
+          }
+        }
+      } else {
+        db.exec('DELETE FROM faculty_sessions');
       }
 
-      // 3. Restore sections
-      const insSec = db.prepare('INSERT INTO sections (id, name, semester, department_id, strength) VALUES (?, ?, ?, ?, ?)');
-      for (const s of snapshot.sections || []) {
-        insSec.run(s.id, s.name, s.semester, s.department_id, s.strength);
-      }
-
-      // 4. Restore subjects
-      const insSub = db.prepare('INSERT INTO subjects (id, code, name, type, weekly_periods, lab_block_length, department_id, semester) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-      for (const sub of snapshot.subjects || []) {
-        insSub.run(sub.id, sub.code, sub.name, sub.type, sub.weekly_periods, sub.lab_block_length, sub.department_id, sub.semester);
-      }
-
-      // 5. Restore faculty
-      const insFac = db.prepare('INSERT INTO faculty (id, user_id, name, department_id, email, phone, max_periods_per_day, max_periods_per_week, is_active, classes_taught, effective_from, weekly_hours) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-      for (const f of snapshot.faculty || []) {
-        insFac.run(f.id, f.user_id, f.name, f.department_id, f.email, f.phone, f.max_periods_per_day, f.max_periods_per_week, f.is_active, f.classes_taught || null, f.effective_from || null, f.weekly_hours || null);
-      }
-
-      // 6. Restore timetable_versions
-      const insVer = db.prepare('INSERT INTO timetable_versions (id, name, status, created_by, created_at, notes) VALUES (?, ?, ?, ?, ?, ?)');
-      for (const v of snapshot.timetable_versions || []) {
-        insVer.run(v.id, v.name, v.status, v.created_by, v.created_at, v.notes);
-      }
-
-      // 7. Restore timetable_entries
-      const insEntry = db.prepare('INSERT INTO timetable_entries (id, version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, is_draft) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-      for (const te of snapshot.timetable_entries || []) {
-        insEntry.run(te.id, te.version_id, te.section_id, te.subject_id, te.faculty_id, te.room_id, te.day_id, te.slot_id, te.is_lab_block, te.locked, te.is_draft);
-      }
-
-      // 8. Restore faculty_availability
-      const insAvail = db.prepare('INSERT INTO faculty_availability (faculty_id, day_id, slot_id, is_available) VALUES (?, ?, ?, ?)');
-      for (const a of snapshot.faculty_availability || []) {
-        insAvail.run(a.faculty_id, a.day_id, a.slot_id, a.is_available);
-      }
-
-      // 9. Restore faculty_subjects & section_subjects
-      const insFS = db.prepare('INSERT INTO faculty_subjects (faculty_id, subject_id) VALUES (?, ?)');
-      for (const fs of snapshot.faculty_subjects || []) {
-        insFS.run(fs.faculty_id, fs.subject_id);
-      }
-      const insSS = db.prepare('INSERT INTO section_subjects (section_id, subject_id, faculty_id) VALUES (?, ?, ?)');
-      for (const ss of snapshot.section_subjects || []) {
-        insSS.run(ss.section_id, ss.subject_id, ss.faculty_id);
-      }
-
-      // 10. Clean up any newly created faculty user accounts
-      if (snapshot.users) {
-        const snapUserIds = new Set(snapshot.users.map(u => u.id));
-        const allFacultyUsers = db.prepare("SELECT id FROM users WHERE role = 'faculty'").all();
-        for (const u of allFacultyUsers) {
-          if (!snapUserIds.has(u.id)) {
-            db.prepare('DELETE FROM users WHERE id = ?').run(u.id);
+      // 2. Remove rows added to subjects that were not in snapshot
+      if (snapshot.subjectCodesBefore) {
+        const existingSubjectCodes = new Set(snapshot.subjectCodesBefore);
+        const currentSubjects = db.prepare('SELECT code FROM subjects').all();
+        for (const s of currentSubjects) {
+          if (!existingSubjectCodes.has(s.code)) {
+            db.prepare('DELETE FROM subjects WHERE code = ?').run(s.code);
           }
         }
       }
 
-      // Delete this snapshot record
+      // 3. Remove rows added to faculty that were not in snapshot
+      if (snapshot.facultyIdsBefore) {
+        const existingFacultyIds = new Set(snapshot.facultyIdsBefore);
+        const currentFaculty = db.prepare('SELECT id, user_id FROM faculty').all();
+        for (const f of currentFaculty) {
+          if (!existingFacultyIds.has(f.id)) {
+            db.prepare('DELETE FROM faculty_availability WHERE faculty_id = ?').run(f.id);
+            db.prepare('DELETE FROM faculty WHERE id = ?').run(f.id);
+            if (f.user_id) {
+              db.prepare('DELETE FROM users WHERE id = ?').run(f.user_id);
+            }
+          }
+        }
+      }
+
+      // 4. Restore original state of updated faculty rows (e.g. Mrs. Manjula H S)
+      if (snapshot.facultyBefore) {
+        for (const f of snapshot.facultyBefore) {
+          db.prepare(`
+            UPDATE faculty
+            SET name = ?, code = ?, classes_taught = ?, effective_from = ?, weekly_hours = ?, phone = ?, email = ?
+            WHERE id = ?
+          `).run(f.name, f.code || null, f.classes_taught || null, f.effective_from || null, f.weekly_hours || null, f.phone || null, f.email || null, f.id);
+        }
+      }
+
+      // 5. Restore original state of updated subjects
+      if (snapshot.subjectsBefore) {
+        for (const s of snapshot.subjectsBefore) {
+          db.prepare(`
+            UPDATE subjects
+            SET name = ?, type = ?, semester = ?
+            WHERE id = ?
+          `).run(s.name, s.type, s.semester, s.id);
+        }
+      }
+
+      // Requirement 5: Never touch rooms, sections, holidays or departments!
+
+      // Delete snapshot row
       db.prepare('DELETE FROM import_snapshots WHERE id = ?').run(snapshotRow.id);
-    } finally {
-      db.pragma('foreign_keys = ON');
-    }
-  })();
+    });
 
-  // Audit log
-  db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)').run(
-    req.user.id,
-    'UNDO_TIMETABLE_IMPORT',
-    JSON.stringify({ snapshotId: snapshotRow.id, revertedAt: new Date().toISOString() })
-  );
+    undoTx();
 
-  const remaining = db.prepare('SELECT COUNT(*) as count FROM import_snapshots').get().count;
-  res.json({
-    success: true,
-    message: 'Last import was successfully undone and previous state restored.',
-    canUndo: remaining > 0
-  });
+    // Audit log
+    db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)').run(
+      req.user?.id || 1,
+      'UNDO_TIMETABLE_IMPORT',
+      JSON.stringify({ snapshotId: snapshotRow.id, revertedAt: new Date().toISOString() })
+    );
+
+    const remaining = db.prepare('SELECT COUNT(*) as count FROM import_snapshots').get().count;
+    res.json({
+      success: true,
+      message: 'Last import was successfully undone and imported rows removed.',
+      canUndo: remaining > 0
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to undo import' });
+  }
 });
 
 // 13. Undo Status Endpoint

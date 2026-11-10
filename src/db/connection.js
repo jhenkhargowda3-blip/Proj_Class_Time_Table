@@ -41,6 +41,9 @@ export function initSchema(db) {
   // Ensure faculty table supports extended fields from JSON import
   try {
     const facultyCols = db.prepare("PRAGMA table_info(faculty)").all().map(c => c.name);
+    if (!facultyCols.includes('code')) {
+      db.exec("ALTER TABLE faculty ADD COLUMN code TEXT NULL");
+    }
     if (!facultyCols.includes('classes_taught')) {
       db.exec("ALTER TABLE faculty ADD COLUMN classes_taught TEXT NULL");
     }
@@ -56,6 +59,24 @@ export function initSchema(db) {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         snapshot_json TEXT NOT NULL
       )
+    `);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS faculty_sessions (
+        id TEXT PRIMARY KEY,
+        faculty_id TEXT NOT NULL,
+        day TEXT NOT NULL,
+        start TEXT,
+        end TEXT,
+        period_start INTEGER,
+        period_end INTEGER,
+        subject_code TEXT,
+        type TEXT,
+        batch TEXT,
+        section TEXT,
+        semester TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_faculty_sessions_faculty ON faculty_sessions(faculty_id);
+      CREATE INDEX IF NOT EXISTS idx_faculty_sessions_day ON faculty_sessions(day);
     `);
   } catch (err) {
     // ignore migration error if already exists

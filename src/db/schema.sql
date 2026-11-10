@@ -245,3 +245,22 @@ CREATE TABLE IF NOT EXISTS student_notice_reads (
 );
 CREATE INDEX IF NOT EXISTS idx_student_notice_reads_user ON student_notice_reads(user_id);
 
+-- 22. Faculty Sessions Table (Imported Timetable Sessions without Room Collisions)
+CREATE TABLE IF NOT EXISTS faculty_sessions (
+  id TEXT PRIMARY KEY,
+  faculty_id TEXT NOT NULL,
+  day TEXT NOT NULL,
+  start TEXT,
+  end TEXT,
+  period_start INTEGER,
+  period_end INTEGER,
+  subject_code TEXT,
+  type TEXT,
+  batch TEXT,
+  section TEXT,
+  semester TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_faculty_sessions_faculty ON faculty_sessions(faculty_id);
+CREATE INDEX IF NOT EXISTS idx_faculty_sessions_day ON faculty_sessions(day);
+
+

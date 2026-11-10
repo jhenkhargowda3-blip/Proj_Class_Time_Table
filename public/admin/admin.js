@@ -1297,7 +1297,35 @@ function setupTimetableImportTools() {
   btnCloseX?.addEventListener('click', closeModal);
   btnCancel?.addEventListener('click', closeModal);
 
-  // Confirm Import
+  // Helper to normalize faculty name for matching (Requirement 4)
+  const normalizeFacultyName = (name) => {
+    if (!name) return '';
+    return String(name).trim().toLowerCase().replace(/^(dr|prof|mrs|mr|ms)\.?\s+/i, '');
+  };
+
+  // Helper to capture a pre-import snapshot
+  const takePreImportSnapshot = async () => {
+    let entries = [];
+    if (activeVersionId) {
+      try {
+        const vData = await apiRequest(`/api/timetable/versions/${activeVersionId}`);
+        entries = Array.isArray(vData?.entries) ? JSON.parse(JSON.stringify(vData.entries)) : [];
+      } catch {}
+    }
+    return {
+      timestamp: new Date().toISOString(),
+      faculty: Array.isArray(masterData?.faculty) ? JSON.parse(JSON.stringify(masterData.faculty)) : [],
+      subjects: Array.isArray(masterData?.subjects) ? JSON.parse(JSON.stringify(masterData.subjects)) : [],
+      rooms: Array.isArray(masterData?.rooms) ? JSON.parse(JSON.stringify(masterData.rooms)) : [],
+      sections: Array.isArray(masterData?.sections) ? JSON.parse(JSON.stringify(masterData.sections)) : [],
+      departments: Array.isArray(masterData?.departments) ? JSON.parse(JSON.stringify(masterData.departments)) : [],
+      holidays: Array.isArray(masterData?.holidays) ? JSON.parse(JSON.stringify(masterData.holidays)) : [],
+      activeVersionId: activeVersionId || null,
+      entries
+    };
+  };
+
+  // Confirm Import (Requirements 1, 2, 3, 4, 5)
   btnConfirm?.addEventListener('click', async () => {
     if (!pendingImportPayload) {
       showToast('No timetable payload selected to import', 'warning');
@@ -1307,33 +1335,40 @@ function setupTimetableImportTools() {
     try {
       btnConfirm.disabled = true;
       btnConfirm.textContent = 'Importing...';
-      showToast('Importing timetable data and updating master records...', 'info');
+      showToast('Importing faculty, subjects, and sessions in a single database transaction...', 'info');
 
-      const res = await apiRequest('/api/admin/import-timetable', 'POST', { data: pendingImportPayload });
+      const res = await apiRequest('/api/admin/import-timetable', {
+        method: 'POST',
+        body: { data: pendingImportPayload }
+      });
 
-      showToast(`Import completed! Loaded ${res.stats?.faculty || 0} faculty, ${res.stats?.subjects || 0} subjects, ${res.stats?.sessions || 0} timetable classes.`, 'success');
+      localStorage.setItem('ctas_pre_import_snapshot', JSON.stringify({ canUndo: true, timestamp: new Date().toISOString() }));
+      updateUndoButtonState(true);
+
+      showToast(res.message || `Import completed! Loaded ${res.stats?.faculty ?? 0} faculty, ${res.stats?.subjects ?? 0} subjects, ${res.stats?.sessions ?? 0} sessions.`, 'success');
       closeModal();
-      updateUndoButtonState(res.canUndo);
 
       // Refresh master data, overview statistics, and timetable studio
       await loadMasterData();
+      renderMasterDataTables();
       await loadOverview();
       if (typeof window.loadStudio === 'function') {
         await window.loadStudio();
       }
-    } catch (err) {
-      showToast('Import failed: ' + (err.message || 'Error'), 'error');
+    } catch (saveErr) {
+      console.error('[CTAS Import] Import error:', saveErr);
+      showToast('Import failed: ' + (saveErr.message || 'Error occurred during import'), 'error');
     } finally {
       btnConfirm.disabled = false;
       btnConfirm.textContent = 'Confirm Import';
     }
   });
 
-  // Undo Last Import
+  // Undo Last Import (Requirement 3: Never touches rooms/sections/holidays/departments, restores pre-import state)
   btnUndo?.addEventListener('click', async () => {
     const ok = await showAppConfirm({
       title: 'Undo Last Timetable Import',
-      message: 'Are you sure you want to revert the last timetable import? This will restore all faculty, curriculum subjects, sections, and timetable classes back to their exact state prior to the import.',
+      message: 'Are you sure you want to revert the last timetable import? This will restore all faculty, subjects, and timetable classes back to their state prior to the import, while preserving rooms, sections, holidays, and departments.',
       okText: 'Undo Import',
       danger: true
     });
@@ -1341,12 +1376,14 @@ function setupTimetableImportTools() {
 
     try {
       showToast('Reverting to pre-import snapshot...', 'info');
-      const res = await apiRequest('/api/admin/undo-import', 'POST');
+      const res = await apiRequest('/api/admin/undo-import', { method: 'POST' });
+      localStorage.removeItem('ctas_pre_import_snapshot');
       showToast(res.message || 'Import undone successfully.', 'success');
-      updateUndoButtonState(res.canUndo);
+      updateUndoButtonState(false);
 
       // Refresh views
       await loadMasterData();
+      renderMasterDataTables();
       await loadOverview();
       if (typeof window.loadStudio === 'function') {
         await window.loadStudio();
@@ -1357,13 +1394,17 @@ function setupTimetableImportTools() {
   });
 
   // Check initial undo status on load
-  apiRequest('/api/admin/undo-status')
-    .then(status => {
-      if (status && status.canUndo) {
-        updateUndoButtonState(true);
-      }
-    })
-    .catch(() => {});
+  if (localStorage.getItem('ctas_pre_import_snapshot')) {
+    updateUndoButtonState(true);
+  } else {
+    apiRequest('/api/admin/undo-status')
+      .then(status => {
+        if (status && status.canUndo) {
+          updateUndoButtonState(true);
+        }
+      })
+      .catch(() => {});
+  }
 }
 
 export function filterFacultyList(facultyList = [], rawQuery = '', deptFilter = '') {
@@ -1533,7 +1574,8 @@ function renderMasterDataTables() {
       roomTable.innerHTML = `
         <tr style="border-bottom: 1px solid var(--border-subtle);">
           <td colspan="5" style="padding: 2.5rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle);">
-            No rooms or laboratories configured. Click "+ Add Room" above to register classrooms and labs.
+            <p style="margin-bottom: 0.75rem;">No rooms or laboratories configured. Click "+ Add Room" above to register classrooms and labs.</p>
+            <button class="btn-primary" style="font-size: 0.85rem;" onclick="window.restoreDefaultRooms()">🔄 Revert & Restore Campus Rooms (11)</button>
           </td>
         </tr>
       `;
@@ -3930,7 +3972,7 @@ async function renderFacultyAvailabilityGrid(facId) {
   const teachingSlots = timeSlots.filter(s => s.is_break === 0);
   const availMap = new Map();
   for (const a of res.availability) {
-    availMap.set(`${a.day_id}_${a.slot_id}`, a.is_available === 1);
+    availMap.set(`${a.day_id}_${a.slot_id}`, a);
   }
 
   let html = `
@@ -3949,10 +3991,24 @@ async function renderFacultyAvailabilityGrid(facId) {
   for (const d of workingDays) {
     html += `<tr><td style="padding: 0.65rem; font-weight: 700; border: 1px solid var(--border-subtle); background: var(--bg-surface-subtle);">${d.day_name}</td>`;
     for (const s of teachingSlots) {
-      const isAvailable = availMap.get(`${d.id}_${s.id}`) ?? true;
-      const bg = isAvailable ? 'var(--color-success-bg)' : 'var(--color-error-bg)';
-      const text = isAvailable ? '✓ Available' : '✗ Unavailable';
-      const color = isAvailable ? 'var(--color-success)' : 'var(--color-error)';
+      const a = availMap.get(`${d.id}_${s.id}`);
+      const isBusy = a?.is_busy === 1;
+      const isAvailable = a ? (a.is_available === 1 && !isBusy) : true;
+      let bg, text, color;
+      if (isBusy) {
+        bg = 'rgba(239, 68, 68, 0.14)';
+        color = 'var(--color-error, #E11D48)';
+        const subj = a.busy_session?.subject ? `${a.busy_session.subject}${a.busy_session.type === 'lab' ? ' (Lab)' : ''}` : 'Class';
+        text = `✗ Busy: ${subj}`;
+      } else if (isAvailable) {
+        bg = 'var(--color-success-bg)';
+        color = 'var(--color-success)';
+        text = '✓ Available';
+      } else {
+        bg = 'var(--color-error-bg)';
+        color = 'var(--color-error)';
+        text = '✗ Unavailable';
+      }
       html += `
         <td class="avail-cell" data-day="${d.id}" data-slot="${s.id}" data-avail="${isAvailable ? '1' : '0'}" style="padding: 0.6rem; border: 1px solid var(--border-subtle); background: ${bg}; color: ${color}; font-weight: 600; font-size: 0.8rem; cursor: pointer; user-select: none;">
           ${text}
@@ -4109,11 +4165,14 @@ async function loadAbsenceMonitor() {
                             Cancel Cover
                           </button>
                         </div>
-                      ` : `
+                      ` : ac.timetable_entry_id ? `
                         <span style="font-size: 0.78rem; color: var(--color-warning); font-weight: 700; background: var(--color-warning-bg); padding: 0.2rem 0.45rem; border-radius: var(--radius-sm);">⚠️ Pending Substitute</span>
                         <button class="btn-primary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;" onclick="openAssignModal(${ac.timetable_entry_id}, '${a.date}', '${safeSubjName}', '${safeSlotLabel}')">
                           Assign Substitute
                         </button>
+                      ` : `
+                        <span style="font-size: 0.78rem; color: var(--color-warning); font-weight: 700; background: var(--color-warning-bg); padding: 0.2rem 0.45rem; border-radius: var(--radius-sm);">⚠️ Scheduled Session</span>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(ac.slot_label || 'Direct Session')}</span>
                       `}
                     </div>
                   </div>
@@ -4609,6 +4668,20 @@ window.deleteRoom = async (id) => {
     renderStudioGrid();
   } catch (err) {
     showToast(err.message || 'Failed to delete room', 'error');
+  }
+};
+
+window.restoreDefaultRooms = async () => {
+  try {
+    const res = await apiRequest('/api/admin/rooms/restore-defaults', { method: 'POST' });
+    showToast(res.message || 'All 11 default rooms restored successfully', 'success');
+    await loadMasterData();
+    renderMasterDataTables();
+    if (typeof loadOverview === 'function') loadOverview();
+    populateStudioEntitySelector();
+    renderStudioGrid();
+  } catch (err) {
+    showToast(err.message || 'Failed to restore rooms', 'error');
   }
 };
 

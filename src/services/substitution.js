@@ -212,6 +212,29 @@ export function findEligibleSubstitutes(timetableEntryId, dateStr) {
   `).all(versionIdToUse, entry.day_id, entry.slot_id);
   const busyBaseSet = new Set(busyBaseRows.map(r => r.faculty_id));
 
+  // Requirement 3: Read busy/free slots from faculty_sessions (in addition to timetable_entries)
+  const dayCodeMap = { 1: 'MON', 2: 'TUE', 3: 'WED', 4: 'THU', 5: 'FRI', 6: 'SAT' };
+  const periodMap = { 1: 1, 2: 2, 4: 3, 5: 4, 7: 5, 8: 6, 9: 7 };
+  const targetDayRow = db.prepare('SELECT day_index FROM working_days WHERE id = ?').get(entry.day_id);
+  const targetSlotRow = db.prepare('SELECT slot_no FROM time_slots WHERE id = ?').get(entry.slot_id);
+  const targetDayCode = dayCodeMap[targetDayRow ? targetDayRow.day_index : entry.day_id];
+  const targetPeriod = targetSlotRow ? periodMap[targetSlotRow.slot_no] : null;
+
+  if (targetDayCode && targetPeriod) {
+    const busySessions = db.prepare(`
+      SELECT fs.faculty_id, f.id as mapped_id
+      FROM faculty_sessions fs
+      LEFT JOIN faculty f ON (fs.faculty_id = f.code OR fs.faculty_id = CAST(f.id AS TEXT) OR fs.faculty_id = f.name)
+      WHERE fs.day = ? AND fs.period_start <= ? AND (CASE WHEN fs.period_end IS NOT NULL THEN fs.period_end ELSE fs.period_start END) >= ?
+    `).all(targetDayCode, targetPeriod, targetPeriod);
+
+    for (const bs of busySessions) {
+      if (bs.mapped_id) busyBaseSet.add(bs.mapped_id);
+      const n = Number(bs.faculty_id);
+      if (!isNaN(n)) busyBaseSet.add(n);
+    }
+  }
+
   // Faculty who already accepted/assigned a substitution in this slot on this date
   const busySubRows = db.prepare(`
     SELECT sub.substitute_faculty_id
@@ -238,7 +261,7 @@ export function findEligibleSubstitutes(timetableEntryId, dateStr) {
     }
   }
 
-  // Pre-calculate weekly load for each faculty in active timetable
+  // Pre-calculate weekly load for each faculty in active timetable & faculty_sessions
   const weeklyLoads = db.prepare(`
     SELECT faculty_id, COUNT(*) as count
     FROM timetable_entries
@@ -247,6 +270,17 @@ export function findEligibleSubstitutes(timetableEntryId, dateStr) {
   `).all(versionIdToUse);
   const weeklyLoadMap = new Map();
   for (const w of weeklyLoads) weeklyLoadMap.set(w.faculty_id, w.count);
+
+  const sessionWeeklyLoads = db.prepare(`
+    SELECT fs.faculty_id, f.id as mapped_id, COUNT(*) as cnt
+    FROM faculty_sessions fs
+    LEFT JOIN faculty f ON (fs.faculty_id = f.code OR fs.faculty_id = CAST(f.id AS TEXT) OR fs.faculty_id = f.name)
+    GROUP BY fs.faculty_id
+  `).all();
+  for (const sw of sessionWeeklyLoads) {
+    const tid = sw.mapped_id || Number(sw.faculty_id);
+    if (tid) weeklyLoadMap.set(tid, (weeklyLoadMap.get(tid) || 0) + sw.cnt);
+  }
 
   // Pre-calculate daily teaching periods for this specific day
   const dailyLoads = db.prepare(`
@@ -257,6 +291,20 @@ export function findEligibleSubstitutes(timetableEntryId, dateStr) {
   `).all(versionIdToUse, entry.day_id);
   const dailyLoadMap = new Map();
   for (const dl of dailyLoads) dailyLoadMap.set(dl.faculty_id, dl.count);
+
+  if (targetDayCode) {
+    const sessionDailyLoads = db.prepare(`
+      SELECT fs.faculty_id, f.id as mapped_id, COUNT(*) as cnt
+      FROM faculty_sessions fs
+      LEFT JOIN faculty f ON (fs.faculty_id = f.code OR fs.faculty_id = CAST(f.id AS TEXT) OR fs.faculty_id = f.name)
+      WHERE fs.day = ?
+      GROUP BY fs.faculty_id
+    `).all(targetDayCode);
+    for (const sdl of sessionDailyLoads) {
+      const tid = sdl.mapped_id || Number(sdl.faculty_id);
+      if (tid) dailyLoadMap.set(tid, (dailyLoadMap.get(tid) || 0) + sdl.cnt);
+    }
+  }
 
   // Substitutions already taken today
   const dailySubLoads = db.prepare(`
@@ -672,6 +720,49 @@ export function getAbsenceBoard(dateStr = null) {
       WHERE sub.absence_id = ?
       ORDER BY ts.slot_no ASC
     `).all(a.id);
+
+    // Also include scheduled sessions from faculty_sessions for this faculty on this date's weekday
+    try {
+      const [y, m, d] = a.date.split('-').map(Number);
+      const dateObj = new Date(Date.UTC(y, m - 1, d));
+      const dayOfWeek = dateObj.getUTCDay();
+      const dayCodeMap = { 1: 'MON', 2: 'TUE', 3: 'WED', 4: 'THU', 5: 'FRI', 6: 'SAT' };
+      const dayCode = dayCodeMap[dayOfWeek];
+
+      if (dayCode) {
+        const facSessions = db.prepare(`
+          SELECT fs.*, s.name as subject_name
+          FROM faculty_sessions fs
+          LEFT JOIN subjects s ON fs.subject_code = s.code
+          JOIN faculty f ON (fs.faculty_id = f.code OR fs.faculty_id = CAST(f.id AS TEXT) OR fs.faculty_id = f.name)
+          WHERE f.id = ? AND fs.day = ?
+          ORDER BY fs.period_start ASC
+        `).all(a.faculty_id, dayCode);
+
+        for (const fs of facSessions) {
+          if (a.type === 'late' && a.expected_arrival && fs.start && fs.start >= a.expected_arrival) {
+            continue; // Not affected by lateness
+          }
+          affected.push({
+            substitution_id: null,
+            sub_status: 'session_scheduled',
+            substitute_faculty_id: null,
+            substitute_faculty_name: null,
+            timetable_entry_id: null,
+            subject_name: fs.subject_name || fs.subject_code,
+            subject_code: fs.subject_code,
+            section_name: fs.section || (fs.batch ? `Batch ${fs.batch}` : 'General'),
+            room_name: 'Scheduled Session',
+            slot_no: fs.period_start,
+            start_time: fs.start || `P${fs.period_start}`,
+            end_time: fs.end || `P${fs.period_end || fs.period_start}`,
+            slot_label: `Period ${fs.period_start}${fs.period_end && fs.period_end !== fs.period_start ? `-${fs.period_end}` : ''} (${fs.type || 'class'})`
+          });
+        }
+      }
+    } catch (e) {
+      // Ignore fallback if parsing fails
+    }
 
     return {
       ...a,

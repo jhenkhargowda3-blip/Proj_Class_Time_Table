@@ -43,20 +43,27 @@ export function setStoredUser(user) {
 }
 
 export async function apiRequest(endpoint, options = {}) {
+  let opts = options;
+  if (typeof opts === 'string') {
+    const method = opts.toUpperCase();
+    const body = arguments[2];
+    opts = { method, body };
+  }
+
   const url = endpoint.startsWith('/') ? endpoint : `/api/${endpoint}`;
   
   const token = getStoredToken();
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    ...(options.headers || {})
+    ...(opts.headers || {})
   };
 
   const config = {
-    method: options.method || 'GET',
+    method: opts.method || 'GET',
     headers,
     credentials: 'include', // Includes httpOnly JWT cookie
-    ...(options.body ? { body: typeof options.body === 'string' ? options.body : JSON.stringify(options.body) } : {})
+    ...(opts.body ? { body: typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body) } : {})
   };
 
   try {

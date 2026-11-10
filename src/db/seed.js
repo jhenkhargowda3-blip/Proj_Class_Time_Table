@@ -85,6 +85,7 @@ export function seedDatabase(customDb, options = {}) {
     const passwordSaltRounds = 10;
     const adminHash = bcrypt.hashSync(SEED_PASSWORDS.admin, passwordSaltRounds);
     const studentHash = bcrypt.hashSync(SEED_PASSWORDS.student, passwordSaltRounds);
+    const facultyHash = bcrypt.hashSync(SEED_PASSWORDS.faculty, passwordSaltRounds);
 
     const insertUser = db.prepare(`
       INSERT INTO users (username, password_hash, role, full_name, email, faculty_id, student_id)
@@ -155,101 +156,14 @@ export function seedDatabase(customDb, options = {}) {
       'Official active timetable version ready for course and faculty scheduling.'
     ).lastInsertRowid;
 
-    if (!isTestRun) {
-      // Ensure CSE Department exists
-      let cseDept = db.prepare("SELECT * FROM departments WHERE code = 'CSE'").get();
-      if (!cseDept) {
-        const insertDept = db.prepare('INSERT INTO departments (name, code) VALUES (?, ?)');
-        const cseId = insertDept.run('Computer Science & Engineering', 'CSE').lastInsertRowid;
-        cseDept = { id: cseId, name: 'Computer Science & Engineering', code: 'CSE' };
-      }
-
-      // Ensure Mrs. Manjula H S exists with her exact credentials and details
-      let manjulaUser = db.prepare("SELECT * FROM users WHERE username = 'manjula'").get();
-      let manjulaFaculty = db.prepare("SELECT * FROM faculty WHERE name LIKE '%Manjula%'").get();
-      if (!manjulaFaculty && manjulaUser?.faculty_id) {
-        manjulaFaculty = db.prepare('SELECT * FROM faculty WHERE id = ?').get(manjulaUser.faculty_id);
-      }
-
-      const facultyPass = process.env.FACULTY_SEED_PASSWORD || 'man2112';
-      const facultyHash = bcrypt.hashSync(facultyPass, passwordSaltRounds);
-
-      if (!manjulaFaculty) {
-        const insertFaculty = db.prepare(`
-          INSERT INTO faculty (name, department_id, email, phone, max_periods_per_day, max_periods_per_week, is_active)
-          VALUES (?, ?, ?, ?, ?, ?, 1)
-        `);
-        const facId = insertFaculty.run('Mrs. Manjula H S', cseDept.id, 'manjula@gmail.com', '7374619852', 4, 18).lastInsertRowid;
-        manjulaFaculty = { id: facId };
-      }
-
-      if (!manjulaUser) {
-        const insertUser = db.prepare(`
-          INSERT INTO users (username, password_hash, role, full_name, email, faculty_id)
-          VALUES (?, ?, 'faculty', ?, ?, ?)
-        `);
-        const uId = insertUser.run('manjula', facultyHash, 'Mrs. Manjula H S', 'manjula@gmail.com', manjulaFaculty.id).lastInsertRowid;
-        manjulaUser = { id: uId };
-      }
-
-      db.prepare('UPDATE faculty SET user_id = ? WHERE id = ?').run(manjulaUser.id, manjulaFaculty.id);
-      db.prepare('UPDATE users SET faculty_id = ? WHERE id = ?').run(manjulaFaculty.id, manjulaUser.id);
-
-      // Populate availability for Mrs. Manjula H S across active slots
-      const days = db.prepare('SELECT id FROM working_days WHERE is_active = 1').all();
-      const slots = db.prepare('SELECT id FROM time_slots WHERE is_break = 0').all();
-      const existingAvail = db.prepare('SELECT count(*) as count FROM faculty_availability WHERE faculty_id = ?').get(manjulaFaculty.id);
-      if (!existingAvail || existingAvail.count === 0) {
-        const insertAvail = db.prepare('INSERT INTO faculty_availability (faculty_id, day_id, slot_id, is_available) VALUES (?, ?, ?, 1)');
-        for (const d of days) {
-          for (const s of slots) {
-            insertAvail.run(manjulaFaculty.id, d.id, s.id);
-          }
-        }
-      }
-
-      const insertAudit = db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)');
-      insertAudit.run(adminUserId, 'SYSTEM_INITIALIZED', JSON.stringify({
-        version: 'Master Academic Timetable',
-        status: 'active',
-        departmentsCount: 1,
-        sectionsCount: 0,
-        roomsCount: 0,
-        holidaysCount: 0,
-        facultyCount: 1,
-        subjectsCount: 0,
-        entriesCount: 0,
-        message: 'Clean academic database ready with CSE department and Mrs. Manjula H S.'
-      }));
-
-      console.log('\n========================================================================');
-      console.log(' [CTAS Seeder] 100% CLEAN MASTER DATABASE INITIALIZED');
-      console.log('========================================================================');
-      console.log(' - Departments: 1 (Computer Science & Engineering [CSE])');
-      console.log(' - Faculty: 1 (Mrs. Manjula H S)');
-      console.log(' - Sections: 0 (Empty - ready for real student sections)');
-      console.log(' - Rooms: 0 (Empty - ready for real classrooms & labs)');
-      console.log(' - Holidays: 0 (Empty - ready for real academic calendar)');
-      console.log(' - Subjects: 0 (Empty - ready for real subject records)');
-      console.log(' - Timetable Entries: 0 (All periods showing "+ Free")');
-      console.log(' - Absences & Substitutions: 0 (Clean history)');
-      console.log('------------------------------------------------------------------------');
-      console.log(' Administrator Credentials:');
-      console.log('    Username: sharma (alias: admin)');
-      console.log(`    Password: ${SEED_PASSWORDS.admin}`);
-      console.log(' Faculty Credentials:');
-      console.log('    Username: manjula');
-      console.log(`    Password: ${SEED_PASSWORDS.faculty}`);
-      console.log('========================================================================\n');
-      return true;
-    }
-
-    // --- TEST FIXTURES ONLY (Included exclusively when isTestRun === true) ---
+    // --- Core Campus Master Infrastructure (Always Seeded) ---
+    // 1. Departments (3)
     const insertDept = db.prepare('INSERT INTO departments (name, code) VALUES (?, ?)');
     const cseDept = insertDept.run('Computer Science & Engineering', 'CSE').lastInsertRowid;
     const itDept = insertDept.run('Information Technology', 'IT').lastInsertRowid;
     const eceDept = insertDept.run('Electronics & Communication', 'ECE').lastInsertRowid;
 
+    // 2. Rooms (11: 8 Classrooms + 3 Labs)
     const insertRoom = db.prepare('INSERT INTO rooms (name, type, capacity, is_active) VALUES (?, ?, ?, ?)');
     const roomIds = { classrooms: [], labs: [] };
     const classrooms = [
@@ -270,6 +184,7 @@ export function seedDatabase(customDb, options = {}) {
       roomIds.labs.push(insertRoom.run(lab.name, 'lab', lab.cap, 1).lastInsertRowid);
     }
 
+    // 3. Sections (4)
     const insertSection = db.prepare('INSERT INTO sections (name, semester, department_id, strength) VALUES (?, ?, ?, ?)');
     const sectionIds = {
       csea: insertSection.run('CSE-4A', 4, cseDept, 45).lastInsertRowid,
@@ -278,17 +193,97 @@ export function seedDatabase(customDb, options = {}) {
       ecea: insertSection.run('ECE-4A', 4, eceDept, 40).lastInsertRowid
     };
 
-    // Associate student users with default section in test fixtures mode
+    // Associate student users with default section
     db.prepare("UPDATE users SET student_id = ? WHERE role = 'student'").run(sectionIds.csea);
 
+    // 4. Academic Holidays (4)
     const insertHoliday = db.prepare('INSERT INTO holidays (date, description) VALUES (?, ?)');
     insertHoliday.run('2026-01-26', 'Republic Day');
     insertHoliday.run('2026-03-20', 'Spring Equinox & Founder Day');
     insertHoliday.run('2026-05-01', 'International Workers Day');
     insertHoliday.run('2026-08-15', 'Independence Day');
 
+    if (!isTestRun) {
+      // Ensure Mrs. Manjula H S exists with her exact credentials and details
+      let manjulaUser = db.prepare("SELECT * FROM users WHERE username = 'manjula'").get();
+      let manjulaFaculty = db.prepare("SELECT * FROM faculty WHERE name LIKE '%Manjula%'").get();
+      if (!manjulaFaculty && manjulaUser?.faculty_id) {
+        manjulaFaculty = db.prepare('SELECT * FROM faculty WHERE id = ?').get(manjulaUser.faculty_id);
+      }
+
+      const facultyPass = process.env.FACULTY_SEED_PASSWORD || 'man2112';
+      const manjulaHash = bcrypt.hashSync(facultyPass, passwordSaltRounds);
+
+      if (!manjulaFaculty) {
+        const insertFaculty = db.prepare(`
+          INSERT INTO faculty (name, department_id, email, phone, max_periods_per_day, max_periods_per_week, is_active)
+          VALUES (?, ?, ?, ?, ?, ?, 1)
+        `);
+        const facId = insertFaculty.run('Mrs. Manjula H S', cseDept, 'manjula@gmail.com', '7374619852', 4, 18).lastInsertRowid;
+        manjulaFaculty = { id: facId };
+      }
+
+      if (!manjulaUser) {
+        const insertUser = db.prepare(`
+          INSERT INTO users (username, password_hash, role, full_name, email, faculty_id)
+          VALUES (?, ?, 'faculty', ?, ?, ?)
+        `);
+        const uId = insertUser.run('manjula', manjulaHash, 'Mrs. Manjula H S', 'manjula@gmail.com', manjulaFaculty.id).lastInsertRowid;
+        manjulaUser = { id: uId };
+      }
+
+      db.prepare('UPDATE faculty SET user_id = ? WHERE id = ?').run(manjulaUser.id, manjulaFaculty.id);
+      db.prepare('UPDATE users SET faculty_id = ? WHERE id = ?').run(manjulaFaculty.id, manjulaUser.id);
+
+      // Populate availability for Mrs. Manjula H S across active slots
+      const daysList = db.prepare('SELECT id FROM working_days WHERE is_active = 1').all();
+      const slotsList = db.prepare('SELECT id FROM time_slots WHERE is_break = 0').all();
+      const existingAvail = db.prepare('SELECT count(*) as count FROM faculty_availability WHERE faculty_id = ?').get(manjulaFaculty.id);
+      if (!existingAvail || existingAvail.count === 0) {
+        const insertAvail = db.prepare('INSERT INTO faculty_availability (faculty_id, day_id, slot_id, is_available) VALUES (?, ?, ?, 1)');
+        for (const d of daysList) {
+          for (const s of slotsList) {
+            insertAvail.run(manjulaFaculty.id, d.id, s.id);
+          }
+        }
+      }
+
+      const insertAudit = db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)');
+      insertAudit.run(adminUserId, 'SYSTEM_INITIALIZED', JSON.stringify({
+        version: 'Master Academic Timetable',
+        status: 'active',
+        departmentsCount: 3,
+        sectionsCount: 4,
+        roomsCount: 11,
+        holidaysCount: 4,
+        facultyCount: 1,
+        subjectsCount: 0,
+        entriesCount: 0,
+        message: 'Master academic database ready with 11 Rooms, 4 Sections, 4 Holidays, 3 Departments, and Mrs. Manjula H S.'
+      }));
+
+      console.log('\n========================================================================');
+      console.log(' [CTAS Seeder] MASTER DATABASE INITIALIZED (CORE INFRASTRUCTURE)');
+      console.log('========================================================================');
+      console.log(' - Departments: 3 (CSE, IT, ECE)');
+      console.log(' - Rooms: 11 (8 Classrooms, 3 Labs)');
+      console.log(' - Sections: 4 (CSE-4A, CSE-4B, IT-4A, ECE-4A)');
+      console.log(' - Holidays: 4 (Republic Day, Equinox, Workers Day, Independence Day)');
+      console.log(' - Faculty: 1 (Mrs. Manjula H S)');
+      console.log(' - Subjects: 0 (Empty - ready for imported or added subjects)');
+      console.log(' - Timetable Entries: 0 (All periods open)');
+      console.log('------------------------------------------------------------------------');
+      console.log(' Administrator Credentials:');
+      console.log('    Username: sharma (alias: admin)');
+      console.log(`    Password: ${SEED_PASSWORDS.admin}`);
+      console.log(' Faculty Credentials:');
+      console.log('    Username: manjula');
+      console.log(`    Password: ${SEED_PASSWORDS.faculty}`);
+      console.log('========================================================================\n');
+      return true;
+    }
+
     // --- TEST FIXTURES ONLY (Included exclusively when isTestRun === true) ---
-    const facultyHash = bcrypt.hashSync(SEED_PASSWORDS.faculty, passwordSaltRounds);
     const insertFaculty = db.prepare(`
       INSERT INTO faculty (user_id, name, department_id, email, phone, max_periods_per_day, max_periods_per_week, is_active)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -424,7 +419,7 @@ export function seedDatabase(customDb, options = {}) {
     insertSecSub.run(sectionIds.ecea, subjectIds['EC201'], facultyIds['faculty8']);
     insertSecSub.run(sectionIds.ecea, subjectIds['CS205'], facultyIds['faculty9']);
 
-    const insertAvail = db.prepare('INSERT INTO faculty_availability (faculty_id, day_id, slot_id, is_available) VALUES (?, ?, ?, ?)');
+    const insertAvail = db.prepare('INSERT OR IGNORE INTO faculty_availability (faculty_id, day_id, slot_id, is_available) VALUES (?, ?, ?, ?)');
     for (const facKey of Object.keys(facultyIds)) {
       const fId = facultyIds[facKey];
       for (const dId of dayIds) {

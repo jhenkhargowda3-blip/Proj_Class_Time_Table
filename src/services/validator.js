@@ -74,87 +74,104 @@ export function validateTimetable(versionIdOrEntries, context = {}) {
     }
 
     // 2. Faculty double-booking (Hard Error)
-    const facKey = `${e.faculty_id}_${timeKey}`;
-    if (facultySlotMap.has(facKey)) {
-      const prior = facultySlotMap.get(facKey);
-      violations.push({
-        severity: 'error',
-        code: 'FACULTY_DOUBLE_BOOKED',
-        message: `Faculty '${e.faculty_name}' is double-booked for '${e.subject_code}' and '${prior.subject_code}' on ${e.day_name} at ${e.slot_label}.`,
-        entities: { facultyId: e.faculty_id, entryId1: prior.id, entryId2: e.id },
-        day: e.day_name,
-        slot: e.slot_label
-      });
-    } else {
-      facultySlotMap.set(facKey, e);
+    if (e.faculty_id) {
+      const facKey = `${e.faculty_id}_${timeKey}`;
+      if (facultySlotMap.has(facKey)) {
+        const prior = facultySlotMap.get(facKey);
+        violations.push({
+          severity: 'error',
+          code: 'FACULTY_DOUBLE_BOOKED',
+          message: `Faculty '${e.faculty_name}' is double-booked for '${e.subject_code}' and '${prior.subject_code}' on ${e.day_name} at ${e.slot_label}.`,
+          entities: { facultyId: e.faculty_id, entryId1: prior.id, entryId2: e.id },
+          day: e.day_name,
+          slot: e.slot_label
+        });
+      } else {
+        facultySlotMap.set(facKey, e);
+      }
     }
 
     // 3. Section double-booking (Hard Error)
-    const secKey = `${e.section_id}_${timeKey}`;
-    if (sectionSlotMap.has(secKey)) {
-      const prior = sectionSlotMap.get(secKey);
-      violations.push({
-        severity: 'error',
-        code: 'SECTION_DOUBLE_BOOKED',
-        message: `Section '${e.section_name}' has two simultaneous classes ('${e.subject_code}' & '${prior.subject_code}') on ${e.day_name} at ${e.slot_label}.`,
-        entities: { sectionId: e.section_id, entryId1: prior.id, entryId2: e.id },
-        day: e.day_name,
-        slot: e.slot_label
-      });
-    } else {
-      sectionSlotMap.set(secKey, e);
+    // Only check if section_id is valid. Do not flag shared Wednesday ACTIVITY slot (two faculty supervise one section).
+    if (e.section_id) {
+      const secKey = `${e.section_id}_${timeKey}`;
+      if (sectionSlotMap.has(secKey)) {
+        const prior = sectionSlotMap.get(secKey);
+        const isSharedActivity = (e.subject_code === 'ACTIVITY' && prior.subject_code === 'ACTIVITY');
+        if (!isSharedActivity) {
+          violations.push({
+            severity: 'error',
+            code: 'SECTION_DOUBLE_BOOKED',
+            message: `Section '${e.section_name}' has two simultaneous classes ('${e.subject_code}' & '${prior.subject_code}') on ${e.day_name} at ${e.slot_label}.`,
+            entities: { sectionId: e.section_id, entryId1: prior.id, entryId2: e.id },
+            day: e.day_name,
+            slot: e.slot_label
+          });
+        }
+      } else {
+        sectionSlotMap.set(secKey, e);
+      }
     }
 
     // 4. Room double-booking (Hard Error)
-    const roomKey = `${e.room_id}_${timeKey}`;
-    if (roomSlotMap.has(roomKey)) {
-      const prior = roomSlotMap.get(roomKey);
-      violations.push({
-        severity: 'error',
-        code: 'ROOM_DOUBLE_BOOKED',
-        message: `Room '${e.room_name}' is booked for two classes simultaneously on ${e.day_name} at ${e.slot_label}.`,
-        entities: { roomId: e.room_id, entryId1: prior.id, entryId2: e.id },
-        day: e.day_name,
-        slot: e.slot_label
-      });
-    } else {
-      roomSlotMap.set(roomKey, e);
+    // Skip room conflict check when room is TBD or room_id is null
+    if (e.room_id && e.room_name && e.room_name !== 'TBD') {
+      const roomKey = `${e.room_id}_${timeKey}`;
+      if (roomSlotMap.has(roomKey)) {
+        const prior = roomSlotMap.get(roomKey);
+        violations.push({
+          severity: 'error',
+          code: 'ROOM_DOUBLE_BOOKED',
+          message: `Room '${e.room_name}' is booked for two classes simultaneously on ${e.day_name} at ${e.slot_label}.`,
+          entities: { roomId: e.room_id, entryId1: prior.id, entryId2: e.id },
+          day: e.day_name,
+          slot: e.slot_label
+        });
+      } else {
+        roomSlotMap.set(roomKey, e);
+      }
     }
 
     // 5. Faculty availability check (Hard Error)
-    if (!availMap.has(`${e.faculty_id}_${e.day_id}_${e.slot_id}`)) {
-      violations.push({
-        severity: 'error',
-        code: 'FACULTY_UNAVAILABLE',
-        message: `Faculty '${e.faculty_name}' is marked unavailable on ${e.day_name} during ${e.slot_label}.`,
-        entities: { facultyId: e.faculty_id, entryId: e.id },
-        day: e.day_name,
-        slot: e.slot_label
-      });
+    // When validating imported faculty sessions where availability marks busy during sessions,
+    // only check if explicitly not bypassed.
+    if (!context.skipFacultyAvailabilityCheck && e.faculty_id && availRows.length > 0) {
+      if (!availMap.has(`${e.faculty_id}_${e.day_id}_${e.slot_id}`)) {
+        violations.push({
+          severity: 'error',
+          code: 'FACULTY_UNAVAILABLE',
+          message: `Faculty '${e.faculty_name}' is marked unavailable on ${e.day_name} during ${e.slot_label}.`,
+          entities: { facultyId: e.faculty_id, entryId: e.id },
+          day: e.day_name,
+          slot: e.slot_label
+        });
+      }
     }
 
     // 6. Room type mismatch (Hard Error)
-    if (e.subject_type === 'lab' && e.room_type !== 'lab') {
-      violations.push({
-        severity: 'error',
-        code: 'ROOM_TYPE_MISMATCH',
-        message: `Lab subject '${e.subject_code}' is scheduled in regular classroom '${e.room_name}' instead of a laboratory.`,
-        entities: { entryId: e.id, roomId: e.room_id, subjectId: e.subject_id },
-        day: e.day_name,
-        slot: e.slot_label
-      });
-    }
+    if (e.room_id && e.room_name && e.room_name !== 'TBD') {
+      if (e.subject_type === 'lab' && e.room_type !== 'lab') {
+        violations.push({
+          severity: 'error',
+          code: 'ROOM_TYPE_MISMATCH',
+          message: `Lab subject '${e.subject_code}' is scheduled in regular classroom '${e.room_name}' instead of a laboratory.`,
+          entities: { entryId: e.id, roomId: e.room_id, subjectId: e.subject_id },
+          day: e.day_name,
+          slot: e.slot_label
+        });
+      }
 
-    // 7. Room capacity check (Hard Error)
-    if (e.room_capacity < e.section_strength) {
-      violations.push({
-        severity: 'error',
-        code: 'ROOM_CAPACITY_INSUFFICIENT',
-        message: `Room '${e.room_name}' capacity (${e.room_capacity}) is smaller than section '${e.section_name}' strength (${e.section_strength}).`,
-        entities: { entryId: e.id, roomId: e.room_id, sectionId: e.section_id },
-        day: e.day_name,
-        slot: e.slot_label
-      });
+      // 7. Room capacity check (Hard Error)
+      if (e.section_strength && e.room_capacity < e.section_strength) {
+        violations.push({
+          severity: 'error',
+          code: 'ROOM_CAPACITY_INSUFFICIENT',
+          message: `Room '${e.room_name}' capacity (${e.room_capacity}) is smaller than section '${e.section_name}' strength (${e.section_strength}).`,
+          entities: { entryId: e.id, roomId: e.room_id, sectionId: e.section_id },
+          day: e.day_name,
+          slot: e.slot_label
+        });
+      }
     }
 
     // Faculty daily load count

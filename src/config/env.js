@@ -21,9 +21,23 @@ function sanitizeGrokKey(key) {
   return trimmed;
 }
 
+function resolvePort() {
+  const portArgIdx = process.argv.indexOf('--port');
+  if (portArgIdx !== -1 && process.argv[portArgIdx + 1]) {
+    return parseInt(process.argv[portArgIdx + 1], 10);
+  }
+  if (process.env.APP_PORT) {
+    return parseInt(process.env.APP_PORT, 10);
+  }
+  if (process.env.PORT && process.env.PORT !== '8080') {
+    return parseInt(process.env.PORT, 10);
+  }
+  return 3000;
+}
+
 export const config = {
   env: process.env.NODE_ENV || 'development',
-  port: process.env.PORT ? parseInt(process.env.PORT, 10) : 3000,
+  port: resolvePort(),
   jwtSecret: process.env.JWT_SECRET || 'ctas-Q7xK2mR9vL4tZp8WnB3dYs6HfJ1aUe5C',
   dbPath: path.resolve(rootDir, process.env.DB_PATH || './data/timetable.db'),
   uploadsDir: path.resolve(rootDir, './uploads'),

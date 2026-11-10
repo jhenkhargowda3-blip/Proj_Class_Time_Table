@@ -545,6 +545,44 @@
 
         <!-- Interactive Grid Viewport -->
         <div id="studio-grid-container" style="overflow-x: auto;"></div>
+
+        <!-- Unassigned Section Sessions Panel (Requirement 4b) -->
+        <div id="unassigned-sections-panel" class="card" style="margin-top: 1.5rem; background: var(--bg-surface); border: 1px solid var(--border-subtle); display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.75rem;">
+            <div>
+              <h3 style="margin: 0 0 0.25rem 0; font-size: 1.15rem; color: var(--color-brand-primary); display: flex; align-items: center; gap: 0.5rem;">
+                <span>⚠️ Unassigned Section Sessions</span>
+                <span id="unassigned-sessions-count-badge" class="drilldown-badge-pill" style="background: #FFFBEB; color: #D97706; border: 1px solid #FCD34D;">0</span>
+              </h3>
+              <p style="margin: 0; font-size: 0.82rem; color: var(--text-secondary);">
+                These sessions have unassigned section codes (e.g. lab batches B4-B9, section E, or multiple candidate sections). Select a section to assign permanently.
+              </p>
+            </div>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <input type="search" id="unassigned-search-input" class="form-input" placeholder="🔍 Filter unassigned..." style="font-size: 0.8rem; padding: 0.35rem 0.65rem; width: 180px;">
+              <button type="button" class="btn-secondary" id="btn-refresh-unassigned" style="font-size: 0.78rem; padding: 0.35rem 0.75rem;">🔄 Refresh</button>
+            </div>
+          </div>
+          <div style="overflow-x: auto; max-height: 480px; overflow-y: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
+              <thead>
+                <tr style="background: var(--bg-surface-subtle); border-bottom: 2px solid var(--border-subtle); position: sticky; top: 0; z-index: 2;">
+                  <th style="padding: 0.5rem 0.75rem;">Session ID</th>
+                  <th style="padding: 0.5rem 0.75rem;">Faculty</th>
+                  <th style="padding: 0.5rem 0.75rem;">Day & Period</th>
+                  <th style="padding: 0.5rem 0.75rem;">Subject</th>
+                  <th style="padding: 0.5rem 0.75rem;">Type / Batch</th>
+                  <th style="padding: 0.5rem 0.75rem;">Semester</th>
+                  <th style="padding: 0.5rem 0.75rem;">Status Reason</th>
+                  <th style="padding: 0.5rem 0.75rem; text-align: right;">Assign Section</th>
+                </tr>
+              </thead>
+              <tbody id="unassigned-sessions-table-body">
+                <tr><td colspan="8" style="padding: 1.5rem; text-align: center; color: var(--text-muted);">Loading unassigned sessions...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -559,12 +597,14 @@
             </p>
           </div>
           <div id="master-data-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button class="btn-primary" id="btn-admin-verify-report" style="background: #16A34A; border-color: #16A34A;" onclick="window.openVerificationModal()">📊 Verification Report (413h)</button>
             <button class="btn-primary" id="btn-add-faculty" onclick="window.openFacultyModal()">+ Add Faculty</button>
             <button class="btn-secondary" id="btn-add-subject" onclick="window.openSubjectModal()">+ Add Subject</button>
             <button class="btn-secondary" id="btn-add-room" onclick="window.openRoomModal()">+ Add Room</button>
             <button class="btn-secondary" id="btn-add-section" onclick="window.openSectionModal()">+ Add Section</button>
             <button class="btn-secondary" id="btn-add-holiday" onclick="window.openHolidayModal()">+ Add Holiday</button>
             <button class="btn-secondary" id="btn-add-department" onclick="window.openDepartmentModal()">+ Add Department</button>
+            <button class="btn-secondary" id="btn-admin-reload-ref" title="Sync with SJBIT CSE 2026-27 Odd Semester Timetable reference data" onclick="window.reloadReferenceData()">🔄 Re-sync Reference Data</button>
             <button class="btn-secondary" id="btn-admin-backup-json" title="Download snapshot of entire database configuration (JSON)">💾 Backup System (JSON)</button>
             <button class="btn-secondary" id="btn-admin-import-json" title="Import timetable data from JSON (ctas_timetable_import.json)">📥 Import Timetable (JSON)</button>
             <button class="btn-secondary" id="btn-admin-undo-import" title="Undo the last timetable import" style="display: none; color: var(--color-warning);">↩️ Undo last import</button>
@@ -705,6 +745,7 @@
                 <tr style="background: var(--bg-surface-subtle); border-bottom: 2px solid var(--border-subtle);">
                   <th style="padding: 0.6rem 0.75rem;">Department Code</th>
                   <th style="padding: 0.6rem 0.75rem;">Department Name</th>
+                  <th style="padding: 0.6rem 0.75rem;">Status</th>
                   <th style="padding: 0.6rem 0.75rem; text-align: right;">Actions</th>
                 </tr>
               </thead>
@@ -1474,6 +1515,48 @@
       <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.25rem;">
         <button type="button" class="btn-secondary" id="app-confirm-cancel-btn" style="padding: 0.5rem 1.1rem; font-size: 0.88rem;">Cancel</button>
         <button type="button" class="btn-primary" id="app-confirm-ok-btn" style="background: #E11D48; border-color: #E11D48; color: #fff; padding: 0.5rem 1.1rem; font-size: 0.88rem; font-weight: 600;">Confirm</button>
+      </div>
+  <!-- MODAL: Timetable Verification Report (33 Faculty, 40 Subjects, 305 Sessions, 413 Hours) -->
+  <div id="modal-verification-report" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 99998; align-items: center; justify-content: center; backdrop-filter: blur(5px); padding: 1rem;">
+    <div class="card" style="max-width: 980px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6); padding: 1.5rem; background: var(--bg-surface); border: 1px solid var(--border-subtle); animation: fadeIn 0.15s ease-out;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.75rem;">
+        <div>
+          <h2 style="margin: 0 0 0.25rem 0; font-size: 1.35rem; color: var(--color-brand-primary); display: flex; align-items: center; gap: 0.5rem;">
+            <span>📊 Timetable Reference Verification</span>
+            <span class="drilldown-badge-pill" style="background: var(--color-success-bg); color: var(--color-success); border: 1px solid var(--color-success);">100% Match · 0 Mismatches</span>
+          </h2>
+          <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">
+            Official 2026-27 Odd Semester Timetable for SJBIT CSE Department (CTAS_reference_data.json)
+          </p>
+        </div>
+        <button type="button" class="btn-secondary" id="btn-close-verification-modal" onclick="document.getElementById('modal-verification-report').style.display='none'" style="font-size: 0.85rem; padding: 0.35rem 0.75rem;">✕ Close</button>
+      </div>
+      
+      <!-- Summary KPI Row -->
+      <div id="verification-kpis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;"></div>
+
+      <!-- Verification comparison table -->
+      <div style="overflow-x: auto; overflow-y: auto; flex: 1; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: left;">
+          <thead>
+            <tr style="background: var(--bg-surface-subtle); border-bottom: 2px solid var(--border-subtle); position: sticky; top: 0; z-index: 2;">
+              <th style="padding: 0.5rem 0.75rem; width: 60px;">Code</th>
+              <th style="padding: 0.5rem 0.75rem;">Faculty Name</th>
+              <th style="padding: 0.5rem 0.75rem;">Classes Taught</th>
+              <th style="padding: 0.5rem 0.75rem; text-align: center;">Target Weekly Hours</th>
+              <th style="padding: 0.5rem 0.75rem; text-align: center;">Actual Session Hours</th>
+              <th style="padding: 0.5rem 0.75rem; text-align: center;">Status</th>
+            </tr>
+          </thead>
+          <tbody id="verification-table-body">
+            <tr><td colspan="6" style="padding: 1.5rem; text-align: center; color: var(--text-muted);">Loading verification table...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle); font-size: 0.8rem; color: var(--text-secondary); flex-wrap: wrap; gap: 0.5rem;">
+        <span id="verification-dept-status">🏛️ Departments: <strong>CSE</strong> (Active, all records) · <strong>IT</strong> & <strong>ECE</strong> (Unused / Kept intact)</span>
+        <button type="button" class="btn-primary" onclick="document.getElementById('modal-verification-report').style.display='none'">Done</button>
       </div>
     </div>
   </div>

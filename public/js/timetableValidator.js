@@ -161,57 +161,65 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
 
     // Check 8a: Room Type Mismatch (e.g. Lab in regular classroom)
     const isLabSubject = sub.type === 'lab' || Number(e.is_lab_block) === 1 || Number(sub.lab_block_length) > 1;
-    if (isLabSubject && rm.type !== 'lab') {
-      registerViolation({
-        type: 'ROOM_TYPE_MISMATCH',
-        day: day.day_name,
-        dayId: day.id,
-        period: slot.label,
-        slotId: slot.id,
-        section: sec.name,
-        sectionId: sec.id,
-        faculty: fac.name,
-        facultyId: fac.id,
-        room: rm.name,
-        roomId: rm.id,
-        message: `Practical lab course '${sub.code}' requires a laboratory room, but is assigned to standard classroom '${rm.name}'.`,
-        suggestedFix: `Reassign to a laboratory venue (e.g. Computer Lab or Science Lab).`,
-        involvedEntryIds: [e.id]
-      });
-    }
+    if (e.room_id && e.room_name && e.room_name !== 'TBD') {
+      if (isLabSubject && rm.type !== 'lab') {
+        registerViolation({
+          type: 'ROOM_TYPE_MISMATCH',
+          day: day.day_name,
+          dayId: day.id,
+          period: slot.label,
+          slotId: slot.id,
+          section: sec.name,
+          sectionId: sec.id,
+          faculty: fac.name,
+          facultyId: fac.id,
+          room: rm.name,
+          roomId: rm.id,
+          message: `Practical lab course '${sub.code}' requires a laboratory room, but is assigned to standard classroom '${rm.name}'.`,
+          suggestedFix: `Reassign to a laboratory venue (e.g. Computer Lab or Science Lab).`,
+          involvedEntryIds: [e.id]
+        });
+      }
 
-    // Check 8b: Room Capacity Mismatch
-    if (rm.capacity && sec.strength && rm.capacity < sec.strength) {
-      registerViolation({
-        type: 'ROOM_CAPACITY_INSUFFICIENT',
-        day: day.day_name,
-        dayId: day.id,
-        period: slot.label,
-        slotId: slot.id,
-        section: sec.name,
-        sectionId: sec.id,
-        faculty: fac.name,
-        facultyId: fac.id,
-        room: rm.name,
-        roomId: rm.id,
-        message: `Room '${rm.name}' capacity (${rm.capacity} seats) is insufficient for Section '${sec.name}' (${sec.strength} students).`,
-        suggestedFix: `Move section to a room with at least ${sec.strength} seats.`,
-        involvedEntryIds: [e.id]
-      });
+      // Check 8b: Room Capacity Mismatch
+      if (rm.capacity && sec.strength && rm.capacity < sec.strength) {
+        registerViolation({
+          type: 'ROOM_CAPACITY_INSUFFICIENT',
+          day: day.day_name,
+          dayId: day.id,
+          period: slot.label,
+          slotId: slot.id,
+          section: sec.name,
+          sectionId: sec.id,
+          faculty: fac.name,
+          facultyId: fac.id,
+          room: rm.name,
+          roomId: rm.id,
+          message: `Room '${rm.name}' capacity (${rm.capacity} seats) is insufficient for Section '${sec.name}' (${sec.strength} students).`,
+          suggestedFix: `Move section to a room with at least ${sec.strength} seats.`,
+          involvedEntryIds: [e.id]
+        });
+      }
     }
 
     // Populate maps for pairwise collision checks
-    const fKey = `${e.faculty_id}_${e.day_id}_${e.slot_id}`;
-    if (!facultySlotMap.has(fKey)) facultySlotMap.set(fKey, []);
-    facultySlotMap.get(fKey).push(e);
+    if (e.faculty_id) {
+      const fKey = `${e.faculty_id}_${e.day_id}_${e.slot_id}`;
+      if (!facultySlotMap.has(fKey)) facultySlotMap.set(fKey, []);
+      facultySlotMap.get(fKey).push(e);
+    }
 
-    const rKey = `${e.room_id}_${e.day_id}_${e.slot_id}`;
-    if (!roomSlotMap.has(rKey)) roomSlotMap.set(rKey, []);
-    roomSlotMap.get(rKey).push(e);
+    if (e.room_id && e.room_name && e.room_name !== 'TBD') {
+      const rKey = `${e.room_id}_${e.day_id}_${e.slot_id}`;
+      if (!roomSlotMap.has(rKey)) roomSlotMap.set(rKey, []);
+      roomSlotMap.get(rKey).push(e);
+    }
 
-    const sKey = `${e.section_id}_${e.day_id}_${e.slot_id}`;
-    if (!sectionSlotMap.has(sKey)) sectionSlotMap.set(sKey, []);
-    sectionSlotMap.get(sKey).push(e);
+    if (e.section_id) {
+      const sKey = `${e.section_id}_${e.day_id}_${e.slot_id}`;
+      if (!sectionSlotMap.has(sKey)) sectionSlotMap.set(sKey, []);
+      sectionSlotMap.get(sKey).push(e);
+    }
 
     // Faculty Day count
     const fDayKey = `${e.faculty_id}_${e.day_id}`;
@@ -294,22 +302,25 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
         for (let j = i + 1; j < booked.length; j++) {
           const e1 = booked[i];
           const e2 = booked[j];
-          registerViolation({
-            type: 'SECTION_DOUBLE_BOOKED',
-            day: e1.day_name,
-            dayId: e1.day_id,
-            period: e1.slot_label,
-            slotId: e1.slot_id,
-            section: e1.section_name,
-            sectionId: e1.section_id,
-            faculty: `${e1.faculty_name} & ${e2.faculty_name}`,
-            facultyId: e1.faculty_id,
-            room: `${e1.room_name} & ${e2.room_name}`,
-            roomId: e1.room_id,
-            message: `Section '${e1.section_name}' has two simultaneous classes ('${e1.subject_code}' and '${e2.subject_code}') on ${e1.day_name} at ${e1.slot_label}.`,
-            suggestedFix: `Relocate one of the conflicting subjects to an open period on another day.`,
-            involvedEntryIds: [e1.id, e2.id]
-          });
+          const isSharedActivity = (e1.subject_code === 'ACTIVITY' && e2.subject_code === 'ACTIVITY');
+          if (!isSharedActivity) {
+            registerViolation({
+              type: 'SECTION_DOUBLE_BOOKED',
+              day: e1.day_name,
+              dayId: e1.day_id,
+              period: e1.slot_label,
+              slotId: e1.slot_id,
+              section: e1.section_name,
+              sectionId: e1.section_id,
+              faculty: `${e1.faculty_name} & ${e2.faculty_name}`,
+              facultyId: e1.faculty_id,
+              room: `${e1.room_name} & ${e2.room_name}`,
+              roomId: e1.room_id,
+              message: `Section '${e1.section_name}' has two simultaneous classes ('${e1.subject_code}' and '${e2.subject_code}') on ${e1.day_name} at ${e1.slot_label}.`,
+              suggestedFix: `Relocate one of the conflicting subjects to an open period on another day.`,
+              involvedEntryIds: [e1.id, e2.id]
+            });
+          }
         }
       }
     }

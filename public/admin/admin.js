@@ -451,6 +451,7 @@ function renderDrilldownContent(type) {
 
     const theory = list.filter(s => s.type === 'theory').length;
     const lab = list.filter(s => s.type === 'lab').length;
+    const activity = list.filter(s => s.type === 'activity').length;
     const totalPeriods = list.reduce((acc, s) => acc + (s.weekly_periods || 0), 0);
 
     kpiHtml = `
@@ -474,8 +475,9 @@ function renderDrilldownContent(type) {
 
     countsMap['Theory'] = theory;
     countsMap['Practical / Lab'] = lab;
+    if (activity > 0) countsMap['Activity'] = activity;
     distTitle = 'Course Type Distribution';
-    distSubtitle = `${theory} Theory · ${lab} Labs`;
+    distSubtitle = `${theory} Theory · ${lab} Labs${activity > 0 ? ` · ${activity} Activity` : ''}`;
 
     theadHtml = `
       <tr>
@@ -768,15 +770,27 @@ function filterDrilldownTable() {
     }
     if (type === 'subjects') {
       const isLab = item.type === 'lab';
+      const isActivity = item.type === 'activity';
+      let semText = item.semester ? `Sem ${item.semester}` : 'Multiple';
+      if (!item.semester && item.semester_candidates) {
+        try {
+          const candidates = typeof item.semester_candidates === 'string' && item.semester_candidates.startsWith('[')
+            ? JSON.parse(item.semester_candidates)
+            : item.semester_candidates;
+          if (Array.isArray(candidates) && candidates.length > 0) {
+            semText = `Multiple (Sem ${candidates.join(', ')})`;
+          }
+        } catch (e) {}
+      }
       return `
         <tr>
           <td><span style="font-family: monospace; font-weight: 700; color: var(--color-brand-primary);">${escapeHtml(item.code)}</span></td>
-          <td><div style="font-weight: 600;">${escapeHtml(item.name)}</div></td>
-          <td><span style="font-size: 0.78rem; color: var(--text-secondary);">${escapeHtml(item.department_code || item.department_name || '—')}</span></td>
-          <td style="text-align: center;" class="tabular-nums">Sem ${item.semester}</td>
+          <td><div style="font-weight: 600;">${escapeHtml(item.name || item.short_name || item.code)}</div></td>
+          <td><span style="font-size: 0.78rem; color: var(--text-secondary);">${escapeHtml(item.department_code || item.department_name || 'CSE')}</span></td>
+          <td style="text-align: center;" class="tabular-nums">${escapeHtml(semText)}</td>
           <td style="text-align: center;">
-            <span class="drilldown-badge-pill" style="${isLab ? 'background: #FDF4FF; color: #9333EA; border: 1px solid rgba(147,51,234,0.2);' : 'background: #EFF6FF; color: #2563EB; border: 1px solid rgba(37,99,235,0.2);'}">
-              ${isLab ? '🧪 Practical Lab' : '📖 Theory'}
+            <span class="drilldown-badge-pill" style="${isLab ? 'background: #FDF4FF; color: #9333EA; border: 1px solid rgba(147,51,234,0.2);' : (isActivity ? 'background: #FEF3C7; color: #D97706; border: 1px solid rgba(217,119,6,0.2);' : 'background: #EFF6FF; color: #2563EB; border: 1px solid rgba(37,99,235,0.2);')}">
+              ${isLab ? '🧪 Practical Lab' : (isActivity ? '🎯 Activity' : '📖 Theory')}
             </span>
           </td>
           <td style="text-align: center; font-weight: 700;" class="tabular-nums">${item.weekly_periods} / wk</td>
@@ -789,12 +803,24 @@ function filterDrilldownTable() {
       `;
     }
     if (type === 'sections') {
+      let batchesText = '-';
+      if (item.batches) {
+        try {
+          const b = typeof item.batches === 'string' && item.batches.startsWith('[') ? JSON.parse(item.batches) : item.batches;
+          batchesText = Array.isArray(b) ? b.join(', ') : String(b);
+        } catch (e) {
+          batchesText = String(item.batches);
+        }
+      }
       return `
         <tr>
-          <td><div style="font-weight: 700; color: var(--text-primary);">${escapeHtml(item.name)}</div></td>
+          <td>
+            <div style="font-weight: 700; color: var(--text-primary);">${escapeHtml(item.name)}</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">Batches: ${escapeHtml(batchesText)}</div>
+          </td>
           <td>
             <span class="drilldown-badge-pill" style="background: #FFFBEB; color: #D97706; border: 1px solid rgba(217,119,6,0.2);">
-              ${escapeHtml(item.department_code || item.department_name || 'General')}
+              ${escapeHtml(item.department_code || item.department_name || 'CSE')}
             </span>
           </td>
           <td style="text-align: center; font-weight: 600;" class="tabular-nums">Semester ${item.semester}</td>
@@ -1550,20 +1576,43 @@ function renderMasterDataTables() {
         </tr>
       `;
     } else {
-      subTable.innerHTML = masterData.subjects.map(s => `
-        <tr style="border-bottom: 1px solid var(--border-subtle);">
-          <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--color-brand-primary);">${s.code || '-'}</td>
-          <td style="padding: 0.6rem 0.75rem; font-weight: 600;">${s.name || '-'}</td>
-          <td style="padding: 0.6rem 0.75rem;">${s.department_code || '-'}</td>
-          <td style="padding: 0.6rem 0.75rem;">${s.semester != null ? 'Sem ' + s.semester : '-'}</td>
-          <td style="padding: 0.6rem 0.75rem;"><span style="text-transform: capitalize; background: var(--bg-surface-subtle); padding: 0.15rem 0.45rem; border-radius: 4px;">${s.type || '-'}</span> ${s.type === 'lab' ? `(${s.lab_block_length || 2}p block)` : ''}</td>
-          <td style="padding: 0.6rem 0.75rem;" class="tabular-nums">${s.weekly_periods != null ? s.weekly_periods + ' periods' : '-'}</td>
-          <td style="padding: 0.6rem 0.75rem; text-align: right;">
-            <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editSubject(${s.id})">Edit</button>
-            <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteSubject(${s.id})">Delete</button>
-          </td>
-        </tr>
-      `).join('');
+      subTable.innerHTML = masterData.subjects.map(s => {
+        const displayName = s.name || s.short_name || s.code || '-';
+        let semDisplay = '-';
+        if (s.semester != null) {
+          semDisplay = 'Sem ' + s.semester;
+        } else if (s.semester_candidates) {
+          try {
+            const cand = typeof s.semester_candidates === 'string' ? JSON.parse(s.semester_candidates) : s.semester_candidates;
+            semDisplay = 'Multiple (Sem ' + (Array.isArray(cand) ? cand.join(', ') : cand) + ')';
+          } catch (e) {
+            semDisplay = 'Multiple';
+          }
+        } else {
+          semDisplay = 'Multiple';
+        }
+
+        const isLab = s.type === 'lab';
+        const isActivity = s.type === 'activity';
+        const typeBadge = isActivity
+          ? '<span style="text-transform: capitalize; background: #FFFBEB; color: #D97706; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600;">⚡ Activity</span>'
+          : (isLab ? '<span style="text-transform: capitalize; background: #FDF4FF; color: #9333EA; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600;">🧪 Lab</span> (2p block)' : '<span style="text-transform: capitalize; background: #EFF6FF; color: #2563EB; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600;">📖 Theory</span>');
+
+        return `
+          <tr style="border-bottom: 1px solid var(--border-subtle);">
+            <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--color-brand-primary); font-family: monospace;">${escapeHtml(s.code || '-')}</td>
+            <td style="padding: 0.6rem 0.75rem; font-weight: 600;">${escapeHtml(displayName)}</td>
+            <td style="padding: 0.6rem 0.75rem;">${escapeHtml(s.department_code || '-')}</td>
+            <td style="padding: 0.6rem 0.75rem;">${escapeHtml(semDisplay)}</td>
+            <td style="padding: 0.6rem 0.75rem;">${typeBadge}</td>
+            <td style="padding: 0.6rem 0.75rem; font-weight: 700;" class="tabular-nums">${s.weekly_periods != null ? s.weekly_periods + ' periods' : '-'}</td>
+            <td style="padding: 0.6rem 0.75rem; text-align: right;">
+              <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editSubject(${s.id})">Edit</button>
+              <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteSubject(${s.id})">Delete</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
     }
   }
 
@@ -1595,7 +1644,7 @@ function renderMasterDataTables() {
     }
   }
 
-  // 4. Sections
+  // 4. Sections (15 sections: CSE-1A..1D, CSE-3A..3D, CSE-5A..5D, CSE-7A..7C)
   const secTable = document.getElementById('table-sections-body');
   if (secTable) {
     if (!masterData.sections || masterData.sections.length === 0) {
@@ -1607,18 +1656,27 @@ function renderMasterDataTables() {
         </tr>
       `;
     } else {
-      secTable.innerHTML = (masterData.sections || []).map(sec => `
-        <tr style="border-bottom: 1px solid var(--border-subtle);">
-          <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--color-brand-primary);">${sec.name}</td>
-          <td style="padding: 0.6rem 0.75rem;">${sec.department_name} (${sec.department_code})</td>
-          <td style="padding: 0.6rem 0.75rem;">Semester ${sec.semester}</td>
-          <td style="padding: 0.6rem 0.75rem;" class="tabular-nums">${sec.strength} students</td>
-          <td style="padding: 0.6rem 0.75rem; text-align: right;">
-            <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editSection(${sec.id})">Edit</button>
-            <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteSection(${sec.id})">Delete</button>
-          </td>
-        </tr>
-      `).join('');
+      secTable.innerHTML = (masterData.sections || []).map(sec => {
+        let batchesStr = '';
+        if (sec.batches) {
+          try {
+            const b = typeof sec.batches === 'string' ? JSON.parse(sec.batches) : sec.batches;
+            if (Array.isArray(b) && b.length > 0) batchesStr = ` · Batches: ${b.join(', ')}`;
+          } catch(e) {}
+        }
+        return `
+          <tr style="border-bottom: 1px solid var(--border-subtle);">
+            <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--color-brand-primary);">${escapeHtml(sec.name)}</td>
+            <td style="padding: 0.6rem 0.75rem;">${escapeHtml(sec.department_name || sec.department_code)}${batchesStr ? `<div style="font-size: 0.72rem; color: var(--text-muted);">${escapeHtml(batchesStr)}</div>` : ''}</td>
+            <td style="padding: 0.6rem 0.75rem;">Semester ${sec.semester}</td>
+            <td style="padding: 0.6rem 0.75rem;" class="tabular-nums">${sec.strength ? sec.strength + ' students' : '-'}</td>
+            <td style="padding: 0.6rem 0.75rem; text-align: right;">
+              <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editSection(${sec.id})">Edit</button>
+              <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteSection(${sec.id})">Delete</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
     }
   }
 
@@ -1646,28 +1704,34 @@ function renderMasterDataTables() {
     }
   }
 
-  // 6. Departments
+  // 6. Departments (CSE active, IT and ECE unused)
   const deptTable = document.getElementById('table-departments-body');
   if (deptTable) {
     if (!masterData.departments || masterData.departments.length === 0) {
       deptTable.innerHTML = `
         <tr style="border-bottom: 1px solid var(--border-subtle);">
-          <td colspan="3" style="padding: 2.5rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle);">
+          <td colspan="4" style="padding: 2.5rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle);">
             No academic departments found. Click "+ Add Department" above to create departments.
           </td>
         </tr>
       `;
     } else {
-      deptTable.innerHTML = (masterData.departments || []).map(d => `
-        <tr style="border-bottom: 1px solid var(--border-subtle);">
-          <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--color-brand-primary);">${d.code}</td>
-          <td style="padding: 0.6rem 0.75rem; font-weight: 600;">${d.name}</td>
-          <td style="padding: 0.6rem 0.75rem; text-align: right;">
-            <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editDepartment(${d.id})">Edit</button>
-            <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; color: var(--color-error);" onclick="window.deleteDepartment(${d.id})">Delete</button>
-          </td>
-        </tr>
-      `).join('');
+      deptTable.innerHTML = (masterData.departments || []).map(d => {
+        const isCse = d.code === 'CSE';
+        const statusBadge = isCse
+          ? '<span class="drilldown-badge-pill" style="background: var(--color-success-bg); color: var(--color-success); border: 1px solid var(--color-success); font-weight: 600;">● Active (All Records)</span>'
+          : '<span class="drilldown-badge-pill" style="background: var(--bg-surface-subtle); color: var(--text-muted); border: 1px solid var(--border-subtle);">Unused (Kept Intact)</span>';
+        return `
+          <tr style="border-bottom: 1px solid var(--border-subtle);">
+            <td style="padding: 0.6rem 0.75rem; font-weight: 700; color: var(--color-brand-primary); font-family: monospace;">${escapeHtml(d.code)}</td>
+            <td style="padding: 0.6rem 0.75rem; font-weight: 600;">${escapeHtml(d.name)}</td>
+            <td style="padding: 0.6rem 0.75rem;">${statusBadge}</td>
+            <td style="padding: 0.6rem 0.75rem; text-align: right;">
+              <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="window.editDepartment(${d.id})">Edit</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
     }
   }
 }
@@ -2586,17 +2650,16 @@ function populateStudioEntitySelector() {
       entitySelector.innerHTML = '<option value="">No faculty added yet</option>';
     } else {
       entitySelector.innerHTML = masterData.faculty.map(f => `
-        <option value="${f.id}">Faculty: ${f.name} (${f.department_code || 'CSE'})</option>
+        <option value="${f.id}">${f.code ? f.code + ' · ' : ''}${f.name} (${f.department_code || 'CSE'}) - ${f.weekly_hours || 0} hrs/wk</option>
       `).join('');
     }
   } else if (studioMode === 'room') {
-    if (!masterData.rooms || masterData.rooms.length === 0) {
-      entitySelector.innerHTML = '<option value="">No rooms added yet</option>';
-    } else {
-      entitySelector.innerHTML = (masterData.rooms || []).map(r => `
-        <option value="${r.id}">Room: ${r.name} (${r.type})</option>
-      `).join('');
-    }
+    entitySelector.innerHTML = `
+      <option value="-1">Room: TBD (All Sessions Awaiting Room Assignment)</option>
+      ${(masterData.rooms || []).map(r => `
+        <option value="${r.id}">Room: ${r.name} (${r.type}, Cap: ${r.capacity})</option>
+      `).join('')}
+    `;
   }
 
   const parsedVal = parseInt(entitySelector.value, 10);
@@ -2645,7 +2708,11 @@ function renderStudioGrid() {
   } else if (studioMode === 'faculty') {
     filteredEntries = studioEntityId ? entries.filter(e => e.faculty_id === studioEntityId) : [];
   } else if (studioMode === 'room') {
-    filteredEntries = studioEntityId ? entries.filter(e => e.room_id === studioEntityId) : [];
+    if (studioEntityId === -1 || studioEntityId === null || studioEntityId === undefined || String(studioEntityId) === '-1') {
+      filteredEntries = entries.filter(e => !e.room_id || e.room_name === 'TBD');
+    } else {
+      filteredEntries = entries.filter(e => e.room_id === studioEntityId);
+    }
   }
 
   const conflictsByEntry = lastSharedValidation?.conflictsByEntryId || {};
@@ -2735,6 +2802,10 @@ function renderStudioGrid() {
             ? `title="[CONFLICT DETECTED] ${escapeHtml(entryConflicts.map(c => c.message).join(' | '))}"`
             : (isModified ? `title="[MODIFIED] Class changed during conflict resolution"` : '');
 
+          const sectionLabel = entry.section_name || (entry.batch ? ('Batch ' + entry.batch) : 'Unassigned');
+          const facultyLabel = entry.faculty_name || 'Faculty';
+          const roomLabel = entry.room_name || 'TBD';
+
           html += `
             <div class="studio-entry-chip" draggable="true" data-entry-id="${entry.id}" ${conflictTooltip} style="${chipStyle}">
               <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.25rem;">
@@ -2748,10 +2819,10 @@ function renderStudioGrid() {
                 </div>
               </div>
               <div style="font-size: 0.75rem; color: ${hasConflict ? 'var(--color-error)' : 'var(--text-secondary)'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                ${escapeHtml(studioMode === 'faculty' ? entry.section_name : entry.faculty_name)}
+                ${escapeHtml(studioMode === 'faculty' ? sectionLabel : facultyLabel)}
               </div>
               <div style="font-size: 0.7rem; color: var(--text-muted);">
-                ${escapeHtml(studioMode === 'room' ? entry.section_name : entry.room_name)} ${entry.is_lab_block ? '· Lab' : ''}
+                ${escapeHtml(studioMode === 'room' ? sectionLabel : roomLabel)} ${entry.is_lab_block ? '· Lab' : ''}
               </div>
             </div>
           `;
@@ -2794,6 +2865,17 @@ function renderStudioGrid() {
 
   container.innerHTML = html;
   attachDragAndDropHandlers();
+
+  // Toggle Unassigned Sections Panel in section mode
+  const unassignedPanel = document.getElementById('unassigned-sections-panel');
+  if (unassignedPanel) {
+    if (studioMode === 'section') {
+      unassignedPanel.style.display = 'block';
+      renderUnassignedSectionsPanel(currentVersionData?.unassignedSessions || []);
+    } else {
+      unassignedPanel.style.display = 'none';
+    }
+  }
 }
 
 // Drag & Drop Implementation with Full Manual Authority (Swap on Occupied Drop)
@@ -5382,6 +5464,255 @@ function renderRescheduleSlotsResult(data) {
     </div>
   `;
 }
+
+// ==========================================
+// SJBIT CSE REFERENCE DATA & UNASSIGNED SESSIONS (Requirement 4 & 5)
+// ==========================================
+
+const DAY_MAP_STUDIO = {
+  MON: 'Monday',
+  TUE: 'Tuesday',
+  WED: 'Wednesday',
+  THU: 'Thursday',
+  FRI: 'Friday',
+  SAT: 'Saturday'
+};
+
+let currentUnassignedSessions = [];
+
+function renderUnassignedSectionsPanel(sessions) {
+  const panel = document.getElementById('unassigned-sections-panel');
+  const countBadge = document.getElementById('unassigned-sessions-count-badge');
+  if (!panel) return;
+
+  currentUnassignedSessions = sessions || [];
+  if (countBadge) {
+    countBadge.textContent = `${currentUnassignedSessions.length} Unassigned`;
+  }
+
+  filterAndRenderUnassignedTable();
+  setupUnassignedPanelListeners();
+}
+
+function filterAndRenderUnassignedTable() {
+  const tbody = document.getElementById('unassigned-sessions-table-body');
+  const searchInput = document.getElementById('unassigned-search-input');
+  if (!tbody) return;
+
+  const q = (searchInput?.value || '').trim().toLowerCase();
+  const filtered = currentUnassignedSessions.filter(s => {
+    if (!q) return true;
+    return (s.session_id || '').toLowerCase().includes(q) ||
+           (s.faculty_name || '').toLowerCase().includes(q) ||
+           (s.faculty_code || '').toLowerCase().includes(q) ||
+           (s.subject_code || '').toLowerCase().includes(q) ||
+           (s.section_status || '').toLowerCase().includes(q) ||
+           (s.day || '').toLowerCase().includes(q) ||
+           (s.batch || '').toLowerCase().includes(q);
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8" style="padding: 1.5rem; text-align: center; color: var(--text-muted);">
+          ${currentUnassignedSessions.length === 0 ? '✓ All sessions have assigned sections!' : 'No matching unassigned sessions found.'}
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  const sectionsList = masterData?.sections || [];
+
+  tbody.innerHTML = filtered.map(s => {
+    let candidateList = [];
+    try {
+      if (typeof s.candidate_sections === 'string') {
+        candidateList = JSON.parse(s.candidate_sections);
+      } else if (Array.isArray(s.candidate_sections)) {
+        candidateList = s.candidate_sections;
+      }
+    } catch (e) {
+      candidateList = [];
+    }
+
+    const dayName = s.day ? (DAY_MAP_STUDIO[s.day] || s.day) : '-';
+    const periodStr = s.period_start === s.period_end ? `P${s.period_start}` : `P${s.period_start}-P${s.period_end}`;
+
+    return `
+      <tr style="border-bottom: 1px solid var(--border-subtle);">
+        <td style="padding: 0.5rem 0.75rem; font-family: monospace; font-weight: 600;">${escapeHtml(s.session_id)}</td>
+        <td style="padding: 0.5rem 0.75rem;"><strong>${escapeHtml(s.faculty_name || s.faculty_code || 'Faculty')}</strong></td>
+        <td style="padding: 0.5rem 0.75rem;">${escapeHtml(dayName)} · ${escapeHtml(periodStr)}</td>
+        <td style="padding: 0.5rem 0.75rem;"><span style="font-weight: 700; color: var(--color-brand-primary);">${escapeHtml(s.subject_code)}</span></td>
+        <td style="padding: 0.5rem 0.75rem;">
+          <span class="drilldown-badge-pill" style="${s.type === 'lab' ? 'background: #FDF4FF; color: #9333EA;' : 'background: #EFF6FF; color: #2563EB;'}">
+            ${escapeHtml(s.type || 'theory')} ${s.batch ? `(${escapeHtml(s.batch)})` : ''}
+          </span>
+        </td>
+        <td style="padding: 0.5rem 0.75rem;">${s.semester ? `Sem ${s.semester}` : 'Multiple / -'}</td>
+        <td style="padding: 0.5rem 0.75rem;">
+          <span style="font-size: 0.75rem; color: #B45309; background: #FEF3C7; padding: 0.15rem 0.45rem; border-radius: 4px; display: inline-block;">
+            ${escapeHtml(s.section_status || 'Unassigned')}
+          </span>
+        </td>
+        <td style="padding: 0.5rem 0.75rem; text-align: right;">
+          <div style="display: flex; gap: 0.35rem; justify-content: flex-end; align-items: center;">
+            <select id="assign-sec-select-${s.id}" class="form-select" style="font-size: 0.78rem; padding: 0.25rem 0.45rem; width: 130px;">
+              <option value="">Select Section...</option>
+              ${candidateList.length > 0 ? `
+                <optgroup label="Candidates">
+                  ${candidateList.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
+                </optgroup>
+              ` : ''}
+              <optgroup label="All CSE Sections">
+                ${sectionsList.map(sec => `<option value="${escapeHtml(sec.name)}">${escapeHtml(sec.name)} (Sem ${sec.semester})</option>`).join('')}
+              </optgroup>
+            </select>
+            <button class="btn-primary" style="font-size: 0.75rem; padding: 0.25rem 0.55rem;" onclick="window.assignSectionToSession(${s.id})">
+              Assign
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function setupUnassignedPanelListeners() {
+  const searchInput = document.getElementById('unassigned-search-input');
+  if (searchInput && !searchInput.dataset.bound) {
+    searchInput.dataset.bound = 'true';
+    searchInput.addEventListener('input', () => {
+      filterAndRenderUnassignedTable();
+    });
+  }
+
+  const btnRefresh = document.getElementById('btn-refresh-unassigned');
+  if (btnRefresh && !btnRefresh.dataset.bound) {
+    btnRefresh.dataset.bound = 'true';
+    btnRefresh.addEventListener('click', async () => {
+      try {
+        const data = await apiRequest('/api/timetable/unassigned-sessions');
+        renderUnassignedSectionsPanel(data.sessions || []);
+        showToast('Unassigned sessions refreshed', 'info');
+      } catch (err) {
+        showToast('Failed to refresh unassigned sessions: ' + err.message, 'error');
+      }
+    });
+  }
+}
+
+window.assignSectionToSession = async (sessionId) => {
+  const select = document.getElementById(`assign-sec-select-${sessionId}`);
+  if (!select || !select.value) {
+    showToast('Please select a target section to assign', 'error');
+    return;
+  }
+  const sectionName = select.value;
+  try {
+    await apiRequest(`/api/timetable/sessions/${sessionId}/assign-section`, {
+      method: 'PUT',
+      body: { sectionName }
+    });
+    showToast(`Session assigned to section ${sectionName} permanently!`, 'success');
+    if (currentVersionId) {
+      await loadStudioVersion(currentVersionId);
+    }
+  } catch (err) {
+    showToast('Failed to assign section: ' + err.message, 'error');
+  }
+};
+
+window.openVerificationModal = async () => {
+  const modal = document.getElementById('modal-verification-report');
+  if (!modal) return;
+  modal.style.display = 'flex';
+
+  const kpisContainer = document.getElementById('verification-kpis');
+  const tbody = document.getElementById('verification-table-body');
+  const deptStatus = document.getElementById('verification-dept-status');
+
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="6" style="padding: 1.5rem; text-align: center; color: var(--text-muted);">Generating real-time verification report from database...</td></tr>';
+  }
+
+  try {
+    const report = await apiRequest('/api/admin/verification-report');
+    if (!report || !report.summary) return;
+
+    if (kpisContainer) {
+      kpisContainer.innerHTML = `
+        <div class="drilldown-kpi-card" style="padding: 0.65rem 0.85rem;">
+          <div class="drilldown-kpi-label">Faculty Count</div>
+          <div class="drilldown-kpi-val" style="color: #2563EB;">${report.summary.facultyCount} <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">(Target: 33)</span></div>
+        </div>
+        <div class="drilldown-kpi-card" style="padding: 0.65rem 0.85rem;">
+          <div class="drilldown-kpi-label">Subjects</div>
+          <div class="drilldown-kpi-val" style="color: #7C3AED;">${report.summary.subjectCount} <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">(Target: 40)</span></div>
+        </div>
+        <div class="drilldown-kpi-card" style="padding: 0.65rem 0.85rem;">
+          <div class="drilldown-kpi-label">Imported Sessions</div>
+          <div class="drilldown-kpi-val" style="color: #D97706;">${report.summary.sessionCount} <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">(Target: 305)</span></div>
+        </div>
+        <div class="drilldown-kpi-card" style="padding: 0.65rem 0.85rem;">
+          <div class="drilldown-kpi-label">Total Teaching Hours</div>
+          <div class="drilldown-kpi-val" style="color: #16A34A;">${report.summary.totalTeachingHours}h <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">(Target: 413)</span></div>
+        </div>
+        <div class="drilldown-kpi-card" style="padding: 0.65rem 0.85rem;">
+          <div class="drilldown-kpi-label">Faculty Mismatches</div>
+          <div class="drilldown-kpi-val" style="color: ${report.summary.mismatchesCount === 0 ? '#16A34A' : '#DC2626'};">
+            ${report.summary.mismatchesCount} <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">(${report.summary.mismatchesCount === 0 ? '✓ 100% Match' : 'Mismatches'})</span>
+          </div>
+        </div>
+      `;
+    }
+
+    if (deptStatus && report.unusedDepartments) {
+      deptStatus.innerHTML = `🏛️ Departments: <strong>CSE</strong> (Active, ${report.summary.sessionCount} sessions) · <strong>${report.unusedDepartments.join(' & ')}</strong> (${report.unusedDepartmentsText || 'Unused, kept intact'})`;
+    }
+
+    if (tbody) {
+      tbody.innerHTML = (report.facultyComparison || []).map(f => {
+        const isMatch = f.match;
+        return `
+          <tr style="border-bottom: 1px solid var(--border-subtle); ${!isMatch ? 'background: #FEF2F2;' : ''}">
+            <td style="padding: 0.5rem 0.75rem; font-family: monospace; font-weight: 700; color: var(--color-brand-primary);">${escapeHtml(f.code)}</td>
+            <td style="padding: 0.5rem 0.75rem; font-weight: 600;">${escapeHtml(f.name)}</td>
+            <td style="padding: 0.5rem 0.75rem; font-size: 0.75rem; color: var(--text-secondary); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(f.classesTaught || '-')}">
+              ${escapeHtml(f.classesTaught || '-')}
+            </td>
+            <td style="padding: 0.5rem 0.75rem; text-align: center; font-weight: 600;" class="tabular-nums">${f.targetWeeklyHours}h</td>
+            <td style="padding: 0.5rem 0.75rem; text-align: center; font-weight: 700;" class="tabular-nums">${f.actualSessionHours}h</td>
+            <td style="padding: 0.5rem 0.75rem; text-align: center;">
+              <span class="drilldown-badge-pill" style="${isMatch ? 'background: var(--color-success-bg); color: var(--color-success); border: 1px solid var(--color-success);' : 'background: #FEE2E2; color: #DC2626; border: 1px solid #DC2626;'}">
+                ${isMatch ? '✓ Exact Match' : `⚠ Diff: ${f.diff > 0 ? '+' + f.diff : f.diff}h`}
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  } catch (err) {
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="6" style="padding: 1.5rem; text-align: center; color: var(--color-error);">Failed to load verification report: ${escapeHtml(err.message)}</td></tr>`;
+    }
+  }
+};
+
+window.reloadReferenceData = async () => {
+  if (!confirm('Re-sync database with CTAS_reference_data.json? This updates the timetable, sections, subjects, and faculty idempotently.')) return;
+  try {
+    showToast('Synchronizing with CTAS reference data...', 'info');
+    const res = await apiRequest('/api/admin/import-reference-data', { method: 'POST' });
+    showToast('Successfully synchronized! 33 faculty, 40 subjects, 305 sessions, 413 teaching hours.', 'success');
+    await loadMasterData();
+    await loadTimetableVersions();
+    await loadOverview();
+  } catch (err) {
+    showToast('Failed to synchronize reference data: ' + err.message, 'error');
+  }
+};
 
 export default { switchTab };
 

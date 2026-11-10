@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { getDatabase, initSchema } from './connection.js';
+import { importReferenceData } from '../services/referenceDataService.js';
 
 // Configured credentials for admin, faculty, and student roles
 export const SEED_PASSWORDS = {
@@ -60,21 +61,21 @@ export function seedDatabase(customDb, options = {}) {
       dayIds.push(insertDay.run(d.name, d.index, 1).lastInsertRowid);
     }
 
-    // 2. Time Slots (7 Teaching Periods + 2 Breaks)
+    // 2. Time Slots (7 Teaching Periods + 2 Breaks matching CTAS_reference_data.json)
     const insertSlot = db.prepare(`
       INSERT INTO time_slots (slot_no, start_time, end_time, is_break, label)
       VALUES (?, ?, ?, ?, ?)
     `);
     const slotsConfig = [
-      { no: 1, start: '09:00', end: '09:50', isBreak: 0, label: 'Period 1' },
-      { no: 2, start: '09:50', end: '10:40', isBreak: 0, label: 'Period 2' },
-      { no: 3, start: '10:40', end: '11:00', isBreak: 1, label: 'Tea Break' },
-      { no: 4, start: '11:00', end: '11:50', isBreak: 0, label: 'Period 3' },
-      { no: 5, start: '11:50', end: '12:40', isBreak: 0, label: 'Period 4' },
-      { no: 6, start: '12:40', end: '13:30', isBreak: 1, label: 'Lunch Break' },
-      { no: 7, start: '13:30', end: '14:20', isBreak: 0, label: 'Period 5' },
-      { no: 8, start: '14:20', end: '15:10', isBreak: 0, label: 'Period 6' },
-      { no: 9, start: '15:10', end: '16:00', isBreak: 0, label: 'Period 7' }
+      { no: 1, start: '08:30', end: '09:30', isBreak: 0, label: 'Period 1' },
+      { no: 2, start: '09:30', end: '10:30', isBreak: 0, label: 'Period 2' },
+      { no: 3, start: '10:30', end: '10:45', isBreak: 1, label: 'Tea Break' },
+      { no: 4, start: '10:45', end: '11:45', isBreak: 0, label: 'Period 3' },
+      { no: 5, start: '11:45', end: '12:45', isBreak: 0, label: 'Period 4' },
+      { no: 6, start: '12:45', end: '13:30', isBreak: 1, label: 'Lunch Break' },
+      { no: 7, start: '13:30', end: '14:30', isBreak: 0, label: 'Period 5' },
+      { no: 8, start: '14:30', end: '15:30', isBreak: 0, label: 'Period 6' },
+      { no: 9, start: '15:30', end: '16:30', isBreak: 0, label: 'Period 7' }
     ];
     const slotIds = {};
     for (const s of slotsConfig) {
@@ -280,6 +281,7 @@ export function seedDatabase(customDb, options = {}) {
       console.log('    Username: manjula');
       console.log(`    Password: ${SEED_PASSWORDS.faculty}`);
       console.log('========================================================================\n');
+      importReferenceData(db);
       return true;
     }
 

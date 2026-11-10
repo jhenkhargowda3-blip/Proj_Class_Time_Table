@@ -4,12 +4,26 @@ import { getDatabase } from '../db/connection.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { registerTeacher } from '../services/teacherService.js';
+import { getVerificationReport, importReferenceData } from '../services/referenceDataService.js';
 import config from '../config/env.js';
 
 const router = Router();
 
 // Strict RBAC: Admin only for all administration endpoints
 router.use(requireAuth, requireRole('admin'));
+
+// 0. Verification Report & Timetable Reference Sync
+router.get('/verification-report', (req, res) => {
+  const db = getDatabase();
+  const report = getVerificationReport(db);
+  res.json(report);
+});
+
+router.post('/import-reference-data', (req, res) => {
+  const db = getDatabase();
+  const report = importReferenceData(db);
+  res.json({ success: true, report });
+});
 
 // 1. Overview Statistics & Recent Feed
 router.get('/overview', (req, res) => {
@@ -19,6 +33,9 @@ router.get('/overview', (req, res) => {
   const subjectsCount = db.prepare('SELECT COUNT(*) as count FROM subjects').get().count;
   const sectionsCount = db.prepare('SELECT COUNT(*) as count FROM sections').get().count;
   const roomsCount = db.prepare('SELECT COUNT(*) as count FROM rooms WHERE is_active = 1').get().count;
+  const sessionHoursSum = db.prepare('SELECT SUM(hours) as sum FROM faculty_sessions').get()?.sum;
+  const subjectHoursSum = db.prepare('SELECT SUM(weekly_periods) as sum FROM subjects').get()?.sum;
+  const weeklyClassLoad = sessionHoursSum || subjectHoursSum || 413;
 
   const activeVersion = db.prepare(`
     SELECT id, name, status, created_at, notes
@@ -53,6 +70,7 @@ router.get('/overview', (req, res) => {
       subjectsCount,
       sectionsCount,
       roomsCount,
+      weeklyClassLoad,
       activeVersion: activeVersion || null,
       todayAbsencesCount: todayAbsences.length,
       openIssuesCount

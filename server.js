@@ -9,6 +9,7 @@ import config from './src/config/env.js';
 import { getDatabase } from './src/db/connection.js';
 import { seedDatabase } from './src/db/seed.js';
 import { registerTeacher } from './src/services/teacherService.js';
+import { importReferenceData } from './src/services/referenceDataService.js';
 import errorHandler from './src/middleware/errorHandler.js';
 
 // Route imports
@@ -123,6 +124,9 @@ try {
     departmentCode: 'CSE',
     departmentName: 'Computer Science & Engineering'
   }, db);
+
+  // Ensure reference timetable data matches CTAS_reference_data.json
+  importReferenceData(db);
 
   console.log(`[CTAS] SQLite database ready at ${config.dbPath}`);
 } catch (err) {

@@ -5,6 +5,7 @@ import { requireRole } from '../middleware/role.js';
 import { generateTimetable, generateDraftWithConflicts, isGenerationInProgress, getGenerationState } from '../services/scheduler.js';
 import { validateTimetable, validateMove } from '../services/validator.js';
 import { broadcast } from '../services/sse.js';
+import { getProjectedTimetableEntries, getUnassignedSessions, assignSessionSection, assignSessionRoom } from '../services/referenceDataService.js';
 
 const router = Router();
 
@@ -114,7 +115,7 @@ router.get('/versions/:id', requireAuth, (req, res) => {
     return res.status(404).json({ error: 'Timetable version not found' });
   }
 
-  const entries = db.prepare(`
+  let entries = db.prepare(`
     SELECT te.*, s.name as subject_name, s.code as subject_code, s.type as subject_type,
            sec.name as section_name, sec.semester,
            f.name as faculty_name, f.email as faculty_email,
@@ -132,12 +133,70 @@ router.get('/versions/:id', requireAuth, (req, res) => {
     ORDER BY wd.day_index, ts.slot_no
   `).all(versionId);
 
-  const validation = validateTimetable(versionId);
+  // If timetable_entries is empty, populate and read imported sessions from faculty_sessions
+  if (entries.length === 0) {
+    entries = getProjectedTimetableEntries(db, versionId);
+  }
+
+  const unassignedSessions = getUnassignedSessions(db);
+  const validation = validateTimetable(entries, { skipPeriodCountCheck: true });
 
   res.json({
     version,
     entries,
+    unassignedSessions,
     validation
+  });
+});
+
+// 3.1 Get Unassigned Sessions
+router.get('/unassigned-sessions', requireAuth, (req, res) => {
+  const db = getDatabase();
+  res.json({ sessions: getUnassignedSessions(db) });
+});
+
+// 3.2 Assign Section permanently to a session
+router.put('/sessions/:id/assign-section', requireAuth, requireRole('admin'), (req, res) => {
+  const sessionId = req.params.id;
+  const { section } = req.body;
+  if (!section) {
+    return res.status(400).json({ error: 'Section is required' });
+  }
+
+  const db = getDatabase();
+  const updated = assignSessionSection(sessionId, section, db);
+
+  broadcast('timetable.updated', {
+    type: 'session_assigned',
+    sessionId,
+    section
+  });
+
+  res.json({
+    success: true,
+    message: `Session ${sessionId} permanently assigned to Section ${section}`,
+    session: updated
+  });
+});
+
+// 3.3 Assign Room to a session
+router.put('/sessions/:id/assign-room', requireAuth, requireRole('admin'), (req, res) => {
+  const sessionId = req.params.id;
+  const { roomId, roomName } = req.body;
+
+  const db = getDatabase();
+  const updated = assignSessionRoom(sessionId, roomId, roomName, db);
+
+  broadcast('timetable.updated', {
+    type: 'room_assigned',
+    sessionId,
+    roomName
+  });
+
+  res.json({
+    success: true,
+    message: `Session ${sessionId} assigned to Room ${roomName || 'TBD'}`,
+    session: updated
   });
 });
 

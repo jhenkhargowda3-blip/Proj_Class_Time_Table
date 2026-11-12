@@ -63,32 +63,35 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
   let conflictSequence = 1;
 
   function registerViolation(v) {
+    v.severity = v.severity || 'error';
     v.id = `cnf_${conflictSequence++}`;
     violations.push(v);
 
-    if (Array.isArray(v.involvedEntryIds)) {
-      for (const eid of v.involvedEntryIds) {
-        if (!conflictsByEntryId[eid]) conflictsByEntryId[eid] = [];
-        conflictsByEntryId[eid].push(v);
+    if (v.severity === 'error') {
+      if (Array.isArray(v.involvedEntryIds)) {
+        for (const eid of v.involvedEntryIds) {
+          if (!conflictsByEntryId[eid]) conflictsByEntryId[eid] = [];
+          conflictsByEntryId[eid].push(v);
+        }
       }
-    }
 
-    if (v.dayId && v.slotId) {
-      // Cell keys for section, faculty, room grids
-      if (v.sectionId) {
-        const kSec = `${v.dayId}_${v.slotId}_sec_${v.sectionId}`;
-        if (!conflictsByCellKey[kSec]) conflictsByCellKey[kSec] = [];
-        conflictsByCellKey[kSec].push(v);
-      }
-      if (v.facultyId) {
-        const kFac = `${v.dayId}_${v.slotId}_fac_${v.facultyId}`;
-        if (!conflictsByCellKey[kFac]) conflictsByCellKey[kFac] = [];
-        conflictsByCellKey[kFac].push(v);
-      }
-      if (v.roomId) {
-        const kRoom = `${v.dayId}_${v.slotId}_room_${v.roomId}`;
-        if (!conflictsByCellKey[kRoom]) conflictsByCellKey[kRoom] = [];
-        conflictsByCellKey[kRoom].push(v);
+      if (v.dayId && v.slotId) {
+        // Cell keys for section, faculty, room grids
+        if (v.sectionId) {
+          const kSec = `${v.dayId}_${v.slotId}_sec_${v.sectionId}`;
+          if (!conflictsByCellKey[kSec]) conflictsByCellKey[kSec] = [];
+          conflictsByCellKey[kSec].push(v);
+        }
+        if (v.facultyId) {
+          const kFac = `${v.dayId}_${v.slotId}_fac_${v.facultyId}`;
+          if (!conflictsByCellKey[kFac]) conflictsByCellKey[kFac] = [];
+          conflictsByCellKey[kFac].push(v);
+        }
+        if (v.roomId) {
+          const kRoom = `${v.dayId}_${v.slotId}_room_${v.roomId}`;
+          if (!conflictsByCellKey[kRoom]) conflictsByCellKey[kRoom] = [];
+          conflictsByCellKey[kRoom].push(v);
+        }
       }
     }
   }
@@ -97,7 +100,7 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
   for (const e of entries) {
     const day = dayMap.get(e.day_id) || { id: e.day_id, day_name: e.day_name || `Day ${e.day_id}` };
     const slot = slotMap.get(e.slot_id) || { id: e.slot_id, slot_no: e.slot_no, label: e.slot_label || `Period ${e.slot_no}`, is_break: e.is_break || 0 };
-    const fac = facultyMap.get(e.faculty_id) || { id: e.faculty_id, name: e.faculty_name || `Faculty ${e.faculty_id}`, max_periods_per_day: e.max_periods_per_day || 4 };
+    const fac = facultyMap.get(e.faculty_id) || { id: e.faculty_id, name: e.faculty_name || `Faculty ${e.faculty_id}`, max_periods_per_day: e.max_periods_per_day || 6 };
     const rm = roomMap.get(e.room_id) || { id: e.room_id, name: e.room_name || `Room ${e.room_id}`, type: e.room_type || 'classroom', capacity: e.room_capacity || 40 };
     const sec = sectionMap.get(e.section_id) || { id: e.section_id, name: e.section_name || `Section ${e.section_id}`, strength: e.section_strength || 40 };
     const sub = subjectMap.get(e.subject_id) || { id: e.subject_id, code: e.subject_code || 'SUB', name: e.subject_name || 'Subject', type: e.subject_type || 'theory', weekly_periods: e.weekly_periods || 4, lab_block_length: e.lab_block_length || 1 };
@@ -201,24 +204,35 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
         });
       }
 
-      // Check 8b: Room Capacity Mismatch
-      if (rm.capacity && sec.strength && rm.capacity < sec.strength) {
-        registerViolation({
-          type: 'ROOM_CAPACITY_INSUFFICIENT',
-          day: day.day_name,
-          dayId: day.id,
-          period: slot.label,
-          slotId: slot.id,
-          section: sec.name,
-          sectionId: sec.id,
-          faculty: fac.name,
-          facultyId: fac.id,
-          room: rm.name,
-          roomId: rm.id,
-          message: `Room '${rm.name}' capacity (${rm.capacity} seats) is insufficient for Section '${sec.name}' (${sec.strength} students).`,
-          suggestedFix: `Move section to a room with at least ${sec.strength} seats.`,
-          involvedEntryIds: [e.id]
-        });
+      // Check 8b: Room Capacity Mismatch (Rule 1)
+      // For lab entries compare room capacity with batch size (section strength / batch count), never whole section.
+      // For theory use section strength. If section strength is missing or 0, skip the check.
+      const rawSecStrength = Number(sec.strength || e.section_strength || 0);
+      if (rawSecStrength > 0 && rm.capacity) {
+        let requiredCapacity = rawSecStrength;
+        if (isLabSubject) {
+          const batchCount = (sec.batches ? sec.batches.split(',').filter(Boolean).length : 0) || 3;
+          requiredCapacity = Math.ceil(rawSecStrength / batchCount);
+        }
+        if (rm.capacity < requiredCapacity) {
+          registerViolation({
+            type: 'ROOM_CAPACITY_INSUFFICIENT',
+            severity: 'error',
+            day: day.day_name,
+            dayId: day.id,
+            period: slot.label,
+            slotId: slot.id,
+            section: sec.name,
+            sectionId: sec.id,
+            faculty: fac.name,
+            facultyId: fac.id,
+            room: rm.name,
+            roomId: rm.id,
+            message: `Room '${rm.name}' capacity (${rm.capacity} seats) is insufficient for Section '${sec.name}' (${isLabSubject ? 'batch size ' + requiredCapacity : rawSecStrength + ' students'}).`,
+            suggestedFix: `Move section to a room with at least ${requiredCapacity} seats.`,
+            involvedEntryIds: [e.id]
+          });
+        }
       }
     }
 
@@ -235,7 +249,9 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
       roomSlotMap.get(rKey).push(e);
     }
 
-    if (e.section_id) {
+    // Sessions with no semester (OE, pooled LCS/Web labs) belong to semester-wide pool and must not be treated as double-booked (Rule 6)
+    const isPooledOrNoSemester = (!e.semester && !sec.semester) || (e.subject_code && (e.subject_code.startsWith('OE') || e.subject_code === 'OE'));
+    if (e.section_id && !isPooledOrNoSemester) {
       const sKey = `${e.section_id}_${e.day_id}_${e.slot_id}`;
       if (!sectionSlotMap.has(sKey)) sectionSlotMap.set(sKey, []);
       sectionSlotMap.get(sKey).push(e);
@@ -251,7 +267,7 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
     if (!sectionSubjectCountMap.has(secSubKey)) sectionSubjectCountMap.set(secSubKey, []);
     sectionSubjectCountMap.get(secSubKey).push(e);
 
-    // Lab blocks grouping per session/batch
+    // Lab blocks grouping per session/batch (Rule 4: group by session_id)
     if (isLabSubject) {
       const labKey = e.session_id ? `session_${e.session_id}` : `${e.section_id}_${e.subject_id}_${e.day_id}_${e.batch || 'all'}`;
       if (!labBlocksMap.has(labKey)) labBlocksMap.set(labKey, []);
@@ -268,6 +284,7 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
           const e2 = booked[j];
           registerViolation({
             type: 'FACULTY_DOUBLE_BOOKED',
+            severity: 'error',
             day: e1.day_name,
             dayId: e1.day_id,
             period: e1.slot_label,
@@ -296,6 +313,7 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
           const e2 = booked[j];
           registerViolation({
             type: 'ROOM_DOUBLE_BOOKED',
+            severity: 'error',
             day: e1.day_name,
             dayId: e1.day_id,
             period: e1.slot_label,
@@ -316,6 +334,8 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
   }
 
   // Check 3: Section Double-Booked (Rules 4-5)
+  // Accept parallel labs of different batches, ACTIVITY with ACTIVITY, parallel electives in different rooms,
+  // or when either entry has a non-empty room_note or different batch values. Keep known same-section overlaps as amber notes (warnings).
   for (const [, booked] of sectionSlotMap) {
     if (booked.length > 1) {
       for (let i = 0; i < booked.length; i++) {
@@ -324,12 +344,15 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
           const e2 = booked[j];
           const isSharedActivity = (e1.subject_code === 'ACTIVITY' && e2.subject_code === 'ACTIVITY');
           const isBothLabs = ((e1.subject_type === 'lab' || Number(e1.is_lab_block) === 1) && (e2.subject_type === 'lab' || Number(e2.is_lab_block) === 1));
-          const isParallelElective = (e1.room_id !== e2.room_id && (e1.room_note || e2.room_note || (e1.batch && e2.batch && e1.batch !== e2.batch) || (e1.subject_code !== e2.subject_code)));
+          const hasDifferentBatch = Boolean(e1.batch && e2.batch && e1.batch !== e2.batch);
+          const hasRoomNote = Boolean(e1.room_note || e2.room_note);
+          const isParallelElective = (e1.room_id !== e2.room_id && (hasRoomNote || hasDifferentBatch || (e1.subject_code !== e2.subject_code)));
 
           // Check Floor Conflict: Lab batches of the same section that run at the same time must be on different floors (Rule 5)
-          if (isBothLabs && e1.floor !== null && e1.floor !== undefined && e1.floor === e2.floor) {
+          if (isBothLabs && hasDifferentBatch && e1.floor !== null && e1.floor !== undefined && e1.floor === e2.floor) {
             registerViolation({
               type: 'FLOOR_CONFLICT',
+              severity: 'error',
               day: e1.day_name,
               dayId: e1.day_id,
               period: e1.slot_label,
@@ -346,9 +369,11 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
             });
           }
 
-          if (!isSharedActivity && !isBothLabs && !isParallelElective) {
+          if (!isSharedActivity && !isBothLabs && !isParallelElective && !hasDifferentBatch && !hasRoomNote) {
+            const isKnownOverlap = Boolean(e1.room_note || e2.room_note || e1.batch || e2.batch || e1.subject_code === 'ACTIVITY' || e2.subject_code === 'ACTIVITY');
             registerViolation({
               type: 'SECTION_DOUBLE_BOOKED',
+              severity: isKnownOverlap ? 'warning' : 'error',
               day: e1.day_name,
               dayId: e1.day_id,
               period: e1.slot_label,
@@ -369,16 +394,17 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
     }
   }
 
-  // Check 5: Faculty Exceeding Max Periods Per Day
+  // Check 5: Faculty Exceeding Max Periods Per Day (Rule 3: default to 6, treat as warning)
   for (const [key, classList] of facultyDayCountMap) {
     const [facId, dayId] = key.split('_').map(Number);
-    const fac = facultyMap.get(facId) || { name: `Faculty ${facId}`, max_periods_per_day: 4 };
+    const fac = facultyMap.get(facId) || { name: `Faculty ${facId}`, max_periods_per_day: 6 };
     const day = dayMap.get(dayId) || { day_name: `Day ${dayId}` };
-    const limit = fac.max_periods_per_day || 4;
+    const limit = fac.max_periods_per_day || 6;
 
     if (classList.length > limit) {
       registerViolation({
         type: 'FACULTY_OVERLOAD_DAY',
+        severity: 'warning',
         day: day.day_name,
         dayId,
         period: null,
@@ -389,14 +415,14 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
         facultyId: fac.id,
         room: classList.map(c => c.room_name).filter((v, i, a) => a.indexOf(v) === i).join(', '),
         roomId: classList[0]?.room_id,
-        message: `${fac.name} is scheduled for ${classList.length} periods on ${day.day_name}, exceeding maximum daily teaching limit of ${limit}.`,
+        message: `${fac.name} is scheduled for ${classList.length} periods on ${day.day_name}, exceeding daily teaching limit of ${limit}.`,
         suggestedFix: `Redistribute one or more periods to other weekdays or assign substitute instructors.`,
         involvedEntryIds: classList.map(c => c.id)
       });
     }
   }
 
-  // Check 6: Lab Consecutive Periods & Contiguity Check
+  // Check 6: Lab Consecutive Periods & Contiguity Check (Rule 4: group by session_id)
   for (const [, labEntries] of labBlocksMap) {
     if (labEntries.length > 1) {
       const sorted = [...labEntries].sort((a, b) => a.slot_no - b.slot_no);
@@ -409,6 +435,7 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
         if (!isConsecutiveSlot || !isSameRoom) {
           registerViolation({
             type: 'LAB_BLOCK_NOT_CONTIGUOUS',
+            severity: 'error',
             day: cur.day_name,
             dayId: cur.day_id,
             period: `${cur.slot_label} & ${next.slot_label}`,
@@ -428,19 +455,33 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
     }
   }
 
-  // Check 7: Subject Weekly Periods Mismatch (Too few or too many)
-  if (options.checkWeeklyPeriods && !options.skipWeeklyHoursCheck) {
-    // If sectionSubjects master data is available, verify against it
+  // Check 7: Subject Weekly Periods Mismatch (Rule 2: count lab periods per batch, derive required, run only on generate/edit)
+  if (options.isGeneratingOrEditing && !options.isImportedBaseline && !options.skipWeeklyHoursCheck) {
     if (Array.isArray(sectionSubjects) && sectionSubjects.length > 0) {
       for (const req of sectionSubjects) {
-        const scheduled = sectionSubjectCountMap.get(`${req.section_id}_${req.subject_id}`) || [];
+        const scheduledAll = sectionSubjectCountMap.get(`${req.section_id}_${req.subject_id}`) || [];
         const sec = sectionMap.get(req.section_id) || { name: `Section ${req.section_id}` };
-        const sub = subjectMap.get(req.subject_id) || { code: req.subject_code || 'SUB', weekly_periods: req.weekly_periods || 4 };
-        const required = req.weekly_periods || sub.weekly_periods || 4;
+        const sub = subjectMap.get(req.subject_id) || { code: req.subject_code || 'SUB', weekly_periods: req.weekly_periods, type: 'theory' };
 
-        if (scheduled.length !== required) {
+        let scheduledCount = scheduledAll.length;
+        if (sub.type === 'lab') {
+          // Count lab periods per batch
+          const batchCounts = new Map();
+          for (const e of scheduledAll) {
+            const b = e.batch || 'all';
+            batchCounts.set(b, (batchCounts.get(b) || 0) + 1);
+          }
+          scheduledCount = batchCounts.size > 0 ? Math.max(...batchCounts.values()) : scheduledAll.length;
+        }
+
+        const required = (req.weekly_periods !== undefined && req.weekly_periods !== null)
+          ? req.weekly_periods
+          : sub.weekly_periods;
+
+        if (required !== undefined && required !== null && scheduledCount !== required) {
           registerViolation({
             type: 'SUBJECT_PERIODS_MISMATCH',
+            severity: 'error',
             day: null,
             dayId: null,
             period: null,
@@ -451,20 +492,22 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
             facultyId: req.faculty_id,
             room: null,
             roomId: null,
-            message: `Section '${sec.name}' requires ${required} weekly periods of '${sub.code}', but has ${scheduled.length} scheduled (${scheduled.length < required ? 'too few' : 'too many'}).`,
-            suggestedFix: scheduled.length < required
-              ? `Schedule ${required - scheduled.length} additional period(s) for ${sub.code}.`
-              : `Remove ${scheduled.length - required} excess period(s) for ${sub.code}.`,
-            involvedEntryIds: scheduled.map(e => e.id)
+            message: `Section '${sec.name}' requires ${required} weekly periods of '${sub.code}', but has ${scheduledCount} scheduled (${scheduledCount < required ? 'too few' : 'too many'}).`,
+            suggestedFix: scheduledCount < required
+              ? `Schedule ${required - scheduledCount} additional period(s) for ${sub.code}.`
+              : `Remove ${scheduledCount - required} excess period(s) for ${sub.code}.`,
+            involvedEntryIds: scheduledAll.map(e => e.id)
           });
         }
       }
     }
   }
 
+  const errorsOnly = violations.filter(v => v.severity === 'error');
   return {
-    isValid: violations.length === 0,
-    errorCount: violations.length,
+    isValid: errorsOnly.length === 0,
+    errorCount: errorsOnly.length,
+    warningCount: violations.filter(v => v.severity === 'warning').length,
     conflicts: violations,
     conflictsByEntryId,
     conflictsByCellKey

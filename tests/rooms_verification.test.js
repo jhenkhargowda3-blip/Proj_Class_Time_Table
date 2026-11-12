@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import test from 'node:test';
+import assert from 'node:assert';
 import { getDatabase } from '../src/db/connection.js';
 import { importReferenceData, getProjectedTimetableEntries, getUnassignedSessions } from '../src/services/referenceDataService.js';
 import { evaluateTimetableConflicts } from '../public/js/timetableValidator.js';
@@ -145,6 +147,7 @@ export function runRoomsVerification() {
   console.log(`lab-in-classroom errors: ${labInClassroomErrors}`);
   console.log(`same-floor same-section lab pairs: ${sameFloorSameSectionLabPairs}`);
   console.log(`unassigned sessions: ${unassignedSessions}`);
+  console.log(`count of sessions whose day/period/subject differ from the JSON: ${diffCount}`);
   console.log(`diff count: ${diffCount}`);
 
   return {
@@ -160,7 +163,19 @@ export function runRoomsVerification() {
   };
 }
 
-// Execute if run directly
 if (process.argv[1] && process.argv[1].endsWith('rooms_verification.test.js')) {
   runRoomsVerification();
+} else {
+  test('CTAS Rooms Verification Self-Test', () => {
+    const result = runRoomsVerification();
+    assert.strictEqual(result.sessionCount, 305);
+    assert.strictEqual(result.roomCount, 29);
+    assert.strictEqual(result.sectionCount, 16);
+    assert.strictEqual(result.roomDoubleBookings, 0);
+    assert.strictEqual(result.facultyDoubleBookings, 0);
+    assert.strictEqual(result.labInClassroomErrors, 0);
+    assert.strictEqual(result.sameFloorSameSectionLabPairs, 0);
+    assert.strictEqual(result.unassignedSessions, 0);
+    assert.strictEqual(result.diffCount, 0);
+  });
 }

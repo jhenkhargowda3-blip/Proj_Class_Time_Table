@@ -138,6 +138,15 @@ export function migrateDatabaseSchema(db) {
     db.exec("ALTER TABLE subjects ADD COLUMN semester_candidates TEXT NULL");
   }
 
+  // Ensure timetable_versions has source and baseline_fingerprint columns
+  const verCols = db.prepare("PRAGMA table_info(timetable_versions)").all().map(c => c.name);
+  if (!verCols.includes('source')) {
+    db.exec("ALTER TABLE timetable_versions ADD COLUMN source TEXT NULL");
+  }
+  if (!verCols.includes('baseline_fingerprint')) {
+    db.exec("ALTER TABLE timetable_versions ADD COLUMN baseline_fingerprint TEXT NULL");
+  }
+
   // In SQLite, if subjects has CHECK (type IN ('theory', 'lab')), we need to ensure 'activity' is permitted.
   const subjectsTableSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='subjects'").get()?.sql || '';
   if (subjectsTableSql.includes("'theory', 'lab'") && !subjectsTableSql.includes("'activity'")) {
@@ -457,8 +466,11 @@ export function importReferenceData(customDb = null, options = {}) {
     const facultyIdMap = {};
 
     for (const fac of rawData.faculty) {
-      // Check existing faculty by code or name
-      let facultyRow = db.prepare("SELECT * FROM faculty WHERE code = ? OR name = ?").get(fac.id, fac.name);
+      const email = fac.id === 'F31' ? 'manjula@gmail.com' : `${fac.id.toLowerCase()}@college.edu`;
+      const phone = fac.id === 'F31' ? '7374619852' : `98765432${fac.id.slice(1).padStart(2, '0')}`;
+
+      // Check existing faculty by code, name, or email
+      let facultyRow = db.prepare("SELECT * FROM faculty WHERE code = ? OR name = ? OR email = ?").get(fac.id, fac.name, email);
       if (!facultyRow && fac.id === 'F31') {
         facultyRow = db.prepare("SELECT * FROM faculty WHERE name LIKE '%Manjula%'").get();
       }
@@ -467,15 +479,13 @@ export function importReferenceData(customDb = null, options = {}) {
       if (facultyRow) {
         db.prepare(`
           UPDATE faculty
-          SET name = ?, department_id = ?, code = ?, classes_taught = ?, 
+          SET name = ?, department_id = ?, email = ?, phone = ?, code = ?, classes_taught = ?, 
               effective_from = ?, weekly_hours = ?, max_periods_per_day = 4, 
               max_periods_per_week = 18, is_active = 1
           WHERE id = ?
-        `).run(fac.name, cseDept.id, fac.id, fac.classes_taught, fac.effective_from, fac.weekly_hours, facultyRow.id);
+        `).run(fac.name, cseDept.id, email, phone, fac.id, fac.classes_taught, fac.effective_from, fac.weekly_hours, facultyRow.id);
         facultyDbId = facultyRow.id;
       } else {
-        const email = fac.id === 'F31' ? 'manjula@gmail.com' : `${fac.id.toLowerCase()}@college.edu`;
-        const phone = fac.id === 'F31' ? '7374619852' : `98765432${fac.id.slice(1).padStart(2, '0')}`;
         const res = db.prepare(`
           INSERT INTO faculty (name, department_id, email, phone, code, classes_taught, effective_from, weekly_hours, max_periods_per_day, max_periods_per_week, is_active)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 4, 18, 1)
@@ -505,7 +515,7 @@ export function importReferenceData(customDb = null, options = {}) {
     db.prepare("DELETE FROM faculty_sessions").run();
 
     const insertSession = db.prepare(`
-      INSERT INTO faculty_sessions (
+      INSERT OR REPLACE INTO faculty_sessions (
         id, faculty_id, faculty_name, day, start, end,
         period_start, period_end, hours, subject_code, type,
         batch, section, semester, section_status, candidate_sections,
@@ -554,7 +564,7 @@ export function importReferenceData(customDb = null, options = {}) {
 
     db.prepare("DELETE FROM faculty_availability").run();
     const insertAvail = db.prepare(`
-      INSERT INTO faculty_availability (faculty_id, day_id, slot_id, is_available)
+      INSERT OR REPLACE INTO faculty_availability (faculty_id, day_id, slot_id, is_available)
       VALUES (?, ?, ?, ?)
     `);
 
@@ -569,16 +579,20 @@ export function importReferenceData(customDb = null, options = {}) {
           const slotId = slotMap[slotNo];
           if (!slotId) continue;
 
-          const isBusy = busyLookup.has(`${fac.id}_${dayCode}_${p}`);
-          insertAvail.run(facDbId, dayRow.id, slotId, isBusy ? 0 : 1);
+          // Faculty are available to teach by default (is_available = 1)
+          insertAvail.run(facDbId, dayRow.id, slotId, 1);
         }
       }
     }
 
-    // 9. Timetable Version: Ensure active version exists and is active
+    // 9. Timetable Version: Ensure active version exists and is marked as imported_verified
     let activeVer = db.prepare("SELECT * FROM timetable_versions WHERE status = 'active'").get();
     if (activeVer) {
-      db.prepare("UPDATE timetable_versions SET name = ?, notes = ? WHERE id = ?").run(
+      db.prepare(`
+        UPDATE timetable_versions 
+        SET name = ?, notes = ?, source = 'imported_verified', baseline_fingerprint = '[]'
+        WHERE id = ?
+      `).run(
         '2026-27 Odd Semester Timetable (SJBIT CSE)',
         'SJBIT CSE Department 2026-27 Odd Semester Timetable matching CTAS_reference_data.json',
         activeVer.id
@@ -586,8 +600,8 @@ export function importReferenceData(customDb = null, options = {}) {
     } else {
       const adminUser = db.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").get();
       db.prepare(`
-        INSERT INTO timetable_versions (name, status, created_by, notes)
-        VALUES (?, 'active', ?, ?)
+        INSERT INTO timetable_versions (name, status, created_by, notes, source, baseline_fingerprint)
+        VALUES (?, 'active', ?, ?, 'imported_verified', '[]')
       `).run(
         '2026-27 Odd Semester Timetable (SJBIT CSE)',
         adminUser?.id || null,

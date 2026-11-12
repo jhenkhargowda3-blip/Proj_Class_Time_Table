@@ -48,14 +48,14 @@ export function getFacultyCalendar(facultyId, year, month) {
 
   const coveringForOthers = db.prepare(`
     SELECT sub.id as substitution_id, sub.date, sub.status as sub_status,
-           te.id, te.id as timetable_entry_id, te.section_id, te.subject_id, te.room_id, te.day_id, te.slot_id, te.is_lab_block,
+           te.id, te.id as timetable_entry_id, te.section_id, te.subject_id, te.room_id, te.day_id, te.slot_id, te.is_lab_block, te.batch,
            s.name as subject_name, s.code as subject_code, s.type as subject_type,
-           sec.name as section_name, r.name as room_name,
+           COALESCE(sec.name, te.room_note, 'All Batches') as section_name, r.name as room_name,
            abs_fac.name as absent_faculty_name
     FROM substitutions sub
     JOIN timetable_entries te ON sub.timetable_entry_id = te.id
     JOIN subjects s ON te.subject_id = s.id
-    JOIN sections sec ON te.section_id = sec.id
+    LEFT JOIN sections sec ON te.section_id = sec.id
     JOIN rooms r ON te.room_id = r.id
     JOIN absences a ON sub.absence_id = a.id
     JOIN faculty abs_fac ON a.faculty_id = abs_fac.id
@@ -72,16 +72,17 @@ export function getFacultyCalendar(facultyId, year, month) {
   if (versionId) {
     baseEntries = db.prepare(`
       SELECT te.*, s.name as subject_name, s.code as subject_code, s.type as subject_type,
-             sec.name as section_name, r.name as room_name,
+             COALESCE(sec.name, te.room_note, 'All Batches') as section_name, r.name as room_name,
              wd.day_index, wd.day_name,
              ts.slot_no, ts.start_time, ts.end_time, ts.is_break, ts.label as slot_label
       FROM timetable_entries te
       JOIN subjects s ON te.subject_id = s.id
-      JOIN sections sec ON te.section_id = sec.id
+      LEFT JOIN sections sec ON te.section_id = sec.id
       JOIN rooms r ON te.room_id = r.id
       JOIN working_days wd ON te.day_id = wd.id
       JOIN time_slots ts ON te.slot_id = ts.id
       WHERE te.version_id = ? AND te.faculty_id = ?
+      ORDER BY wd.day_index, ts.slot_no, te.batch
     `).all(versionId, facultyId);
   }
 
@@ -124,6 +125,7 @@ export function getFacultyCalendar(facultyId, year, month) {
         subjectType: bc.subject_type,
         sectionName: bc.section_name,
         roomName: bc.room_name,
+        batch: bc.batch || null,
         isLab: bc.is_lab_block === 1,
         isCoveredByColleague: Boolean(subInfo),
         substituteFacultyName: subInfo ? subInfo.substitute_name : null
@@ -218,17 +220,19 @@ export function getFacultyDaySchedule(facultyId, dateStr) {
       continue;
     }
 
-    const scheduled = dayInfo?.classes.find(c => c.slotNo === s.slot_no);
-    if (scheduled) {
-      scheduleSlots.push({
-        slotNo: s.slot_no,
-        startTime: s.start_time,
-        endTime: s.end_time,
-        label: s.label,
-        isBreak: false,
-        isFree: false,
-        ...scheduled
-      });
+    const matchingClasses = dayInfo?.classes.filter(c => c.slotNo === s.slot_no) || [];
+    if (matchingClasses.length > 0) {
+      for (const scheduled of matchingClasses) {
+        scheduleSlots.push({
+          slotNo: s.slot_no,
+          startTime: s.start_time,
+          endTime: s.end_time,
+          label: s.label,
+          isBreak: false,
+          isFree: false,
+          ...scheduled
+        });
+      }
     } else {
       scheduleSlots.push({
         slotNo: s.slot_no,

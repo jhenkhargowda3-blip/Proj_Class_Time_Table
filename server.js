@@ -128,6 +128,7 @@ if (!process.env.NODE_TEST_CONTEXT) {
 
     // Ensure reference timetable data matches CTAS_reference_data.json
     importReferenceData(db);
+    db.pragma('wal_checkpoint(TRUNCATE)');
 
     console.log(`[CTAS] SQLite database ready at ${config.dbPath}`);
   } catch (err) {
@@ -151,6 +152,35 @@ if (isDirectRun) {
     console.log(` Phase: 1-3 Verified`);
     console.log(`======================================================\n`);
   });
+
+  serverInstance.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`[CTAS] Port ${config.port} already in use. Waiting or using active process.`);
+    } else {
+      console.error('[CTAS Server Error]', err);
+    }
+  });
+
+  const cleanup = () => {
+    if (serverInstance) {
+      serverInstance.close(() => {
+        process.exit(0);
+      });
+    } else {
+      process.exit(0);
+    }
+  };
+
+  process.on('SIGINT', cleanup);
+  process.on('SIGTERM', cleanup);
 }
+
+process.on('uncaughtException', (err) => {
+  console.error('[CTAS] Uncaught exception:', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[CTAS] Unhandled rejection:', reason);
+});
 
 export default app;

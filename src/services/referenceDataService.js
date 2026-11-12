@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
-import { getDatabase } from '../db/connection.js';
+import { getDatabase, ensureDataLinks } from '../db/connection.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -720,6 +720,7 @@ export function importReferenceData(customDb = null, options = {}) {
   });
 
   importTx();
+  ensureDataLinks(db);
   return getVerificationReport(db);
 }
 

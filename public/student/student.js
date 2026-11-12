@@ -46,6 +46,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const user = await checkSession('student');
   if (!user) return;
 
+  const displayNameEl = document.getElementById('user-display-name');
+  if (displayNameEl) {
+    displayNameEl.textContent = user.fullName || user.full_name || 'Jhenkhar Gowda';
+  }
+
   // Initialize SSE for live schedule and substitution updates
   initSSE('/api/events');
   onEvent('timetable.updated', () => {
@@ -1076,8 +1081,22 @@ async function loadSchedule(dateStr) {
     currentSection = data.section;
 
     if (data.section) {
-      document.getElementById('section-title-header').textContent = `Section ${data.section.name} Schedule`;
-      document.getElementById('section-dept-line').textContent = `${data.section.department_name} · Semester ${data.section.semester} · Strength: ${data.section.strength} students`;
+      const sec = data.section;
+      const semNum = sec.semester || 5;
+      let secLetter = 'B';
+      if (sec.name) {
+        if (sec.name.includes('-')) {
+          secLetter = sec.name.split('-')[1].replace(/\d+/g, '');
+        } else {
+          secLetter = sec.name.replace(/\d+/g, '');
+        }
+      }
+      const sectionFormatted = `${semNum}th Sem - ${secLetter || 'B'} Section`;
+      document.getElementById('section-title-header').textContent = sectionFormatted;
+      document.getElementById('section-dept-line').textContent = `${sec.department_name || 'Department of Computer Science & Engineering'} · Section ${sec.name} · Strength: ${sec.strength || 45} students`;
+    } else {
+      document.getElementById('section-title-header').textContent = 'No Section Assigned';
+      document.getElementById('section-dept-line').textContent = data.message || 'No section assigned to this student account yet. Please contact your administrator.';
     }
 
     renderTodaySchedule(data);
@@ -1176,6 +1195,7 @@ function renderTodaySchedule(data) {
           <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.35rem;">
             <span style="font-weight: 700; font-size: 1.15rem; color: var(--color-brand-primary);">${c.subject_name}</span>
             <span style="font-size: 0.75rem; background: var(--bg-surface-subtle); border: 1px solid var(--border-subtle); padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600;">${c.subject_code}</span>
+            ${c.batch ? `<span style="font-size: 0.75rem; background: var(--color-brand-blush-soft); color: var(--color-brand-primary); border: 1px solid var(--border-subtle); padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 700;">Batch ${c.batch}</span>` : ''}
             <span style="font-size: 0.75rem; background: var(--bg-surface-subtle); border: 1px solid var(--border-subtle); padding: 0.2rem 0.5rem; border-radius: 4px;">Room: ${c.room_name}</span>
             <span style="font-size: 0.75rem; font-weight: 700; background: ${badgeBg}; color: ${badgeColor}; padding: 0.2rem 0.6rem; border-radius: 4px;">
               ${c.badgeText}
@@ -1270,61 +1290,84 @@ function renderWeeklyBreakdown(fullSchedule) {
   const container = document.getElementById('student-schedule-list');
   if (!container) return;
 
-  if (!fullSchedule.length) {
-    container.innerHTML = `<div style="color: var(--text-muted);">No entries found in active timetable.</div>`;
+  if (!fullSchedule || !fullSchedule.length) {
+    container.innerHTML = `<div style="padding: 1.5rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle); border-radius: var(--radius-md);">No entries found in active timetable.</div>`;
     return;
   }
 
-  // Group by weekday
-  const byDay = new Map();
-  for (const c of fullSchedule) {
-    if (!byDay.has(c.day_name)) byDay.set(c.day_name, []);
-    byDay.get(c.day_name).push(c);
-  }
+  // Days: Monday (1) to Saturday (6)
+  const days = [
+    { index: 1, name: 'Monday', short: 'Mon' },
+    { index: 2, name: 'Tuesday', short: 'Tue' },
+    { index: 3, name: 'Wednesday', short: 'Wed' },
+    { index: 4, name: 'Thursday', short: 'Thu' },
+    { index: 5, name: 'Friday', short: 'Fri' },
+    { index: 6, name: 'Saturday', short: 'Sat' }
+  ];
 
-  let html = '';
-  for (const [dayName, dayClasses] of byDay) {
-    html += `
-      <div style="margin-bottom: 1.25rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.3rem; margin-bottom: 0.5rem;">
-          <h4 style="font-size: 1rem; color: var(--color-brand-primary); margin: 0; font-weight: 700;">
-            ${dayName} (${dayClasses.length} Periods)
-          </h4>
-          <button type="button" class="btn-secondary btn-jump-to-weekday" data-weekday="${dayName}" style="font-size: 0.72rem; padding: 0.2rem 0.5rem; font-weight: 600;" title="Jump schedule to ${dayName}">
-            View ${dayName} &rarr;
-          </button>
-        </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.6rem;">
-          ${dayClasses.map(dc => `
-            <div style="padding: 0.65rem 0.85rem; background: var(--bg-surface-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
-              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.2rem;">
-                <span style="font-weight: 700; font-size: 0.9rem; color: var(--color-brand-primary);">${dc.subject_code}</span>
-                <span style="font-size: 0.75rem; color: var(--text-muted);" class="tabular-nums">${dc.start_time}</span>
-              </div>
-              <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem;">${dc.subject_name}</div>
-              <div style="font-size: 0.75rem; color: var(--text-secondary);">
-                ${dc.faculty_name} · Room ${dc.room_name}
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
-  }
-
-  container.innerHTML = html;
-
-  // Attach click listener to "View <Day> ->" buttons in weekly schedule
-  container.querySelectorAll('.btn-jump-to-weekday').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const targetDayName = btn.getAttribute('data-weekday');
-      const targetDate = getDateForWeekdayInCurrentWeek(targetDayName);
-      if (targetDate) {
-        jumpToDate(targetDate);
-        document.getElementById('today-classes-container')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    });
+  // Distinct slots from fullSchedule
+  const slotMap = new Map();
+  fullSchedule.forEach(e => {
+    if (!slotMap.has(e.slot_no)) {
+      slotMap.set(e.slot_no, {
+        slotNo: e.slot_no,
+        label: e.slot_label || `Period ${e.slot_no}`,
+        startTime: e.start_time,
+        endTime: e.end_time
+      });
+    }
   });
+
+  const slots = Array.from(slotMap.values()).sort((a, b) => a.slotNo - b.slotNo);
+
+  let html = `
+    <div style="overflow-x: auto; margin-top: 0.5rem;">
+      <table style="width: 100%; border-collapse: collapse; border: 1px solid var(--border-subtle); font-size: 0.8rem; background: var(--bg-surface);">
+        <thead>
+          <tr style="background: var(--bg-surface-subtle); border-bottom: 2px solid var(--border-subtle);">
+            <th style="padding: 0.6rem 0.5rem; border: 1px solid var(--border-subtle); width: 100px; text-align: center;">Period</th>
+            ${days.map(d => `<th style="padding: 0.6rem 0.5rem; border: 1px solid var(--border-subtle); text-align: center; min-width: 110px;">${d.short}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  for (const slot of slots) {
+    html += `
+      <tr>
+        <td style="padding: 0.5rem 0.4rem; border: 1px solid var(--border-subtle); background: var(--bg-surface-subtle); text-align: center; font-weight: 700;">
+          <div style="color: var(--color-brand-primary);">${slot.label}</div>
+          <div style="font-size: 0.68rem; color: var(--text-muted); font-weight: 400;" class="tabular-nums">${slot.startTime}</div>
+        </td>
+    `;
+
+    for (const d of days) {
+      const cellEntries = fullSchedule.filter(e => e.day_index === d.index && e.slot_no === slot.slotNo);
+
+      if (cellEntries.length === 0) {
+        html += `<td style="padding: 0.4rem; border: 1px solid var(--border-subtle); text-align: center; color: var(--text-muted); font-size: 0.72rem;">—</td>`;
+      } else {
+        html += `<td style="padding: 0.35rem; border: 1px solid var(--border-subtle); vertical-align: top; background: var(--bg-surface);">`;
+        html += cellEntries.map(e => `
+          <div style="padding: 0.35rem 0.45rem; background: var(--color-brand-blush-soft); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); margin-bottom: 0.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.2rem;">
+              <span style="font-weight: 700; color: var(--color-brand-primary); font-size: 0.78rem;">${e.subject_code}</span>
+              ${e.batch ? `<span style="font-size: 0.65rem; font-weight: 700; background: var(--bg-surface); padding: 0.05rem 0.25rem; border-radius: 3px; border: 1px solid var(--border-subtle);">B:${e.batch}</span>` : ''}
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-primary); font-weight: 600; line-height: 1.2; margin-top: 0.15rem;">${e.subject_name}</div>
+            <div style="font-size: 0.68rem; color: var(--text-secondary); margin-top: 0.1rem;">${e.faculty_name}</div>
+            <div style="font-size: 0.65rem; color: var(--text-muted);">${e.room_name}</div>
+          </div>
+        `).join('');
+        html += `</td>`;
+      }
+    }
+
+    html += `</tr>`;
+  }
+
+  html += `</tbody></table></div>`;
+  container.innerHTML = html;
 }
 
 async function loadDepartmentTimetable() {

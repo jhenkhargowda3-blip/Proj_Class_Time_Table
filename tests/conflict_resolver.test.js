@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert';
 import { getDatabase } from '../src/db/connection.js';
+import { importReferenceData } from '../src/services/referenceDataService.js';
 import app from '../server.js';
 import { SEED_PASSWORDS } from '../src/db/seed.js';
 import { evaluateTimetableConflicts, validateTimetableConflict } from '../public/js/timetableValidator.js';
@@ -11,6 +12,9 @@ let baseUrl;
 let adminToken;
 
 test.before(async () => {
+  const db = getDatabase();
+  importReferenceData(db);
+
   return new Promise((resolve) => {
     serverInstance = app.listen(0, '127.0.0.1', async () => {
       const address = serverInstance.address();

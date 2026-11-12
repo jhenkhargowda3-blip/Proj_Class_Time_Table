@@ -34,7 +34,14 @@ function calculateRowsChecksum(rows) {
 }
 
 test('Publish (Activate) Flow Verification with 413-Entry Imported Timetable', async (t) => {
-  // Ensure source backup database exists
+  // Ensure source backup database exists or auto-create it
+  if (!fs.existsSync(sourceDbPath)) {
+    const initDb = getDatabase();
+    importReferenceData(initDb);
+    initDb.pragma('wal_checkpoint(TRUNCATE)');
+    closeDatabase();
+    fs.copyFileSync(config.dbPath, sourceDbPath);
+  }
   assert.ok(fs.existsSync(sourceDbPath), `Source database not found at ${sourceDbPath}`);
 
   // Create isolated copy of database

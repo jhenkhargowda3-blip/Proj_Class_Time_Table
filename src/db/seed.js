@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { getDatabase, initSchema } from './connection.js';
+import { getDatabase, initSchema, ensureDataLinks } from './connection.js';
 import { importReferenceData } from '../services/referenceDataService.js';
 
 // Configured credentials for admin, faculty, and student roles
@@ -119,7 +119,7 @@ export function seedDatabase(customDb, options = {}) {
       'jhenkhar',
       studentHash,
       'student',
-      'Student Account',
+      'Jhenkhar Gowda',
       'student@college.edu',
       null,
       null
@@ -129,7 +129,7 @@ export function seedDatabase(customDb, options = {}) {
       'student',
       studentHash,
       'student',
-      'Student Account',
+      'Jhenkhar Gowda',
       'student@college.edu',
       null,
       null
@@ -497,6 +497,7 @@ export function seedDatabase(customDb, options = {}) {
   });
 
   seedTransaction();
+  ensureDataLinks(db);
   return true;
 }
 

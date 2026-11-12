@@ -6,8 +6,26 @@ import { initSSE, onEvent } from '/js/sse.js';
 let currentFaculty = null;
 let currentYear = new Date().getFullYear();
 let currentMonth = new Date().getMonth();
-let selectedDateStr = new Date().toISOString().split('T')[0];
-let activeView = 'calendar'; // 'calendar' | 'today' | 'weekly' | 'availability'
+let selectedDateStr = getLocalDateString(new Date());
+let activeView = 'calendar'; // 'calendar' | 'today' | 'weekly' | 'availability' | 'substitutions'
+
+function getLocalDateString(d) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseLocalDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function addDaysToDateStr(dateStr, days) {
+  const d = parseLocalDate(dateStr);
+  d.setDate(d.getDate() + days);
+  return getLocalDateString(d);
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
   const user = await checkSession('faculty');
@@ -18,6 +36,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   onEvent('timetable.updated', () => {
     loadCalendar(currentYear, currentMonth);
     loadOpenSubstitutions();
+    if (activeView === 'weekly') loadWeeklySchedule();
+    if (activeView === 'today') loadTodayTracker(selectedDateStr);
   });
   onEvent('absence:created', (data) => {
     showToast(`Notice: ${data.facultyName} reported ${data.type} on ${data.date}. Open slots available.`, 'info');
@@ -38,7 +58,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupNavigation();
   await loadProfile();
   await loadCalendar(currentYear, currentMonth);
-  await loadTodayTracker();
+  await loadTodayTracker(selectedDateStr);
   await loadOpenSubstitutions();
 });
 
@@ -79,16 +99,59 @@ function setupNavigation() {
     loadCalendar(currentYear, currentMonth);
   });
 
+  // Close calendar selected day card
+  document.getElementById('btn-close-calendar-day')?.addEventListener('click', () => {
+    const card = document.getElementById('calendar-selected-day-card');
+    if (card) card.style.display = 'none';
+  });
+
   // Slide-in panel close
   document.getElementById('side-panel-close')?.addEventListener('click', () => {
-    document.getElementById('day-slide-panel').style.transform = 'translateX(100%)';
+    const panel = document.getElementById('day-slide-panel');
+    if (panel) panel.style.transform = 'translateX(100%)';
+  });
+
+  // Today view date navigation buttons & picker
+  const picker = document.getElementById('fac-date-picker');
+  if (picker) {
+    picker.value = selectedDateStr;
+    picker.addEventListener('change', () => {
+      if (picker.value) {
+        selectedDateStr = picker.value;
+        loadTodayTracker(selectedDateStr);
+      }
+    });
+  }
+
+  document.getElementById('btn-fac-date-prev')?.addEventListener('click', () => {
+    selectedDateStr = addDaysToDateStr(selectedDateStr, -1);
+    if (picker) picker.value = selectedDateStr;
+    loadTodayTracker(selectedDateStr);
+  });
+
+  document.getElementById('btn-fac-date-today')?.addEventListener('click', () => {
+    selectedDateStr = getLocalDateString(new Date());
+    if (picker) picker.value = selectedDateStr;
+    loadTodayTracker(selectedDateStr);
+  });
+
+  document.getElementById('btn-fac-date-tomorrow')?.addEventListener('click', () => {
+    selectedDateStr = addDaysToDateStr(getLocalDateString(new Date()), 1);
+    if (picker) picker.value = selectedDateStr;
+    loadTodayTracker(selectedDateStr);
+  });
+
+  document.getElementById('btn-fac-date-next')?.addEventListener('click', () => {
+    selectedDateStr = addDaysToDateStr(selectedDateStr, 1);
+    if (picker) picker.value = selectedDateStr;
+    loadTodayTracker(selectedDateStr);
   });
 
   // Absence modal open/close
   document.getElementById('btn-report-absence')?.addEventListener('click', () => {
     const dateInput = document.getElementById('abs-date');
     if (dateInput && !dateInput.value) {
-      dateInput.value = new Date().toISOString().split('T')[0];
+      dateInput.value = selectedDateStr;
     }
     document.getElementById('modal-absence').style.display = 'flex';
   });
@@ -123,7 +186,7 @@ function setupNavigation() {
       showToast(`Notice registered! ${res.affectedClasses?.length || 0} affected class period(s) surfaced on the substitution board.`, 'success');
       document.getElementById('modal-absence').style.display = 'none';
       await loadCalendar(currentYear, currentMonth);
-      await loadTodayTracker();
+      await loadTodayTracker(selectedDateStr);
       await loadOpenSubstitutions();
     } catch (err) {
       // error handled by apiRequest toast
@@ -141,7 +204,8 @@ function switchView(view) {
   const target = document.getElementById(`view-${view}`);
   if (target) target.style.display = 'block';
 
-  if (view === 'today') loadTodayTracker();
+  if (view === 'today') loadTodayTracker(selectedDateStr);
+  if (view === 'weekly') loadWeeklySchedule();
   if (view === 'substitutions') loadOpenSubstitutions();
   if (view === 'availability') loadFacultyAvailability();
 }
@@ -158,7 +222,12 @@ async function loadProfile() {
         data.faculty.phone ? `Phone: ${data.faculty.phone}` : null
       ].filter(Boolean);
       document.getElementById('faculty-dept-line').textContent = deptParts.join(' · ') || 'Department of Computer Science & Engineering';
-      document.getElementById('stat-weekly-load').textContent = `${data.weeklySchedule?.length || 0} Periods`;
+      
+      const periodsCount = data.weeklySchedule?.length || 0;
+      document.getElementById('stat-weekly-load').textContent = `${periodsCount} Periods`;
+      const badge = document.getElementById('fac-weekly-load-badge');
+      if (badge) badge.textContent = `${periodsCount} Periods / Week`;
+
       const headerChip = document.getElementById('user-display-name');
       if (headerChip) {
         headerChip.textContent = data.faculty.name;
@@ -191,6 +260,124 @@ async function loadProfile() {
   }
 }
 
+// Full Monday to Saturday Weekly Timetable View for Faculty
+async function loadWeeklySchedule() {
+  const container = document.getElementById('faculty-weekly-grid-container');
+  if (!container) return;
+
+  container.innerHTML = `<div style="padding: 1.5rem; text-align: center; color: var(--text-muted);">Loading weekly schedule...</div>`;
+
+  try {
+    const data = await apiRequest('/api/faculty/profile');
+    const schedule = data.weeklySchedule || [];
+
+    const badge = document.getElementById('fac-weekly-load-badge');
+    if (badge) badge.textContent = `${schedule.length} Periods / Week`;
+    const statLoad = document.getElementById('stat-weekly-load');
+    if (statLoad) statLoad.textContent = `${schedule.length} Periods`;
+
+    if (schedule.length === 0) {
+      container.innerHTML = `<div style="padding: 2rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle); border-radius: var(--radius-md);">No weekly classes scheduled in active timetable.</div>`;
+      return;
+    }
+
+    const days = [
+      { index: 1, name: 'Monday', short: 'Mon' },
+      { index: 2, name: 'Tuesday', short: 'Tue' },
+      { index: 3, name: 'Wednesday', short: 'Wed' },
+      { index: 4, name: 'Thursday', short: 'Thu' },
+      { index: 5, name: 'Friday', short: 'Fri' },
+      { index: 6, name: 'Saturday', short: 'Sat' }
+    ];
+
+    // Standard time slots (1 to 7)
+    const slotMap = new Map();
+    schedule.forEach(e => {
+      if (!slotMap.has(e.slot_no)) {
+        slotMap.set(e.slot_no, {
+          slotNo: e.slot_no,
+          label: e.slot_label || `Period ${e.slot_no}`,
+          startTime: e.start_time,
+          endTime: e.end_time
+        });
+      }
+    });
+
+    // Ensure all 7 standard slots are present for grid continuity
+    const defaultSlots = [
+      { slotNo: 1, label: 'Period 1', startTime: '09:00', endTime: '10:00' },
+      { slotNo: 2, label: 'Period 2', startTime: '10:00', endTime: '11:00' },
+      { slotNo: 3, label: 'Period 3', startTime: '11:15', endTime: '12:15' },
+      { slotNo: 4, label: 'Period 4', startTime: '12:15', endTime: '13:15' },
+      { slotNo: 5, label: 'Period 5', startTime: '14:00', endTime: '15:00' },
+      { slotNo: 6, label: 'Period 6', startTime: '15:00', endTime: '16:00' },
+      { slotNo: 7, label: 'Period 7', startTime: '16:00', endTime: '17:00' }
+    ];
+
+    defaultSlots.forEach(ds => {
+      if (!slotMap.has(ds.slotNo)) {
+        slotMap.set(ds.slotNo, ds);
+      }
+    });
+
+    const slots = Array.from(slotMap.values()).sort((a, b) => a.slotNo - b.slotNo);
+
+    let html = `
+      <table style="width: 100%; border-collapse: collapse; border: 1px solid var(--border-subtle); font-size: 0.8rem; background: var(--bg-surface);">
+        <thead>
+          <tr style="background: var(--bg-surface-subtle); border-bottom: 2px solid var(--border-subtle);">
+            <th style="padding: 0.6rem 0.5rem; border: 1px solid var(--border-subtle); width: 105px; text-align: center;">Period</th>
+            ${days.map(d => `<th style="padding: 0.6rem 0.5rem; border: 1px solid var(--border-subtle); text-align: center; min-width: 120px;">${d.name}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    for (const slot of slots) {
+      html += `
+        <tr>
+          <td style="padding: 0.5rem 0.4rem; border: 1px solid var(--border-subtle); background: var(--bg-surface-subtle); text-align: center; font-weight: 700;">
+            <div style="color: var(--color-brand-primary);">${slot.label}</div>
+            <div style="font-size: 0.68rem; color: var(--text-muted); font-weight: 400;" class="tabular-nums">${slot.startTime} - ${slot.endTime}</div>
+          </td>
+      `;
+
+      for (const d of days) {
+        const cellEntries = schedule.filter(e => e.day_index === d.index && e.slot_no === slot.slotNo);
+
+        if (cellEntries.length === 0) {
+          html += `<td style="padding: 0.4rem; border: 1px solid var(--border-subtle); text-align: center; color: var(--text-muted); font-size: 0.72rem;">—</td>`;
+        } else {
+          html += `<td style="padding: 0.35rem; border: 1px solid var(--border-subtle); vertical-align: top; background: var(--bg-surface);">`;
+          html += cellEntries.map(e => `
+            <div style="padding: 0.4rem 0.5rem; background: var(--color-brand-blush-soft); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); margin-bottom: 0.25rem;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.2rem;">
+                <span style="font-weight: 700; color: var(--color-brand-primary); font-size: 0.8rem;">${e.subject_code}</span>
+                ${e.batch ? `<span style="font-size: 0.65rem; font-weight: 700; background: var(--bg-surface); padding: 0.05rem 0.25rem; border-radius: 3px; border: 1px solid var(--border-subtle);">B:${e.batch}</span>` : ''}
+              </div>
+              <div style="font-size: 0.72rem; color: var(--text-primary); font-weight: 600; line-height: 1.2; margin-top: 0.15rem;">${e.subject_name}</div>
+              <div style="font-size: 0.68rem; color: var(--text-secondary); margin-top: 0.15rem;">
+                Sec: <strong>${e.section_name}</strong>
+              </div>
+              <div style="font-size: 0.65rem; color: var(--text-muted);">${e.room_name}</div>
+            </div>
+          `).join('');
+          html += `</td>`;
+        }
+      }
+
+      html += `</tr>`;
+    }
+
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+
+  } catch (err) {
+    console.error('Failed to load weekly schedule:', err);
+    container.innerHTML = `<div style="color: var(--color-error); padding: 1.5rem;">Failed to load weekly timetable: ${err.message}</div>`;
+  }
+}
+
 // Interactive Month Calendar with Green-Present convention
 async function loadCalendar(year, month) {
   const container = document.getElementById('calendar-grid-cells');
@@ -203,7 +390,7 @@ async function loadCalendar(year, month) {
   try {
     const calData = await apiRequest(`/api/faculty/calendar?year=${year}&month=${month}`);
     const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0 = Sunday
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateString(new Date());
 
     let html = '';
 
@@ -252,7 +439,7 @@ async function loadCalendar(year, month) {
 
     container.innerHTML = html;
 
-    // Attach click listener to each date cell for Slide-in panel
+    // Attach click listener to each date cell for Slide-in panel and inline view
     container.querySelectorAll('.cal-day-cell').forEach(cell => {
       cell.addEventListener('click', () => {
         const date = cell.getAttribute('data-date');
@@ -265,19 +452,59 @@ async function loadCalendar(year, month) {
   }
 }
 
-// Slide-In Panel Listing Day's Schedule in Time Order
+// Slide-In Panel & Inline Card Listing Day's Schedule in Time Order
 async function openDateSlidePanel(dateStr) {
   selectedDateStr = dateStr;
   const panel = document.getElementById('day-slide-panel');
-  if (!panel) return;
-
-  panel.style.transform = 'translateX(0)';
+  if (panel) panel.style.transform = 'translateX(0)';
 
   try {
     const data = await apiRequest(`/api/faculty/schedule-date?date=${dateStr}`);
-    document.getElementById('panel-date-title').textContent = `${data.dayName}, ${data.date}`;
-    document.getElementById('panel-date-status').textContent = data.status.toUpperCase();
-    document.getElementById('panel-date-status').style.color = data.colorClass === 'green' ? 'var(--color-success)' : (data.colorClass === 'soft-red' ? 'var(--color-error)' : 'var(--color-warning)');
+    const panelTitle = document.getElementById('panel-date-title');
+    if (panelTitle) panelTitle.textContent = `${data.dayName}, ${data.date}`;
+    
+    const panelStatus = document.getElementById('panel-date-status');
+    if (panelStatus) {
+      panelStatus.textContent = data.status.toUpperCase();
+      panelStatus.style.color = data.colorClass === 'green' ? 'var(--color-success)' : (data.colorClass === 'soft-red' ? 'var(--color-error)' : 'var(--color-warning)');
+    }
+
+    const teachingSlots = data.schedule.filter(s => !s.isBreak && !s.isFree);
+
+    // Also populate the inline card under the month calendar
+    const inlineCard = document.getElementById('calendar-selected-day-card');
+    const inlineTitle = document.getElementById('calendar-selected-day-title');
+    const inlineList = document.getElementById('calendar-selected-day-list');
+
+    if (inlineCard && inlineTitle && inlineList) {
+      inlineCard.style.display = 'block';
+      inlineTitle.textContent = `Schedule for ${data.dayName}, ${data.date} (${teachingSlots.length} Teaching Classes)`;
+
+      if (teachingSlots.length === 0) {
+        inlineList.innerHTML = `
+          <div style="padding: 1rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle); border-radius: var(--radius-sm);">
+            No scheduled teaching classes on this day (${data.dayName}) · Free for research, student mentoring, and office hours.
+          </div>
+        `;
+      } else {
+        inlineList.innerHTML = teachingSlots.map(s => `
+          <div style="padding: 0.75rem 1rem; background: var(--color-brand-blush-soft); border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                <span style="font-weight: 700; color: var(--color-brand-primary); font-size: 0.95rem;">${s.subjectCode} · ${s.subjectName}</span>
+                <span style="font-size: 0.75rem; background: var(--bg-surface); border: 1px solid var(--border-subtle); padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 600;">Sec ${s.sectionName}</span>
+                ${s.batch ? `<span style="font-size: 0.75rem; background: var(--bg-surface); border: 1px solid var(--border-subtle); padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 700;">Batch ${s.batch}</span>` : ''}
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Room: ${s.roomName}</span>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.8rem; font-weight: 700;">${s.label}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);" class="tabular-nums">${s.startTime} - ${s.endTime}</div>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
 
     const container = document.getElementById('panel-slots-list');
     if (!container) return;
@@ -305,6 +532,7 @@ async function openDateSlidePanel(dateStr) {
       }
 
       // Scheduled Class
+      const typeStr = s.subjectType ? `(${s.subjectType.toUpperCase()})` : '';
       return `
         <div style="padding: 0.85rem 1rem; background: var(--color-brand-blush-soft); border-radius: var(--radius-md); border: 1px solid var(--border-strong); display: flex; justify-content: space-between; align-items: flex-start;">
           <div>
@@ -312,7 +540,7 @@ async function openDateSlidePanel(dateStr) {
               ${s.subjectCode} · ${s.subjectName}
             </div>
             <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.2rem;">
-              Section: <strong>${s.sectionName}</strong> · Room: <strong>${s.roomName}</strong> (${s.subjectType.toUpperCase()})
+              Section: <strong>${s.sectionName}</strong> ${s.batch ? `· Batch: <strong>${s.batch}</strong>` : ''} · Room: <strong>${s.roomName}</strong> ${typeStr}
             </div>
             ${s.isCoveredByColleague ? `<div style="font-size: 0.75rem; color: var(--color-info); margin-top: 0.25rem;">✓ Covered by colleague: Prof. ${s.substituteFacultyName}</div>` : ''}
             ${s.isSubstituteDuty ? `<div style="font-size: 0.75rem; color: var(--color-warning); margin-top: 0.25rem;">★ Covering as Substitute for ${s.originalFacultyName}</div>` : ''}
@@ -330,12 +558,61 @@ async function openDateSlidePanel(dateStr) {
   }
 }
 
-// Today View with Next Class Tracker & Countdown
-async function loadTodayTracker() {
+// Today View with Date Navigation & Next Class Tracker
+async function loadTodayTracker(dateStr) {
+  const targetDate = dateStr || selectedDateStr || getLocalDateString(new Date());
+  selectedDateStr = targetDate;
+
+  // Sync date picker input value
+  const picker = document.getElementById('fac-date-picker');
+  if (picker && picker.value !== targetDate) {
+    picker.value = targetDate;
+  }
+
+  // Update button active states
+  const todayStr = getLocalDateString(new Date());
+  const tomorrowStr = addDaysToDateStr(todayStr, 1);
+  const btnToday = document.getElementById('btn-fac-date-today');
+  const btnTomorrow = document.getElementById('btn-fac-date-tomorrow');
+
+  if (btnToday) {
+    if (targetDate === todayStr) {
+      btnToday.classList.add('btn-primary');
+      btnToday.classList.remove('btn-secondary');
+    } else {
+      btnToday.classList.remove('btn-primary');
+      btnToday.classList.add('btn-secondary');
+    }
+  }
+
+  if (btnTomorrow) {
+    if (targetDate === tomorrowStr) {
+      btnTomorrow.classList.add('btn-primary');
+      btnTomorrow.classList.remove('btn-secondary');
+    } else {
+      btnTomorrow.classList.remove('btn-primary');
+      btnTomorrow.classList.add('btn-secondary');
+    }
+  }
+
   try {
-    const data = await apiRequest('/api/faculty/today');
+    const data = await apiRequest(`/api/faculty/today?date=${targetDate}`);
     const container = document.getElementById('today-classes-container');
     const trackerBox = document.getElementById('next-class-tracker-box');
+    const heading = document.getElementById('fac-today-heading');
+    const subtext = document.getElementById('fac-today-subtext');
+
+    const dayName = data.daySchedule?.dayName || '';
+    if (heading) {
+      if (targetDate === todayStr) {
+        heading.textContent = `Today's Schedule (${dayName})`;
+      } else {
+        heading.textContent = `Schedule for ${dayName}, ${targetDate}`;
+      }
+    }
+    if (subtext) {
+      subtext.textContent = `Chronological teaching timeline for ${dayName}, ${targetDate} · ${data.allClasses?.length || 0} class(es)`;
+    }
 
     if (trackerBox) {
       if (data.currentClass) {
@@ -345,7 +622,7 @@ async function loadTodayTracker() {
             ${data.currentClass.subjectCode} · ${data.currentClass.subjectName}
           </div>
           <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.2rem;">
-            Section: ${data.currentClass.sectionName} · Room: ${data.currentClass.roomName} · ${data.currentClass.startTime} - ${data.currentClass.endTime}
+            Section: ${data.currentClass.sectionName} ${data.currentClass.batch ? `(Batch ${data.currentClass.batch})` : ''} · Room: ${data.currentClass.roomName} · ${data.currentClass.startTime} - ${data.currentClass.endTime}
           </div>
         `;
       } else if (data.nextClass) {
@@ -355,28 +632,39 @@ async function loadTodayTracker() {
             ${data.nextClass.subjectCode} · ${data.nextClass.subjectName}
           </div>
           <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.2rem;">
-            Section: ${data.nextClass.sectionName} · Room: ${data.nextClass.roomName} · Starts at ${data.nextClass.startTime}
+            Section: ${data.nextClass.sectionName} ${data.nextClass.batch ? `(Batch ${data.nextClass.batch})` : ''} · Room: ${data.nextClass.roomName} · Starts at ${data.nextClass.startTime}
           </div>
         `;
       } else {
         trackerBox.innerHTML = `
-          <div style="font-size: 0.85rem; color: var(--text-muted);">No further classes scheduled for today. You are free for research and office hours.</div>
+          <div style="font-size: 0.85rem; color: var(--text-muted);">No ongoing teaching classes for this date. Free for research, grading, and office hours.</div>
         `;
       }
     }
 
     if (container && data.allClasses) {
       if (data.allClasses.length === 0) {
-        container.innerHTML = `<div style="color: var(--text-muted); padding: 1.5rem; text-align: center;">No scheduled teaching classes today.</div>`;
+        container.innerHTML = `
+          <div style="padding: 2.5rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle); border-radius: var(--radius-md); border: 1px dashed var(--border-subtle);">
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">☕</div>
+            <div style="font-weight: 700; font-size: 1.1rem; color: var(--text-primary); margin-bottom: 0.25rem;">No Scheduled Teaching Classes</div>
+            <p style="font-size: 0.85rem;">You have 0 teaching periods scheduled on ${dayName} (${targetDate}). Use this time for research, student mentorship, and laboratory prep.</p>
+          </div>
+        `;
       } else {
         container.innerHTML = data.allClasses.map(c => `
-          <div style="padding: 0.75rem 1rem; background: var(--bg-surface-subtle); border-radius: var(--radius-md); border: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
+          <div style="padding: 0.9rem 1.1rem; background: var(--bg-surface-subtle); border-radius: var(--radius-md); border: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
             <div>
-              <span style="font-weight: 700; color: var(--color-brand-primary);">${c.subjectCode} · ${c.subjectName}</span>
-              <span style="font-size: 0.85rem; color: var(--text-secondary); margin-left: 0.5rem;">Section ${c.sectionName} (${c.roomName})</span>
+              <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                <span style="font-weight: 700; color: var(--color-brand-primary); font-size: 1.05rem;">${c.subjectCode} · ${c.subjectName}</span>
+                <span style="font-size: 0.75rem; background: var(--bg-surface); border: 1px solid var(--border-subtle); padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600;">Sec ${c.sectionName}</span>
+                ${c.batch ? `<span style="font-size: 0.75rem; background: var(--color-brand-blush-soft); color: var(--color-brand-primary); border: 1px solid var(--border-subtle); padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 700;">Batch ${c.batch}</span>` : ''}
+                <span style="font-size: 0.75rem; background: var(--bg-surface); border: 1px solid var(--border-subtle); padding: 0.2rem 0.5rem; border-radius: 4px;">Room: ${c.roomName}</span>
+              </div>
+              ${c.isSubstituteDuty ? `<div style="font-size: 0.75rem; color: var(--color-warning); margin-top: 0.25rem; font-weight: 600;">★ Covering as Substitute for ${c.originalFacultyName}</div>` : ''}
             </div>
             <div style="text-align: right;">
-              <div style="font-size: 0.8rem; font-weight: 600;">${c.slotLabel}</div>
+              <div style="font-size: 0.85rem; font-weight: 700;">${c.slotLabel || `Period ${c.slotNo}`}</div>
               <div style="font-size: 0.75rem; color: var(--text-muted);" class="tabular-nums">${c.startTime} - ${c.endTime}</div>
             </div>
           </div>
@@ -467,7 +755,7 @@ async function loadFacultyAvailability() {
   }
 }
 
-// 4. Open Substitutions Board (Mode A: Self-Service Claim)
+// Open Substitutions Board (Mode A: Self-Service Claim)
 async function loadOpenSubstitutions() {
   const container = document.getElementById('open-subs-container');
   const badgeCount = document.getElementById('open-subs-count');
@@ -542,4 +830,5 @@ window.claimSub = async (timetableEntryId, date) => {
   }
 };
 
-export default { switchView };
+export default { switchView, loadWeeklySchedule, loadTodayTracker };
+

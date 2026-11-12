@@ -14,15 +14,22 @@ function resolveFacultyId(req) {
   if (req.user.role === 'admin' && req.query.facultyId) {
     return parseInt(req.query.facultyId, 10);
   }
-  if (req.user.facultyId || req.user.faculty_id) {
-    return req.user.facultyId || req.user.faculty_id;
-  }
   const db = getDatabase();
+  // 1. By logged-in user id (stable key)
   if (req.user.id) {
     const userRow = db.prepare('SELECT faculty_id FROM users WHERE id = ?').get(req.user.id);
     if (userRow?.faculty_id) return userRow.faculty_id;
     const facRow = db.prepare('SELECT id FROM faculty WHERE user_id = ?').get(req.user.id);
     if (facRow?.id) return facRow.id;
+  }
+  // 2. By JWT facultyId
+  if (req.user.facultyId || req.user.faculty_id) {
+    return req.user.facultyId || req.user.faculty_id;
+  }
+  // 3. Fallback by email
+  if (req.user.email) {
+    const facByEmail = db.prepare('SELECT id FROM faculty WHERE LOWER(email) = LOWER(?)').get(req.user.email);
+    if (facByEmail?.id) return facByEmail.id;
   }
   if (req.user.role === 'admin') {
     const firstFac = db.prepare('SELECT id FROM faculty WHERE is_active = 1 ORDER BY id ASC LIMIT 1').get();
@@ -54,28 +61,28 @@ router.get('/profile', (req, res) => {
 
   // Assigned subjects
   const subjects = db.prepare(`
-    SELECT s.*, ss.section_id, sec.name as section_name
+    SELECT s.*, ss.section_id, COALESCE(sec.name, 'Multiple / Elective') as section_name
     FROM section_subjects ss
     JOIN subjects s ON ss.subject_id = s.id
-    JOIN sections sec ON ss.section_id = sec.id
+    LEFT JOIN sections sec ON ss.section_id = sec.id
     WHERE ss.faculty_id = ?
   `).all(facultyId);
 
-  // Active timetable entries for this faculty
+  // Active timetable entries for this faculty (using LEFT JOIN on sections so parallel lab/cross-section batches are retained)
   const entries = db.prepare(`
     SELECT te.*, s.name as subject_name, s.code as subject_code, s.type as subject_type,
-           sec.name as section_name, r.name as room_name,
+           COALESCE(sec.name, te.room_note, 'All Batches') as section_name, r.name as room_name,
            wd.day_name, wd.day_index,
            ts.slot_no, ts.start_time, ts.end_time, ts.label as slot_label
     FROM timetable_entries te
     JOIN timetable_versions tv ON te.version_id = tv.id AND tv.status = 'active'
     JOIN subjects s ON te.subject_id = s.id
-    JOIN sections sec ON te.section_id = sec.id
+    LEFT JOIN sections sec ON te.section_id = sec.id
     JOIN rooms r ON te.room_id = r.id
     JOIN working_days wd ON te.day_id = wd.id
     JOIN time_slots ts ON te.slot_id = ts.id
     WHERE te.faculty_id = ?
-    ORDER BY wd.day_index, ts.slot_no
+    ORDER BY wd.day_index, ts.slot_no, te.batch
   `).all(facultyId);
 
   res.json({
@@ -108,13 +115,16 @@ router.get('/schedule-date', (req, res) => {
   res.json(daySchedule);
 });
 
-// 4. Today View with Live Next Class Tracker & Countdown
+// 4. Today View with Live Next Class Tracker & Countdown (supports ?date=YYYY-MM-DD)
 router.get('/today', (req, res) => {
   const facultyId = resolveFacultyId(req);
   if (!facultyId) return res.status(400).json({ error: 'Faculty ID required' });
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const daySchedule = getFacultyDaySchedule(facultyId, todayStr);
+  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' });
+  const todayIST = formatter.format(new Date());
+  const queryDate = req.query.date || todayIST;
+
+  const daySchedule = getFacultyDaySchedule(facultyId, queryDate);
 
   const now = new Date();
   const curTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -133,7 +143,7 @@ router.get('/today', (req, res) => {
   }
 
   res.json({
-    date: todayStr,
+    date: queryDate,
     currentClass,
     nextClass,
     allClasses: activeClasses,

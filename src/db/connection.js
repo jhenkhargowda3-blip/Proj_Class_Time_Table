@@ -28,6 +28,9 @@ export function getDatabase() {
   // Initialize schema if not present
   initSchema(dbInstance);
 
+  // Ensure persistent student & faculty data links
+  ensureDataLinks(dbInstance);
+
   return dbInstance;
 }
 
@@ -261,6 +264,66 @@ export function initSchema(db) {
   } catch (err) {
     console.error('[CTAS Schema Migration Error]', err);
     throw err;
+  }
+}
+
+export function ensureDataLinks(db) {
+  try {
+    const hasUsers = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'").get();
+    const hasSections = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='sections'").get();
+    const hasFaculty = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='faculty'").get();
+
+    if (!hasUsers) return;
+
+    // 1. Link student accounts to 5th Sem, B Section (CSE-5B) and set full_name to 'Jhenkhar Gowda'
+    if (hasSections) {
+      const sec5B = db.prepare(`
+        SELECT id FROM sections 
+        WHERE name = 'CSE-5B' 
+           OR (semester = 5 AND name LIKE '%B%')
+        ORDER BY CASE WHEN name = 'CSE-5B' THEN 0 ELSE 1 END, id ASC 
+        LIMIT 1
+      `).get();
+
+      if (sec5B) {
+        db.prepare(`
+          UPDATE users
+          SET student_id = ?, full_name = 'Jhenkhar Gowda'
+          WHERE LOWER(username) IN ('jhenkhar', 'student')
+        `).run(sec5B.id);
+
+        // Also if any student account has null student_id, fallback to sec5B
+        db.prepare(`
+          UPDATE users
+          SET student_id = ?
+          WHERE role = 'student' AND student_id IS NULL
+        `).run(sec5B.id);
+      }
+    }
+
+    // 2. Link every faculty login to its Master Data faculty record using stable key (id, user_id, email)
+    if (hasFaculty) {
+      const facultyUsers = db.prepare("SELECT id, username, email, faculty_id FROM users WHERE role = 'faculty'").all();
+      for (const u of facultyUsers) {
+        let fac = null;
+        if (u.faculty_id) {
+          fac = db.prepare("SELECT id, user_id FROM faculty WHERE id = ?").get(u.faculty_id);
+        }
+        if (!fac) {
+          fac = db.prepare("SELECT id, user_id FROM faculty WHERE user_id = ? OR LOWER(email) = LOWER(?)").get(u.id, u.email);
+        }
+        if (fac) {
+          if (u.faculty_id !== fac.id) {
+            db.prepare("UPDATE users SET faculty_id = ? WHERE id = ?").run(fac.id, u.id);
+          }
+          if (fac.user_id !== u.id) {
+            db.prepare("UPDATE faculty SET user_id = ? WHERE id = ?").run(u.id, fac.id);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[CTAS Data Links Error]', err);
   }
 }
 

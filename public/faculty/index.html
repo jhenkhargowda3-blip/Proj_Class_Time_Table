@@ -54,6 +54,7 @@
     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
       <button class="btn-primary" data-fac-view="calendar">Month Calendar</button>
       <button class="btn-secondary" data-fac-view="today">Today's Classes</button>
+      <button class="btn-secondary" data-fac-view="weekly">Weekly Schedule</button>
       <button class="btn-secondary" data-fac-view="substitutions">Open Substitutions (<span id="open-subs-count">0</span>)</button>
       <button class="btn-secondary" data-fac-view="availability">My Availability</button>
     </div>
@@ -151,6 +152,15 @@
 
           <!-- Month Grid Cells -->
           <div id="calendar-grid-cells" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; text-align: center;"></div>
+
+          <!-- Selected Date Classes Box in Month Calendar View -->
+          <div id="calendar-selected-day-card" style="display: none; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border-subtle);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <h4 style="font-size: 1.15rem; color: var(--color-brand-primary); margin: 0;" id="calendar-selected-day-title">Classes for Selected Date</h4>
+              <button type="button" class="btn-secondary" id="btn-close-calendar-day" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;">✕ Close</button>
+            </div>
+            <div id="calendar-selected-day-list" style="display: flex; flex-direction: column; gap: 0.5rem;"></div>
+          </div>
         </div>
 
         <!-- Sidebar: Assigned Courses & Next Class Banner -->
@@ -174,9 +184,36 @@
     <!-- 2. VIEW: TODAY'S CLASSES -->
     <div id="view-today" class="fac-view-panel animate-fade-in" style="display: none;">
       <div class="card">
-        <h3 style="font-size: 1.6rem; color: var(--color-brand-primary); margin-bottom: 0.5rem;">Today's Classes Breakdown</h3>
-        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1.5rem;">Chronological timeline of today's lecture and lab blocks.</p>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <h3 style="font-size: 1.6rem; color: var(--color-brand-primary); margin-bottom: 0.25rem;" id="fac-today-heading">Teaching Schedule</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary);" id="fac-today-subtext">Chronological timeline of scheduled lecture and lab blocks.</p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+            <button class="btn-secondary" id="btn-fac-date-prev" style="padding: 0.35rem 0.65rem;" title="Previous day">&larr;</button>
+            <button class="btn-primary" id="btn-fac-date-today" style="padding: 0.35rem 0.75rem;">Today</button>
+            <button class="btn-secondary" id="btn-fac-date-tomorrow" style="padding: 0.35rem 0.75rem;">Tomorrow</button>
+            <button class="btn-secondary" id="btn-fac-date-next" style="padding: 0.35rem 0.65rem;" title="Next day">&rarr;</button>
+            <input type="date" id="fac-date-picker" title="Pick date to view schedule" style="font-size: 0.85rem; padding: 0.35rem 0.6rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--bg-surface); cursor: pointer;">
+          </div>
+        </div>
         <div id="today-classes-container" class="today-classes-container fade-slide-left" style="display: flex; flex-direction: column; gap: 0.75rem;"></div>
+      </div>
+    </div>
+
+    <!-- 2b. VIEW: WEEKLY SCHEDULE -->
+    <div id="view-weekly" class="fac-view-panel animate-fade-in" style="display: none;">
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <h3 style="font-size: 1.6rem; color: var(--color-brand-primary); margin-bottom: 0.25rem;">My Weekly Timetable</h3>
+            <p style="font-size: 0.85rem; color: var(--text-secondary);">Comprehensive Monday to Saturday schedule across all assigned classes and labs.</p>
+          </div>
+          <div style="font-size: 0.85rem; font-weight: 700; color: var(--color-brand-primary);" id="fac-weekly-load-badge">
+            -- Periods
+          </div>
+        </div>
+        <div id="faculty-weekly-grid-container" style="overflow-x: auto;"></div>
       </div>
     </div>
 

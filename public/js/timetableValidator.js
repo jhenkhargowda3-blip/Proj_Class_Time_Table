@@ -118,7 +118,7 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
     const fac = facultyMap.get(e.faculty_id) || { id: e.faculty_id, name: e.faculty_name || `Faculty ${e.faculty_id}`, max_periods_per_day: e.max_periods_per_day || 6 };
     const rm = roomMap.get(e.room_id) || { id: e.room_id, name: e.room_name || `Room ${e.room_id}`, type: e.room_type || 'classroom', capacity: e.room_capacity || 40 };
     const sec = sectionMap.get(e.section_id) || { id: e.section_id, name: e.section_name || `Section ${e.section_id}`, strength: e.section_strength || 40 };
-    const sub = subjectMap.get(e.subject_id) || { id: e.subject_id, code: e.subject_code || 'SUB', name: e.subject_name || 'Subject', type: e.subject_type || 'theory', weekly_periods: e.weekly_periods || 4, lab_block_length: e.lab_block_length || 1 };
+    const sub = subjectMap.get(e.subject_id) || { id: e.subject_id, code: e.subject_code || 'SUB', name: e.subject_name || 'Subject', type: e.subject_type || 'theory', weekly_periods: e.weekly_periods ?? null, lab_block_length: e.lab_block_length || 1 };
 
     // Fill denormalized attributes on the entry if missing
     e.day_name = day.day_name;

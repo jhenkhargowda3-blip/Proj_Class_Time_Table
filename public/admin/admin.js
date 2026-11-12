@@ -2733,6 +2733,16 @@ async function loadStudioVersion(versionId) {
       originalBaselineSnapshot = null;
     }
 
+    // Update selector label with actual entry count if it showed (0 classes)
+    const selector = document.getElementById('studio-version-selector');
+    if (selector && currentVersionData?.entries?.length) {
+      const opt = selector.querySelector(`option[value="${versionId}"]`);
+      if (opt && opt.textContent.includes('(0 classes)')) {
+        const v = currentVersionData.version || {};
+        opt.textContent = `${v.name || 'Timetable'} [${(v.status || 'draft').toUpperCase()}] (${currentVersionData.entries.length} classes)`;
+      }
+    }
+
     const val = runSharedValidation(currentVersionData.entries);
 
     // Sync draft conflict banner

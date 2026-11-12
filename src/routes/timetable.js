@@ -88,7 +88,11 @@ router.get('/versions', requireAuth, (req, res) => {
   const db = getDatabase();
   const versions = db.prepare(`
     SELECT tv.*, u.full_name as created_by_name,
-           COUNT(te.id) as entries_count
+           CASE
+             WHEN COUNT(te.id) > 0 THEN COUNT(te.id)
+             WHEN tv.source = 'imported_verified' THEN (SELECT COUNT(*) FROM faculty_sessions)
+             ELSE 0
+           END as entries_count
     FROM timetable_versions tv
     LEFT JOIN users u ON tv.created_by = u.id
     LEFT JOIN timetable_entries te ON tv.id = te.version_id

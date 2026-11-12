@@ -654,11 +654,46 @@ export function generateDraftWithConflicts(options = {}) {
   const sections = db.prepare('SELECT * FROM sections ORDER BY id ASC').all();
   const rooms = db.prepare('SELECT * FROM rooms WHERE is_active = 1 ORDER BY capacity ASC').all();
   const facultyList = db.prepare('SELECT * FROM faculty WHERE is_active = 1 ORDER BY id ASC').all();
-  const sectionSubjects = db.prepare(`
+  let sectionSubjects = db.prepare(`
     SELECT ss.*, s.weekly_periods, s.type as subject_type, s.code as subject_code, s.name as subject_name, s.lab_block_length
     FROM section_subjects ss
     JOIN subjects s ON ss.subject_id = s.id
   `).all();
+
+  if (sectionSubjects.length === 0) {
+    const subjects = db.prepare('SELECT * FROM subjects').all();
+    const sessions = db.prepare('SELECT * FROM faculty_sessions').all();
+    const secMap = new Map(sections.map(s => [s.name, s.id]));
+    const subMap = new Map(subjects.map(s => [s.code, s.id]));
+    const facMap = new Map(facultyList.map(f => [f.code, f.id]));
+    const seen = new Set();
+    for (const s of sessions) {
+      const effectiveSec = s.section_resolved || s.section;
+      const secName = (s.semester && effectiveSec)
+        ? `CSE-${s.semester}${effectiveSec}`
+        : (effectiveSec ? (effectiveSec.startsWith('CSE-') ? effectiveSec : null) : null);
+      const secId = secName ? secMap.get(secName) : null;
+      const subId = subMap.get(s.subject_code);
+      const facId = facMap.get(s.faculty_id) || facultyList[0]?.id;
+      if (secId && subId) {
+        const k = `${secId}_${subId}`;
+        if (!seen.has(k)) {
+          seen.add(k);
+          const sub = subjects.find(sb => sb.id === subId);
+          sectionSubjects.push({
+            section_id: secId,
+            subject_id: subId,
+            faculty_id: facId,
+            weekly_periods: 3,
+            subject_type: sub?.type || s.type || 'theory',
+            subject_code: s.subject_code,
+            subject_name: sub?.name || s.subject_code,
+            lab_block_length: sub?.lab_block_length || (s.type === 'lab' ? 2 : 1)
+          });
+        }
+      }
+    }
+  }
 
   // 1. Upfront Master Data Feasibility Verification
   if (!days.length || !teachingSlots.length || !sections.length || !rooms.length || !facultyList.length) {

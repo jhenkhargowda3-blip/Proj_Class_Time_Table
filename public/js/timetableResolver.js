@@ -99,6 +99,31 @@ export class TimetableResolver {
     this.runRapidCompletion();
   }
 
+  solve() {
+    return new Promise((resolve) => {
+      this.stepDelayMs = 0;
+      this.skipToEndActive = true;
+      const initialVal = this.evaluateConflicts(this.entries);
+      const initialCount = initialVal.errorCount;
+      const done = (res) => {
+        const finalVal = this.evaluateConflicts(this.entries);
+        const rem = (res && typeof res.conflictsRemaining === 'number')
+          ? res.conflictsRemaining
+          : finalVal.errorCount;
+        resolve({
+          ...res,
+          initialConflicts: initialCount,
+          remainingConflicts: rem,
+          stepsExecuted: this.stepCount || this.iterations || (res?.stepCount ?? 0)
+        });
+      };
+      this.onComplete = done;
+      this.onError = done;
+      this.start();
+      this.skipToEnd();
+    });
+  }
+
   cancel() {
     this.isCancelled = true;
     this.isRunning = false;

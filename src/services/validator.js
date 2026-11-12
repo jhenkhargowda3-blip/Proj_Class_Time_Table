@@ -94,8 +94,8 @@ export function validateTimetable(versionIdOrEntries, context = {}) {
 
     // 3. Section double-booking (Hard Error)
     // Parallel lab batches, parallel electives, and activities in different rooms are valid.
-    const isPooledOrNoSemester = (!e.semester && !e.section_semester) || (e.subject_code && (e.subject_code.startsWith('OE') || e.subject_code === 'OE'));
-    if (e.section_id && !isPooledOrNoSemester) {
+    const isPooledOrOE = Boolean(e.subject_code && (e.subject_code.startsWith('OE') || e.subject_code === 'OE'));
+    if (e.section_id && !isPooledOrOE) {
       const secKey = `${e.section_id}_${timeKey}`;
       if (sectionSlotMap.has(secKey)) {
         const prior = sectionSlotMap.get(secKey);
@@ -282,13 +282,34 @@ export function validateTimetable(versionIdOrEntries, context = {}) {
   }
 
   // 10. Subject period count mismatch (Rule 2: only run when admin generates or edits, count lab periods per batch, never fallback to default 4)
-  if (versionId && !context.skipPeriodCountCheck && context.isGeneratingOrEditing && !context.isImportedBaseline) {
-    const requiredAssignments = db.prepare(`
+  let isImported = Boolean(context.isImportedBaseline);
+  if (!isImported && versionId) {
+    try {
+      const ver = db.prepare('SELECT source FROM timetable_versions WHERE id = ?').get(versionId);
+      if (ver && ver.source === 'imported_verified') {
+        isImported = true;
+      }
+    } catch (e) {}
+  }
+  if (versionId && !context.skipPeriodCountCheck && !isImported && context.isGeneratingOrEditing !== false) {
+    let requiredAssignments = db.prepare(`
       SELECT ss.section_id, ss.subject_id, s.code as subject_code, s.weekly_periods, s.type as subject_type, sec.name as section_name
       FROM section_subjects ss
       JOIN subjects s ON ss.subject_id = s.id
       JOIN sections sec ON ss.section_id = sec.id
     `).all();
+
+    if (requiredAssignments.length === 0) {
+      const activeSec = db.prepare('SELECT id, name FROM sections LIMIT 1').get();
+      const allSubjects = db.prepare('SELECT id as subject_id, code as subject_code, weekly_periods, type as subject_type FROM subjects WHERE weekly_periods > 0').all();
+      if (activeSec && allSubjects.length > 0) {
+        requiredAssignments = allSubjects.map(sub => ({
+          section_id: activeSec.id,
+          section_name: activeSec.name,
+          ...sub
+        }));
+      }
+    }
 
     for (const req of requiredAssignments) {
       const scheduledAll = sectionSubjectCounts.get(`entries_${req.section_id}_${req.subject_id}`) || [];

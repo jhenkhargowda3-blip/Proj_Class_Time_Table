@@ -242,6 +242,46 @@ export function migrateDatabaseSchema(db) {
   if (!sessionCols.includes('section_source')) {
     db.exec("ALTER TABLE faculty_sessions ADD COLUMN section_source TEXT NULL");
   }
+
+  // Ensure timetable_entries allows nullable section_id and has batch, room_note, session_id columns
+  const teSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='timetable_entries'").get()?.sql || '';
+  if (teSql.includes('section_id INTEGER NOT NULL')) {
+    db.exec(`
+      PRAGMA foreign_keys = OFF;
+      CREATE TABLE timetable_entries_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        version_id INTEGER NOT NULL REFERENCES timetable_versions(id) ON DELETE CASCADE,
+        section_id INTEGER NULL REFERENCES sections(id) ON DELETE CASCADE,
+        subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE RESTRICT,
+        faculty_id INTEGER NOT NULL REFERENCES faculty(id) ON DELETE RESTRICT,
+        room_id INTEGER NOT NULL REFERENCES rooms(id) ON DELETE RESTRICT,
+        day_id INTEGER NOT NULL REFERENCES working_days(id) ON DELETE RESTRICT,
+        slot_id INTEGER NOT NULL REFERENCES time_slots(id) ON DELETE RESTRICT,
+        is_lab_block INTEGER NOT NULL DEFAULT 0 CHECK (is_lab_block IN (0, 1)),
+        locked INTEGER NOT NULL DEFAULT 0 CHECK (locked IN (0, 1)),
+        is_draft INTEGER NOT NULL DEFAULT 0 CHECK (is_draft IN (0, 1)),
+        batch TEXT NULL,
+        room_note TEXT NULL,
+        session_id TEXT NULL
+      );
+      INSERT INTO timetable_entries_new (id, version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, is_draft)
+      SELECT id, version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, is_draft FROM timetable_entries;
+      DROP TABLE timetable_entries;
+      ALTER TABLE timetable_entries_new RENAME TO timetable_entries;
+      PRAGMA foreign_keys = ON;
+    `);
+  } else {
+    const teCols = db.prepare("PRAGMA table_info(timetable_entries)").all().map(c => c.name);
+    if (!teCols.includes('batch')) {
+      db.exec("ALTER TABLE timetable_entries ADD COLUMN batch TEXT NULL");
+    }
+    if (!teCols.includes('room_note')) {
+      db.exec("ALTER TABLE timetable_entries ADD COLUMN room_note TEXT NULL");
+    }
+    if (!teCols.includes('session_id')) {
+      db.exec("ALTER TABLE timetable_entries ADD COLUMN session_id TEXT NULL");
+    }
+  }
 }
 
 /**
@@ -587,6 +627,7 @@ export function importReferenceData(customDb = null, options = {}) {
 
     // 9. Timetable Version: Ensure active version exists and is marked as imported_verified
     let activeVer = db.prepare("SELECT * FROM timetable_versions WHERE status = 'active'").get();
+    let activeVersionId;
     if (activeVer) {
       db.prepare(`
         UPDATE timetable_versions 
@@ -597,9 +638,10 @@ export function importReferenceData(customDb = null, options = {}) {
         'SJBIT CSE Department 2026-27 Odd Semester Timetable matching CTAS_reference_data.json',
         activeVer.id
       );
+      activeVersionId = activeVer.id;
     } else {
       const adminUser = db.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").get();
-      db.prepare(`
+      const res = db.prepare(`
         INSERT INTO timetable_versions (name, status, created_by, notes, source, baseline_fingerprint)
         VALUES (?, 'active', ?, ?, 'imported_verified', '[]')
       `).run(
@@ -607,6 +649,49 @@ export function importReferenceData(customDb = null, options = {}) {
         adminUser?.id || null,
         'SJBIT CSE Department 2026-27 Odd Semester Timetable matching CTAS_reference_data.json'
       );
+      activeVersionId = res.lastInsertRowid;
+    }
+
+    // Sync timetable_entries for the active imported version
+    db.prepare("DELETE FROM timetable_entries WHERE version_id = ?").run(activeVersionId);
+    const insertTe = db.prepare(`
+      INSERT INTO timetable_entries (
+        version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, is_draft, batch, room_note, session_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+    `);
+
+    for (const s of rawData.sessions) {
+      const facDbId = facultyIdMap[s.faculty_id];
+      const subDbId = subjectIdMap[s.subject_code];
+      const dbRoomId = (s.room_id ? roomIdMap[s.room_id] : null) || (s.room_name ? roomIdMap[s.room_name] : null);
+      const effectiveSec = s.section_resolved || s.section;
+      const secName = (s.semester && effectiveSec)
+        ? `CSE-${s.semester}${effectiveSec}`
+        : (effectiveSec ? (effectiveSec.startsWith('CSE-') ? effectiveSec : null) : null);
+      const secDbId = secName ? sectionIdMap[secName] : null;
+      const dayRow = dayNameMap[s.day];
+      if (!dayRow || !facDbId || !subDbId || !dbRoomId) continue;
+
+      for (let p = s.period_start; p <= s.period_end; p++) {
+        const slotNo = PERIOD_TO_SLOT_NO[p];
+        const slotId = slotMap[slotNo];
+        if (!slotId) continue;
+
+        insertTe.run(
+          activeVersionId,
+          secDbId || null,
+          subDbId,
+          facDbId,
+          dbRoomId,
+          dayRow.id,
+          slotId,
+          s.type === 'lab' ? 1 : 0,
+          0,
+          s.batch || null,
+          s.room_note || null,
+          s.id || null
+        );
+      }
     }
 
     // 10. Audit log

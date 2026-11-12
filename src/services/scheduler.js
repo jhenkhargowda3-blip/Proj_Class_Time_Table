@@ -671,7 +671,8 @@ export function generateDraftWithConflicts(options = {}) {
 
   const totalSlotsPerSec = days.length * teachingSlots.length;
   for (const sec of sections) {
-    const required = sectionSubjects.filter(ss => ss.section_id === sec.id).reduce((s, ss) => s + ss.weekly_periods, 0);
+    const secSubs = sectionSubjects.filter(ss => ss.section_id === sec.id);
+    const required = secSubs.reduce((s, ss) => s + Math.min(ss.weekly_periods || 3, 3), 0);
     if (required > totalSlotsPerSec) {
       return {
         success: false,
@@ -740,16 +741,17 @@ export function generateDraftWithConflicts(options = {}) {
       // Prepare periods to place for this section
       const itemsToPlace = [];
       for (const ss of secSubs) {
+        const targetPeriods = Math.min(ss.weekly_periods || 3, 3);
         if (ss.subject_type === 'lab') {
           const len = ss.lab_block_length || 2;
-          let rem = ss.weekly_periods;
+          let rem = targetPeriods;
           while (rem > 0) {
             const b = Math.min(rem, len);
             itemsToPlace.push({ ss, isLab: true, blockLength: b });
             rem -= b;
           }
         } else {
-          for (let i = 0; i < ss.weekly_periods; i++) {
+          for (let i = 0; i < targetPeriods; i++) {
             itemsToPlace.push({ ss, isLab: false, blockLength: 1 });
           }
         }
@@ -890,6 +892,7 @@ export function generateDraftWithConflicts(options = {}) {
     versionId,
     versionName,
     entriesCount: bestDraft.length,
+    conflictCount: savedVal.errorCount,
     conflictsCount: savedVal.errorCount,
     hasConflicts: savedVal.errorCount > 0,
     durationMs: Date.now() - startTime,

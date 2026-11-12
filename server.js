@@ -103,16 +103,19 @@ app.get('/', (req, res) => {
 // Centralized error handler
 app.use(errorHandler);
 
-// Initialize DB on boot & initialize clean structure if empty (in normal server mode)
-if (!process.env.NODE_TEST_CONTEXT) {
+// Initialize DB function (safe, idempotent)
+export function initDatabase() {
+  if (process.env.NODE_TEST_CONTEXT) return;
   try {
     const db = getDatabase();
     const userTable = db.prepare("SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='users'").get();
+    let justSeeded = false;
     if (userTable && userTable.count > 0) {
       const adminCount = db.prepare("SELECT count(*) as count FROM users WHERE role = 'admin'").get();
       if (!adminCount || adminCount.count === 0) {
         console.log('[CTAS] Database empty - initializing clean college structure...');
         seedDatabase(db, { clean: true });
+        justSeeded = true;
       }
     }
     // Ensure faculty profile & credentials for Mrs. Manjula H S are initialized
@@ -126,8 +129,10 @@ if (!process.env.NODE_TEST_CONTEXT) {
       departmentName: 'Computer Science & Engineering'
     }, db);
 
-    // Ensure reference timetable data matches CTAS_reference_data.json
-    importReferenceData(db);
+    // Ensure reference timetable data matches CTAS_reference_data.json if not just seeded
+    if (!justSeeded) {
+      importReferenceData(db);
+    }
     db.pragma('wal_checkpoint(TRUNCATE)');
 
     console.log(`[CTAS] SQLite database ready at ${config.dbPath}`);
@@ -144,6 +149,7 @@ const isDirectRun = Boolean(
 );
 
 if (isDirectRun) {
+  // Bind port immediately so health checks pass instantly
   serverInstance = app.listen(config.port, '0.0.0.0', () => {
     console.log(`\n======================================================`);
     console.log(` CTAS · Class Timetable Automation System`);
@@ -151,6 +157,9 @@ if (isDirectRun) {
     console.log(` Environment: ${config.env}`);
     console.log(` Phase: 1-3 Verified`);
     console.log(`======================================================\n`);
+
+    // Perform DB initialization once port is active
+    initDatabase();
   });
 
   serverInstance.on('error', (err) => {
@@ -173,6 +182,8 @@ if (isDirectRun) {
 
   process.on('SIGINT', cleanup);
   process.on('SIGTERM', cleanup);
+} else if (!process.env.NODE_TEST_CONTEXT) {
+  initDatabase();
 }
 
 process.on('uncaughtException', (err) => {

@@ -28,6 +28,9 @@ function resolvePort() {
   if (portArgIdx !== -1 && process.argv[portArgIdx + 1]) {
     return parseInt(process.argv[portArgIdx + 1], 10);
   }
+  if (process.env.PORT) {
+    return parseInt(process.env.PORT, 10);
+  }
   if (process.env.APP_PORT) {
     return parseInt(process.env.APP_PORT, 10);
   }

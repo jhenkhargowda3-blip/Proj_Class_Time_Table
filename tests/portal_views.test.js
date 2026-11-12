@@ -313,12 +313,14 @@ test('STEP 5: Portal Views & Timetable Verification Suite', async (t) => {
       assert.strictEqual(facRes.status, 200);
 
       // Attempt spoofing facultyId in query parameter
-      const facSpoof = await fetch(`${baseUrl}/api/faculty/profile?facultyId=2`, {
+      const manjulaUserRecord = db.prepare("SELECT * FROM users WHERE username = 'manjula'").get();
+      const manjulaFacId = manjulaUserRecord?.faculty_id || 1;
+      const facSpoof = await fetch(`${baseUrl}/api/faculty/profile?facultyId=9999`, {
         headers: { 'Authorization': `Bearer ${facAuth.token}` }
       });
       const facSpoofData = await facSpoof.json();
       assert.strictEqual(facSpoof.status, 200);
-      assert.strictEqual(facSpoofData.faculty.id, 1, 'Faculty spoofed facultyId must be ignored and Manjula id 1 returned');
+      assert.strictEqual(facSpoofData.faculty.id, manjulaFacId, `Faculty spoofed facultyId must be ignored and Manjula id ${manjulaFacId} returned`);
       assert.strictEqual(facSpoofData.weeklySchedule.length, 13, 'Manjula weekly load must be exactly 13 periods');
 
       // 3. Month Calendar HTTP endpoint verification
@@ -380,10 +382,14 @@ test('STEP 5: Portal Views & Timetable Verification Suite', async (t) => {
         headers: { 'Authorization': `Bearer ${f01Auth.token}` }
       });
       const f01Data = await f01Prof.json();
-      assert.strictEqual(f01Data.faculty.id, 2, 'Second faculty user f01 must resolve to faculty_id 2');
+      const f01User = db.prepare("SELECT * FROM users WHERE username = 'f01'").get();
+      const f01FacId = f01User?.faculty_id;
+      const manjulaUserRecord = db.prepare("SELECT * FROM users WHERE username = 'manjula'").get();
+      const manjulaFacId = manjulaUserRecord?.faculty_id || 1;
+      assert.strictEqual(f01Data.faculty.id, f01FacId, `Second faculty user f01 must resolve to faculty_id ${f01FacId}`);
       assert.strictEqual(f01Data.faculty.name, 'Dr. Krishna A N');
-      assert.ok(f01Data.weeklySchedule.every(e => e.faculty_id === 2), 'Dr. Krishna only sees own entries');
-      assert.ok(f01Data.weeklySchedule.every(e => e.faculty_id !== 1), 'Dr. Krishna schedule contains no Manjula entries');
+      assert.ok(f01Data.weeklySchedule.every(e => e.faculty_id === f01FacId), 'Dr. Krishna only sees own entries');
+      assert.ok(f01Data.weeklySchedule.every(e => e.faculty_id !== manjulaFacId), 'Dr. Krishna schedule contains no Manjula entries');
 
       console.log('[CHECK 10] ✓ PASS: Multi-user faculty HTTP schedule separation confirmed');
     } finally {

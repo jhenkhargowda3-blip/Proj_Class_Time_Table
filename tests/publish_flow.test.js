@@ -158,8 +158,8 @@ test('Publish (Activate) Flow Verification with 413-Entry Imported Timetable', a
   // STEP 4, Item 4: Faculty view and student view return published timetable
   await t.test('4. Faculty view and student view return published timetable with accurate row counts', () => {
     // Test sample faculty: F01 (first faculty) and F31 (Mrs. Manjula H S)
-    const f01 = db.prepare("SELECT id, name FROM faculty WHERE code = 'F01' OR id = 1").get();
-    const f31 = db.prepare("SELECT id, name FROM faculty WHERE code = 'F31' OR email = 'manjula@gmail.com'").get();
+    const f01 = db.prepare("SELECT id, name FROM faculty WHERE code = 'F01'").get() || db.prepare("SELECT id, name FROM faculty WHERE id = 1").get();
+    const f31 = db.prepare("SELECT id, name FROM faculty WHERE code = 'F31'").get() || db.prepare("SELECT id, name FROM faculty WHERE email = 'manjula@gmail.com'").get();
 
     const facultyEntriesF01 = db.prepare(`
       SELECT te.*, s.code as subject_code, sec.name as section_name, r.name as room_name, wd.day_name, ts.slot_no

@@ -157,10 +157,9 @@ CREATE TABLE IF NOT EXISTS timetable_entries (
 -- Enforced for committed/active timetables (is_draft = 0).
 -- ============================================================================
 
--- A. A section cannot have two classes at the same time in the same version
+-- A. A section cannot have two classes in the same slot, room, and batch (blocks true duplicates while allowing parallel batches)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_section_slot 
-ON timetable_entries(version_id, section_id, day_id, slot_id)
-WHERE is_draft = 0;
+ON timetable_entries(version_id, section_id, day_id, slot_id, room_id, COALESCE(batch, ''));
 
 -- B. A faculty cannot teach two classes at the same time in the same version
 CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_faculty_slot 

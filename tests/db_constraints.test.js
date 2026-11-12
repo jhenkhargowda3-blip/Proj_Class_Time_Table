@@ -43,22 +43,22 @@ test('Database Hard Constraints & Collision Prevention', async (t) => {
 
   await t.test('Prevents section double-booking via UNIQUE constraint', () => {
     const otherFaculty = db.prepare('SELECT id FROM faculty WHERE id != ? LIMIT 1').get(existing.faculty_id);
-    const otherRoom = db.prepare("SELECT id FROM rooms WHERE id != ? AND type = 'classroom' LIMIT 1").get(existing.room_id);
 
     assert.throws(
       () => {
         db.prepare(`
           INSERT INTO timetable_entries 
-          (version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked)
-          VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)
+          (version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, batch)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
         `).run(
           existing.version_id,
           existing.section_id, // SAME SECTION
           existing.subject_id,
           otherFaculty.id,
-          otherRoom.id,
+          existing.room_id,    // SAME ROOM
           existing.day_id,     // SAME DAY
-          existing.slot_id     // SAME SLOT
+          existing.slot_id,    // SAME SLOT
+          existing.batch || null
         );
       },
       (err) => {

@@ -169,6 +169,67 @@ export function initSchema(db) {
     if (!sessionCols.includes('section_source')) {
       db.exec("ALTER TABLE faculty_sessions ADD COLUMN section_source TEXT NULL");
     }
+
+    // 6. Safe Migration: Table rebuild for UNIQUE(version_id, section_id, day_id, slot_id, room_id, COALESCE(batch,''))
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        name TEXT PRIMARY KEY,
+        applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    const alreadyRebuilt = db.prepare("SELECT 1 FROM schema_migrations WHERE name = 'rebuild_timetable_entries_unique_constraint'").get();
+    if (!alreadyRebuilt) {
+      db.pragma('foreign_keys = OFF');
+      const tableExists = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='timetable_entries'").get();
+      if (tableExists) {
+        db.exec(`
+          DROP INDEX IF EXISTS idx_unique_section_slot;
+          DROP INDEX IF EXISTS idx_unique_section_batch_slot;
+
+          CREATE TABLE IF NOT EXISTS timetable_entries_v2 (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            version_id INTEGER NOT NULL REFERENCES timetable_versions(id) ON DELETE CASCADE,
+            section_id INTEGER NULL REFERENCES sections(id) ON DELETE CASCADE,
+            subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE RESTRICT,
+            faculty_id INTEGER NOT NULL REFERENCES faculty(id) ON DELETE RESTRICT,
+            room_id INTEGER NOT NULL REFERENCES rooms(id) ON DELETE RESTRICT,
+            day_id INTEGER NOT NULL REFERENCES working_days(id) ON DELETE RESTRICT,
+            slot_id INTEGER NOT NULL REFERENCES time_slots(id) ON DELETE RESTRICT,
+            is_lab_block INTEGER NOT NULL DEFAULT 0 CHECK (is_lab_block IN (0, 1)),
+            locked INTEGER NOT NULL DEFAULT 0 CHECK (locked IN (0, 1)),
+            is_draft INTEGER NOT NULL DEFAULT 0 CHECK (is_draft IN (0, 1)),
+            batch TEXT NULL,
+            room_note TEXT NULL,
+            session_id TEXT NULL
+          );
+
+          INSERT INTO timetable_entries_v2 (
+            id, version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, is_draft, batch, room_note, session_id
+          )
+          SELECT 
+            id, version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, is_draft, batch, room_note, session_id
+          FROM timetable_entries;
+
+          DROP TABLE timetable_entries;
+          ALTER TABLE timetable_entries_v2 RENAME TO timetable_entries;
+
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_section_slot 
+          ON timetable_entries(version_id, section_id, day_id, slot_id, room_id, COALESCE(batch, ''));
+
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_faculty_slot 
+          ON timetable_entries(version_id, faculty_id, day_id, slot_id)
+          WHERE is_draft = 0;
+
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_room_slot 
+          ON timetable_entries(version_id, room_id, day_id, slot_id)
+          WHERE is_draft = 0;
+
+          INSERT INTO schema_migrations (name) VALUES ('rebuild_timetable_entries_unique_constraint');
+        `);
+      }
+      db.pragma('foreign_keys = ON');
+    }
   } catch (err) {
     // ignore migration error if already exists
   }

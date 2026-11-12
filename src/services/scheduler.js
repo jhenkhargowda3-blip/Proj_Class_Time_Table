@@ -558,8 +558,8 @@ export function generateTimetable(options = {}) {
 
     const insertEntry = db.prepare(`
       INSERT INTO timetable_entries 
-      (version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+      (version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, is_draft)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1)
     `);
 
     for (const entry of solutionEntries) {

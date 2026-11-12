@@ -123,11 +123,11 @@ router.post('/import-confirm', requireAuth, requireRole('admin'), (req, res, nex
 
     const newVersionId = insertVersion.run(versionTitle, req.user.id, versionNotes).lastInsertRowid;
 
-    // 2. Insert valid timetable entries
+    // 2. Insert valid timetable entries as draft (is_draft = 1)
     const insertEntry = db.prepare(`
       INSERT INTO timetable_entries 
-      (version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+      (version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, is_draft)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1)
     `);
 
     const insertTx = db.transaction(() => {

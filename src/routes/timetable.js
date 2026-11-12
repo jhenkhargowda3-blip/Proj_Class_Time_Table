@@ -223,22 +223,26 @@ router.post('/versions/:id/activate', requireAuth, requireRole('admin'), (req, r
     });
   }
 
+  const entriesCountBefore = db.prepare('SELECT count(*) as count FROM timetable_entries WHERE version_id = ?').get(versionId).count;
+
   // Atomic activation transaction
   const activateTx = db.transaction(() => {
     // Archive currently active version
     db.prepare("UPDATE timetable_versions SET status = 'archived' WHERE status = 'active'").run();
-    // Activate target version and ensure is_draft = 0
+    // Activate target version and ensure all entries have is_draft = 0
     db.prepare("UPDATE timetable_entries SET is_draft = 0 WHERE version_id = ?").run(versionId);
     db.prepare("UPDATE timetable_versions SET status = 'active' WHERE id = ?").run(versionId);
 
     db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)').run(
       req.user.id,
       'TIMETABLE_ACTIVATED',
-      JSON.stringify({ versionId, versionName: targetVersion.name })
+      JSON.stringify({ versionId, versionName: targetVersion.name, entriesCount: entriesCountBefore })
     );
   });
 
   activateTx();
+
+  const entriesCountAfter = db.prepare('SELECT count(*) as count FROM timetable_entries WHERE version_id = ?').get(versionId).count;
 
   broadcast('timetable.updated', {
     type: 'version_activated',
@@ -249,7 +253,10 @@ router.post('/versions/:id/activate', requireAuth, requireRole('admin'), (req, r
   res.json({
     success: true,
     message: `Timetable '${targetVersion.name}' is now active.`,
-    activeVersionId: versionId
+    activeVersionId: versionId,
+    status: 'ACTIVE',
+    entriesCountBefore,
+    entriesCountAfter
   });
 });
 
@@ -292,8 +299,9 @@ router.post('/versions', requireAuth, requireRole('admin'), (req, res) => {
     if (Array.isArray(entries) && entries.length > 0) {
       const isDraftVal = (activateNow || status === 'active') ? 0 : 1;
       const insertEntry = db.prepare(`
-        INSERT INTO timetable_entries (version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, is_draft)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO timetable_entries (
+          version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, is_draft, batch, room_note, session_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       for (const e of entries) {
@@ -307,7 +315,10 @@ router.post('/versions', requireAuth, requireRole('admin'), (req, res) => {
           e.slot_id,
           e.is_lab_block || 0,
           e.locked || 0,
-          isDraftVal
+          isDraftVal,
+          e.batch || null,
+          e.room_note || null,
+          e.session_id || null
         );
       }
     }
@@ -350,11 +361,21 @@ router.post('/entries/:id/move', requireAuth, requireRole('admin'), (req, res) =
   let swappedEntry = null;
   if (swapWithEntryId) {
     swappedEntry = db.prepare('SELECT * FROM timetable_entries WHERE id = ? AND version_id = ?').get(swapWithEntryId, entry.version_id);
+  } else if (force || overrideWarnings) {
+    // Check if an existing occupant is in the target slot for this section to auto-swap
+    swappedEntry = db.prepare(`
+      SELECT * FROM timetable_entries 
+      WHERE version_id = ? AND section_id = ? AND day_id = ? AND slot_id = ? AND id != ?
+      LIMIT 1
+    `).get(entry.version_id, entry.section_id, targetDayId, targetSlotId, entryId);
   }
 
   const tx = db.transaction(() => {
     if (swappedEntry) {
-      // Move swapped entry to the source entry's slot
+      // Step 1: Temporarily un-index source entry by setting is_draft = 1 to prevent intermediate UNIQUE collision in SQLite
+      db.prepare('UPDATE timetable_entries SET is_draft = 1 WHERE id = ?').run(entryId);
+
+      // Step 2: Move swapped entry to source entry's slot
       db.prepare(`
         UPDATE timetable_entries
         SET day_id = ?, slot_id = ?
@@ -362,21 +383,33 @@ router.post('/entries/:id/move', requireAuth, requireRole('admin'), (req, res) =
       `).run(entry.day_id, entry.slot_id, swappedEntry.id);
     }
 
-    // Move source entry to target slot
+    // Step 3: Move source entry to target slot and restore its draft state
     db.prepare(`
       UPDATE timetable_entries
-      SET day_id = ?, slot_id = ?, room_id = ?, faculty_id = ?
+      SET day_id = ?, slot_id = ?, room_id = ?, faculty_id = ?, is_draft = ?
       WHERE id = ?
     `).run(
       targetDayId,
       targetSlotId,
       targetRoomId || entry.room_id,
       targetFacultyId || entry.faculty_id,
+      entry.is_draft,
       entryId
     );
   });
 
-  tx();
+  try {
+    tx();
+  } catch (err) {
+    if (err.message && err.message.includes('UNIQUE constraint failed')) {
+      return res.status(409).json({
+        error: 'Cannot move class: Slot collision detected for section, faculty, or room.',
+        code: 'UNIQUE_CONSTRAINT_COLLISION',
+        details: err.message
+      });
+    }
+    throw err;
+  }
 
   const validation = validateTimetable(entry.version_id);
 
@@ -411,15 +444,29 @@ router.post('/versions/:id/duplicate', requireAuth, requireRole('admin'), (req, 
 
     const newId = newVersion.lastInsertRowid;
 
-    // Clone all entries
+    // Clone all entries as draft
     const sourceEntries = db.prepare('SELECT * FROM timetable_entries WHERE version_id = ?').all(sourceId);
     const insertEntry = db.prepare(`
-      INSERT INTO timetable_entries (version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO timetable_entries (
+        version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, is_draft, batch, room_note, session_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
     `);
 
     for (const e of sourceEntries) {
-      insertEntry.run(newId, e.section_id, e.subject_id, e.faculty_id, e.room_id, e.day_id, e.slot_id, e.is_lab_block, e.locked);
+      insertEntry.run(
+        newId,
+        e.section_id,
+        e.subject_id,
+        e.faculty_id,
+        e.room_id,
+        e.day_id,
+        e.slot_id,
+        e.is_lab_block,
+        e.locked,
+        e.batch || null,
+        e.room_note || null,
+        e.session_id || null
+      );
     }
 
     return { newId, newVersionName, count: sourceEntries.length };
@@ -460,57 +507,71 @@ router.delete('/versions/:id', requireAuth, requireRole('admin'), (req, res) => 
 
 // 9.5 Create New Timetable Entry (Admin Only - Unrestricted Manual Edit Authority)
 router.post('/entries', requireAuth, requireRole('admin'), (req, res) => {
-  const { versionId, sectionId, subjectId, facultyId, roomId, dayId, slotId, isLabBlock, locked } = req.body;
+  const { versionId, sectionId, subjectId, facultyId, roomId, dayId, slotId, isLabBlock, locked, isDraft, batch, roomNote } = req.body;
   const db = getDatabase();
 
   if (!versionId || !sectionId || !subjectId || !facultyId || !roomId || !dayId || !slotId) {
     return res.status(400).json({ error: 'Missing required entry fields (versionId, sectionId, subjectId, facultyId, roomId, dayId, slotId)' });
   }
 
-  const result = db.prepare(`
-    INSERT INTO timetable_entries (
-      version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    versionId,
-    sectionId,
-    subjectId,
-    facultyId,
-    roomId,
-    dayId,
-    slotId,
-    isLabBlock ? 1 : 0,
-    locked ? 1 : 0
-  );
+  try {
+    const result = db.prepare(`
+      INSERT INTO timetable_entries (
+        version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, is_draft, batch, room_note
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      versionId,
+      sectionId,
+      subjectId,
+      facultyId,
+      roomId,
+      dayId,
+      slotId,
+      isLabBlock ? 1 : 0,
+      locked ? 1 : 0,
+      isDraft ?? 0,
+      batch || null,
+      roomNote || null
+    );
 
-  const newEntry = db.prepare(`
-    SELECT te.*, s.name as subject_name, s.code as subject_code, s.type as subject_type,
-           sec.name as section_name, sec.semester,
-           f.name as faculty_name, f.email as faculty_email,
-           r.name as room_name, r.type as room_type, r.capacity as room_capacity,
-           wd.day_name, wd.day_index,
-           ts.slot_no, ts.start_time, ts.end_time, ts.is_break, ts.label as slot_label
-    FROM timetable_entries te
-    JOIN subjects s ON te.subject_id = s.id
-    JOIN sections sec ON te.section_id = sec.id
-    JOIN faculty f ON te.faculty_id = f.id
-    JOIN rooms r ON te.room_id = r.id
-    JOIN working_days wd ON te.day_id = wd.id
-    JOIN time_slots ts ON te.slot_id = ts.id
-    WHERE te.id = ?
-  `).get(result.lastInsertRowid);
+    const newEntry = db.prepare(`
+      SELECT te.*, s.name as subject_name, s.code as subject_code, s.type as subject_type,
+             sec.name as section_name, sec.semester,
+             f.name as faculty_name, f.email as faculty_email,
+             r.name as room_name, r.type as room_type, r.capacity as room_capacity,
+             wd.day_name, wd.day_index,
+             ts.slot_no, ts.start_time, ts.end_time, ts.is_break, ts.label as slot_label
+      FROM timetable_entries te
+      JOIN subjects s ON te.subject_id = s.id
+      JOIN sections sec ON te.section_id = sec.id
+      JOIN faculty f ON te.faculty_id = f.id
+      JOIN rooms r ON te.room_id = r.id
+      JOIN working_days wd ON te.day_id = wd.id
+      JOIN time_slots ts ON te.slot_id = ts.id
+      WHERE te.id = ?
+    `).get(result.lastInsertRowid);
 
-  broadcast('timetable.updated', {
-    type: 'entry_created',
-    entryId: result.lastInsertRowid,
-    versionId
-  });
+    broadcast('timetable.updated', {
+      type: 'entry_created',
+      entryId: result.lastInsertRowid,
+      versionId
+    });
 
-  res.status(201).json({
-    success: true,
-    message: 'Timetable entry added successfully',
-    entry: newEntry
-  });
+    res.status(201).json({
+      success: true,
+      message: 'Timetable entry added successfully',
+      entry: newEntry
+    });
+  } catch (err) {
+    if (err.message && err.message.includes('UNIQUE constraint failed')) {
+      return res.status(409).json({
+        error: 'Cannot add class: Schedule conflict on section, faculty, or room in this time slot.',
+        code: 'UNIQUE_CONSTRAINT_COLLISION',
+        details: err.message
+      });
+    }
+    throw err;
+  }
 });
 
 // 10. Update or Lock Single Entry

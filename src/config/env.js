@@ -31,9 +31,6 @@ function resolvePort() {
   if (process.env.APP_PORT) {
     return parseInt(process.env.APP_PORT, 10);
   }
-  if (process.env.PORT && process.env.PORT !== '8080') {
-    return parseInt(process.env.PORT, 10);
-  }
   return 3000;
 }
 

@@ -282,6 +282,17 @@ export function migrateDatabaseSchema(db) {
       db.exec("ALTER TABLE timetable_entries ADD COLUMN session_id TEXT NULL");
     }
   }
+
+  // Ensure idx_unique_section_slot allows parallel lab batches and electives: UNIQUE(version_id, section_id, day_id, slot_id, room_id, COALESCE(batch,''))
+  const currentIdxSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='index' AND name='idx_unique_section_slot'").get()?.sql || '';
+  if (!currentIdxSql || !currentIdxSql.includes('room_id')) {
+    db.exec(`
+      DROP INDEX IF EXISTS idx_unique_section_slot;
+      DROP INDEX IF EXISTS idx_unique_section_batch_slot;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_section_slot 
+      ON timetable_entries(version_id, section_id, day_id, slot_id, room_id, COALESCE(batch, ''));
+    `);
+  }
 }
 
 /**

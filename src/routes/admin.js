@@ -1365,6 +1365,45 @@ router.get('/undo-status', (req, res) => {
   res.json({ canUndo: count > 0 });
 });
 
+// 14. Timetable Publish (Activate) Endpoint
+router.post(['/publish-timetable', '/publish', '/versions/:id/activate'], (req, res) => {
+  const db = getDatabase();
+  const versionId = req.params.id ? parseInt(req.params.id, 10) : (req.body.versionId || db.prepare("SELECT id FROM timetable_versions WHERE status = 'active' OR source = 'imported_verified' ORDER BY id ASC LIMIT 1").get()?.id);
+  if (!versionId) {
+    return res.status(400).json({ error: 'No version ID specified' });
+  }
+  const targetVersion = db.prepare('SELECT * FROM timetable_versions WHERE id = ?').get(versionId);
+  if (!targetVersion) {
+    return res.status(404).json({ error: 'Timetable version not found' });
+  }
+
+  const entriesCountBefore = db.prepare('SELECT count(*) as count FROM timetable_entries WHERE version_id = ?').get(versionId).count;
+
+  const activateTx = db.transaction(() => {
+    db.prepare("UPDATE timetable_versions SET status = 'archived' WHERE status = 'active'").run();
+    db.prepare("UPDATE timetable_entries SET is_draft = 0 WHERE version_id = ?").run(versionId);
+    db.prepare("UPDATE timetable_versions SET status = 'active' WHERE id = ?").run(versionId);
+    db.prepare('INSERT INTO audit_log (user_id, action, details_json) VALUES (?, ?, ?)').run(
+      req.user?.id || 1,
+      'TIMETABLE_ACTIVATED',
+      JSON.stringify({ versionId, versionName: targetVersion.name, entriesCount: entriesCountBefore })
+    );
+  });
+
+  activateTx();
+
+  const entriesCountAfter = db.prepare('SELECT count(*) as count FROM timetable_entries WHERE version_id = ?').get(versionId).count;
+
+  res.json({
+    success: true,
+    message: `Timetable '${targetVersion.name}' is now active.`,
+    activeVersionId: versionId,
+    status: 'ACTIVE',
+    entriesCountBefore,
+    entriesCountAfter
+  });
+});
+
 export default router;
 
 

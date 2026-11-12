@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import Database from 'better-sqlite3';
 import { fileURLToPath } from 'url';
 import { closeDatabase, getDatabase, initSchema } from '../src/db/connection.js';
+import { importReferenceData } from '../src/services/referenceDataService.js';
 import { validateTimetable } from '../src/services/validator.js';
 import config from '../src/config/env.js';
 

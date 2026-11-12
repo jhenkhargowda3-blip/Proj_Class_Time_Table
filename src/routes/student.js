@@ -13,22 +13,15 @@ function getTodayIST() {
   return formatter.format(new Date());
 }
 
-/**
- * GET /api/student/schedule
- * Query params: ?date=YYYY-MM-DD (defaults to today in IST)
- * Overlays date-specific absences, holidays, and substitutions
- */
-router.get('/schedule', (req, res) => {
-  const db = getDatabase();
-  let sectionId = req.user.role === 'admin' && req.query.sectionId
-    ? parseInt(req.query.sectionId, 10)
-    : (req.user.studentId || req.user.student_id);
-
+function resolveStudentSectionId(req, db) {
+  if (req.user.role === 'admin' && req.query.sectionId) {
+    return parseInt(req.query.sectionId, 10);
+  }
+  let sectionId = req.user.studentId || req.user.student_id;
   if (!sectionId && req.user.id) {
     const u = db.prepare('SELECT student_id FROM users WHERE id = ?').get(req.user.id);
     if (u?.student_id) sectionId = u.student_id;
   }
-
   if (!sectionId && req.user.role === 'student') {
     const sec5B = db.prepare(`
       SELECT id FROM sections 
@@ -40,11 +33,23 @@ router.get('/schedule', (req, res) => {
     if (sec5B) {
       sectionId = sec5B.id;
       if (req.user.id) {
-        db.prepare("UPDATE users SET student_id = ?, full_name = 'Jhenkhar Gowda' WHERE id = ?").run(sec5B.id, req.user.id);
+        try {
+          db.prepare("UPDATE users SET student_id = ?, full_name = 'Jhenkhar Gowda' WHERE id = ?").run(sec5B.id, req.user.id);
+        } catch (e) {}
       }
     }
   }
+  return sectionId || null;
+}
 
+/**
+ * GET /api/student/schedule
+ * Query params: ?date=YYYY-MM-DD (defaults to today in IST)
+ * Overlays date-specific absences, holidays, and substitutions
+ */
+router.get('/schedule', (req, res) => {
+  const db = getDatabase();
+  const sectionId = resolveStudentSectionId(req, db);
   const queryDate = req.query.date || getTodayIST();
 
   if (!sectionId) {
@@ -196,9 +201,7 @@ router.get('/schedule', (req, res) => {
  */
 router.get('/notices', (req, res) => {
   const db = getDatabase();
-  const sectionId = req.user.role === 'admin' && req.query.sectionId
-    ? parseInt(req.query.sectionId, 10)
-    : (req.user.studentId || 1);
+  const sectionId = resolveStudentSectionId(req, db);
 
   if (!sectionId) {
     return res.status(400).json({ error: 'Section not linked to this student account' });
@@ -415,7 +418,7 @@ router.post('/notices/read-all', (req, res) => {
  */
 router.get('/department-timetable', (req, res) => {
   const db = getDatabase();
-  const studentSectionId = req.user.studentId;
+  const studentSectionId = resolveStudentSectionId(req, db) || 1;
 
   const section = db.prepare('SELECT department_id FROM sections WHERE id = ?').get(studentSectionId);
   const deptId = section ? section.department_id : 1;
@@ -451,9 +454,7 @@ router.get('/department-timetable', (req, res) => {
  */
 router.get('/export.ics', (req, res) => {
   const db = getDatabase();
-  let sectionId = (req.user.role === 'admin' && req.query.sectionId)
-    ? parseInt(req.query.sectionId, 10)
-    : req.user.studentId;
+  let sectionId = resolveStudentSectionId(req, db);
 
   if (!sectionId) {
     const defaultSec = db.prepare('SELECT id FROM sections LIMIT 1').get();

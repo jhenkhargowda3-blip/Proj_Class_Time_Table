@@ -381,8 +381,9 @@ export class TimetableResolver {
   }
 
   selectConflictedEntry(val) {
+    const errorViolations = (val.conflicts || []).filter(v => v.severity === 'error' && !v.isBaseline);
     const conflictedIds = new Set();
-    for (const v of val.conflicts) {
+    for (const v of errorViolations) {
       if (Array.isArray(v.involvedEntryIds)) {
         for (const id of v.involvedEntryIds) conflictedIds.add(id);
       }

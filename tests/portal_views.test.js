@@ -4,6 +4,8 @@ import { getDatabase } from '../src/db/connection.js';
 import { importReferenceData } from '../src/services/referenceDataService.js';
 import { validateTimetable } from '../src/services/validator.js';
 import { getFacultyCalendar, getFacultyDaySchedule } from '../src/services/calendar.js';
+import app from '../server.js';
+import { SEED_PASSWORDS } from '../src/db/seed.js';
 
 test('STEP 5: Portal Views & Timetable Verification Suite', async (t) => {
   const db = getDatabase();
@@ -274,7 +276,122 @@ test('STEP 5: Portal Views & Timetable Verification Suite', async (t) => {
     assert.strictEqual(result.errorCount, 0, 'Active timetable version must have 0 hard validation errors');
   });
 
+  // CHECK 9: HTTP Security Review: Parameter Spoofing Resistance & Strict RBAC Enforcement
+  await t.test('9. HTTP Security Review: Parameter Spoofing Resistance & Strict RBAC Enforcement', async () => {
+    const serverInstance = await new Promise((resolve) => {
+      const server = app.listen(0, '127.0.0.1', () => resolve(server));
+    });
+    const { port } = serverInstance.address();
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    try {
+      // 1. Authenticate Student
+      const stuRes = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'student', password: SEED_PASSWORDS.student, role: 'student' })
+      });
+      const stuAuth = await stuRes.json();
+      assert.strictEqual(stuRes.status, 200);
+
+      // Attempt spoofing sectionId in query parameter
+      const stuSpoof = await fetch(`${baseUrl}/api/student/schedule?sectionId=5`, {
+        headers: { 'Authorization': `Bearer ${stuAuth.token}` }
+      });
+      const stuSpoofData = await stuSpoof.json();
+      assert.strictEqual(stuSpoof.status, 200);
+      assert.strictEqual(stuSpoofData.section.id, 15, 'Student spoofed sectionId must be ignored and own section 15 returned');
+      assert.strictEqual(stuSpoofData.section.name, 'CSE-5B');
+
+      // 2. Authenticate Faculty Manjula
+      const facRes = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'manjula', password: SEED_PASSWORDS.faculty, role: 'faculty' })
+      });
+      const facAuth = await facRes.json();
+      assert.strictEqual(facRes.status, 200);
+
+      // Attempt spoofing facultyId in query parameter
+      const facSpoof = await fetch(`${baseUrl}/api/faculty/profile?facultyId=2`, {
+        headers: { 'Authorization': `Bearer ${facAuth.token}` }
+      });
+      const facSpoofData = await facSpoof.json();
+      assert.strictEqual(facSpoof.status, 200);
+      assert.strictEqual(facSpoofData.faculty.id, 1, 'Faculty spoofed facultyId must be ignored and Manjula id 1 returned');
+      assert.strictEqual(facSpoofData.weeklySchedule.length, 13, 'Manjula weekly load must be exactly 13 periods');
+
+      // 3. Month Calendar HTTP endpoint verification
+      const calRes = await fetch(`${baseUrl}/api/faculty/calendar?year=2026&month=10`, {
+        headers: { 'Authorization': `Bearer ${facAuth.token}` }
+      });
+      const calData = await calRes.json();
+      assert.strictEqual(calRes.status, 200);
+      assert.strictEqual(calData.days.length, 30);
+      const day12 = calData.days.find(d => d.date === '2026-11-12');
+      assert.strictEqual(day12.dayName, 'Thursday');
+      assert.strictEqual(day12.classesCount, 0, 'Thursday has 0 scheduled periods for Manjula');
+
+      // 4. Cross-role boundary enforcement (403 Forbidden)
+      const stuToFac = await fetch(`${baseUrl}/api/faculty/profile`, {
+        headers: { 'Authorization': `Bearer ${stuAuth.token}` }
+      });
+      assert.strictEqual(stuToFac.status, 403, 'Student cannot access faculty routes');
+
+      const stuToAdmin = await fetch(`${baseUrl}/api/admin/overview`, {
+        headers: { 'Authorization': `Bearer ${stuAuth.token}` }
+      });
+      assert.strictEqual(stuToAdmin.status, 403, 'Student cannot access admin routes');
+
+      const facToStu = await fetch(`${baseUrl}/api/student/schedule`, {
+        headers: { 'Authorization': `Bearer ${facAuth.token}` }
+      });
+      assert.strictEqual(facToStu.status, 403, 'Faculty cannot access student routes');
+
+      const facToAdmin = await fetch(`${baseUrl}/api/admin/overview`, {
+        headers: { 'Authorization': `Bearer ${facAuth.token}` }
+      });
+      assert.strictEqual(facToAdmin.status, 403, 'Faculty cannot access admin routes');
+
+      console.log('[CHECK 9] ✓ PASS: HTTP parameter spoofing blocked & strict RBAC barriers verified (403)');
+    } finally {
+      serverInstance.close();
+    }
+  });
+
+  // CHECK 10: Multi-User HTTP Schedule Separation
+  await t.test('10. Multi-User HTTP Schedule Separation', async () => {
+    const serverInstance = await new Promise((resolve) => {
+      const server = app.listen(0, '127.0.0.1', () => resolve(server));
+    });
+    const { port } = serverInstance.address();
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    try {
+      const f01Res = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'f01', password: SEED_PASSWORDS.faculty, role: 'faculty' })
+      });
+      const f01Auth = await f01Res.json();
+      assert.strictEqual(f01Res.status, 200);
+
+      const f01Prof = await fetch(`${baseUrl}/api/faculty/profile`, {
+        headers: { 'Authorization': `Bearer ${f01Auth.token}` }
+      });
+      const f01Data = await f01Prof.json();
+      assert.strictEqual(f01Data.faculty.id, 2, 'Second faculty user f01 must resolve to faculty_id 2');
+      assert.strictEqual(f01Data.faculty.name, 'Dr. Krishna A N');
+      assert.ok(f01Data.weeklySchedule.every(e => e.faculty_id === 2), 'Dr. Krishna only sees own entries');
+      assert.ok(f01Data.weeklySchedule.every(e => e.faculty_id !== 1), 'Dr. Krishna schedule contains no Manjula entries');
+
+      console.log('[CHECK 10] ✓ PASS: Multi-user faculty HTTP schedule separation confirmed');
+    } finally {
+      serverInstance.close();
+    }
+  });
+
   console.log('\n========================================================================');
-  console.log('ALL 8 VERIFICATION CHECKS PASSED PERFECTLY!');
+  console.log('ALL 10 VERIFICATION CHECKS PASSED PERFECTLY!');
   console.log('========================================================================\n');
 });

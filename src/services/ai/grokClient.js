@@ -1,7 +1,7 @@
 import config from '../../config/env.js';
 
 export async function callGrok({ apiKey, model, messages, temperature = 0.2, responseFormat = null }) {
-  if (!apiKey || apiKey.startsWith('sk-O5H6d')) {
+  if (!apiKey) {
     throw new Error('GROK_API_KEY_NOT_CONFIGURED');
   }
 

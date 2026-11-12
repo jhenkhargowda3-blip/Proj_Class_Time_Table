@@ -141,7 +141,7 @@ ON timetable_versions(status) WHERE status = 'active';
 CREATE TABLE IF NOT EXISTS timetable_entries (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   version_id INTEGER NOT NULL REFERENCES timetable_versions(id) ON DELETE CASCADE,
-  section_id INTEGER NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+  section_id INTEGER NULL REFERENCES sections(id) ON DELETE CASCADE,
   subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE RESTRICT,
   faculty_id INTEGER NOT NULL REFERENCES faculty(id) ON DELETE RESTRICT,
   room_id INTEGER NOT NULL REFERENCES rooms(id) ON DELETE RESTRICT,
@@ -149,7 +149,10 @@ CREATE TABLE IF NOT EXISTS timetable_entries (
   slot_id INTEGER NOT NULL REFERENCES time_slots(id) ON DELETE RESTRICT,
   is_lab_block INTEGER NOT NULL DEFAULT 0 CHECK (is_lab_block IN (0, 1)),
   locked INTEGER NOT NULL DEFAULT 0 CHECK (locked IN (0, 1)),
-  is_draft INTEGER NOT NULL DEFAULT 0 CHECK (is_draft IN (0, 1))
+  is_draft INTEGER NOT NULL DEFAULT 0 CHECK (is_draft IN (0, 1)),
+  batch TEXT NULL,
+  room_note TEXT NULL,
+  session_id TEXT NULL
 );
 
 -- ============================================================================
@@ -158,8 +161,8 @@ CREATE TABLE IF NOT EXISTS timetable_entries (
 -- ============================================================================
 
 -- A. A section cannot have two classes in the same slot, room, and batch (blocks true duplicates while allowing parallel batches)
-CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_section_slot 
-ON timetable_entries(version_id, section_id, day_id, slot_id, room_id, COALESCE(batch, ''));
+CREATE UNIQUE INDEX IF NOT EXISTS uq_timetable_entries_slot 
+ON timetable_entries(version_id, section_id, day_id, slot_id, COALESCE(room_id,0), COALESCE(batch,''));
 
 -- B. A faculty cannot teach two classes at the same time in the same version
 CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_faculty_slot 

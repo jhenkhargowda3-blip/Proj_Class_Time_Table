@@ -6,6 +6,7 @@ import { requireRole } from '../middleware/role.js';
 import { registerTeacher } from '../services/teacherService.js';
 import { getVerificationReport, importReferenceData } from '../services/referenceDataService.js';
 import config from '../config/env.js';
+import { broadcast } from '../services/sse.js';
 
 const router = Router();
 
@@ -1368,7 +1369,11 @@ router.get('/undo-status', (req, res) => {
 // 14. Timetable Publish (Activate) Endpoint
 router.post(['/publish-timetable', '/publish', '/versions/:id/activate'], (req, res) => {
   const db = getDatabase();
-  const versionId = req.params.id ? parseInt(req.params.id, 10) : (req.body.versionId || db.prepare("SELECT id FROM timetable_versions WHERE status = 'active' OR source = 'imported_verified' ORDER BY id ASC LIMIT 1").get()?.id);
+  const versionIdRaw = req.params.id || req.body?.versionId;
+  const versionId = versionIdRaw
+    ? parseInt(versionIdRaw, 10)
+    : db.prepare("SELECT id FROM timetable_versions WHERE status = 'active' OR source = 'imported_verified' ORDER BY id ASC LIMIT 1").get()?.id;
+
   if (!versionId) {
     return res.status(400).json({ error: 'No version ID specified' });
   }
@@ -1393,6 +1398,12 @@ router.post(['/publish-timetable', '/publish', '/versions/:id/activate'], (req, 
   activateTx();
 
   const entriesCountAfter = db.prepare('SELECT count(*) as count FROM timetable_entries WHERE version_id = ?').get(versionId).count;
+
+  broadcast('timetable.updated', {
+    type: 'version_activated',
+    versionId,
+    versionName: targetVersion.name
+  });
 
   res.json({
     success: true,

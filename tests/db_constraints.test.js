@@ -41,7 +41,7 @@ test('Database Hard Constraints & Collision Prevention', async (t) => {
     );
   });
 
-  await t.test('Prevents section double-booking via UNIQUE constraint', () => {
+  await t.test('Prevents section double-booking via UNIQUE constraint (identical room and batch)', () => {
     const otherFaculty = db.prepare('SELECT id FROM faculty WHERE id != ? LIMIT 1').get(existing.faculty_id);
 
     assert.throws(
@@ -66,6 +66,29 @@ test('Database Hard Constraints & Collision Prevention', async (t) => {
       },
       'Expected insertion to fail due to section double-booking constraint'
     );
+  });
+
+  await t.test('Allows parallel batches for the same section in the same slot with different room or batch', () => {
+    const otherRoom = db.prepare('SELECT id FROM rooms WHERE id != ? LIMIT 1').get(existing.room_id);
+    const otherFaculty = db.prepare('SELECT id FROM faculty WHERE id != ? LIMIT 1').get(existing.faculty_id);
+
+    const info = db.prepare(`
+      INSERT INTO timetable_entries 
+      (version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, is_draft, batch)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0, 1, ?)
+    `).run(
+      existing.version_id,
+      existing.section_id,
+      existing.subject_id,
+      otherFaculty.id,
+      otherRoom.id,
+      existing.day_id,
+      existing.slot_id,
+      'BATCH_PARALLEL_TEST'
+    );
+
+    assert.ok(info.lastInsertRowid > 0);
+    db.prepare('DELETE FROM timetable_entries WHERE id = ?').run(info.lastInsertRowid);
   });
 
   await t.test('Prevents room double-booking via UNIQUE constraint', () => {

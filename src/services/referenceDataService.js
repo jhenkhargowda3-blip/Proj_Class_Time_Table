@@ -264,8 +264,8 @@ export function migrateDatabaseSchema(db) {
         room_note TEXT NULL,
         session_id TEXT NULL
       );
-      INSERT INTO timetable_entries_new (id, version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, is_draft)
-      SELECT id, version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, is_draft FROM timetable_entries;
+      INSERT INTO timetable_entries_new (id, version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, is_draft, batch, room_note, session_id)
+      SELECT id, version_id, section_id, subject_id, faculty_id, room_id, day_id, slot_id, is_lab_block, locked, is_draft, batch, room_note, session_id FROM timetable_entries;
       DROP TABLE timetable_entries;
       ALTER TABLE timetable_entries_new RENAME TO timetable_entries;
       PRAGMA foreign_keys = ON;

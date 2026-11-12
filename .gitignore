@@ -7,8 +7,9 @@ coverage/
 .env
 .env.local
 !.env.example
-data/*.db
-data/*.db-shm
-data/*.db-wal
+data/*.db*
+data/*.bak*
+*.db*
+*.bak*
 uploads/*
 !uploads/.gitkeep

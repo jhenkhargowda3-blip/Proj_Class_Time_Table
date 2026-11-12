@@ -103,34 +103,36 @@ app.get('/', (req, res) => {
 // Centralized error handler
 app.use(errorHandler);
 
-// Initialize DB on boot & initialize clean structure if empty
-try {
-  const db = getDatabase();
-  const userTable = db.prepare("SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='users'").get();
-  if (userTable && userTable.count > 0) {
-    const adminCount = db.prepare("SELECT count(*) as count FROM users WHERE role = 'admin'").get();
-    if (!adminCount || adminCount.count === 0) {
-      console.log('[CTAS] Database empty - initializing clean college structure...');
-      seedDatabase(db, { clean: true });
+// Initialize DB on boot & initialize clean structure if empty (in normal server mode)
+if (!process.env.NODE_TEST_CONTEXT) {
+  try {
+    const db = getDatabase();
+    const userTable = db.prepare("SELECT count(*) as count FROM sqlite_master WHERE type='table' AND name='users'").get();
+    if (userTable && userTable.count > 0) {
+      const adminCount = db.prepare("SELECT count(*) as count FROM users WHERE role = 'admin'").get();
+      if (!adminCount || adminCount.count === 0) {
+        console.log('[CTAS] Database empty - initializing clean college structure...');
+        seedDatabase(db, { clean: true });
+      }
     }
+    // Ensure faculty profile & credentials for Mrs. Manjula H S are initialized
+    registerTeacher({
+      username: 'manjula',
+      password: process.env.FACULTY_SEED_PASSWORD || 'man2112',
+      fullName: 'Mrs. Manjula H S',
+      email: 'manjula@gmail.com',
+      phone: '7374619852',
+      departmentCode: 'CSE',
+      departmentName: 'Computer Science & Engineering'
+    }, db);
+
+    // Ensure reference timetable data matches CTAS_reference_data.json
+    importReferenceData(db);
+
+    console.log(`[CTAS] SQLite database ready at ${config.dbPath}`);
+  } catch (err) {
+    console.error('[CTAS] Failed to initialize database:', err);
   }
-  // Ensure faculty profile & credentials for Mrs. Manjula H S are initialized
-  registerTeacher({
-    username: 'manjula',
-    password: process.env.FACULTY_SEED_PASSWORD || 'man2112',
-    fullName: 'Mrs. Manjula H S',
-    email: 'manjula@gmail.com',
-    phone: '7374619852',
-    departmentCode: 'CSE',
-    departmentName: 'Computer Science & Engineering'
-  }, db);
-
-  // Ensure reference timetable data matches CTAS_reference_data.json
-  importReferenceData(db);
-
-  console.log(`[CTAS] SQLite database ready at ${config.dbPath}`);
-} catch (err) {
-  console.error('[CTAS] Failed to initialize database:', err);
 }
 
 let serverInstance = null;

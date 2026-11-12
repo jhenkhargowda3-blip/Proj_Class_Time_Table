@@ -30,9 +30,13 @@ CREATE TABLE IF NOT EXISTS faculty (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER UNIQUE NULL REFERENCES users(id) ON DELETE SET NULL,
   name TEXT NOT NULL,
+  code TEXT NULL,
   department_id INTEGER NOT NULL REFERENCES departments(id) ON DELETE RESTRICT,
   email TEXT NOT NULL UNIQUE,
   phone TEXT NOT NULL,
+  classes_taught TEXT NULL,
+  effective_from TEXT NULL,
+  weekly_hours INTEGER NULL,
   max_periods_per_day INTEGER NOT NULL DEFAULT 4,
   max_periods_per_week INTEGER NOT NULL DEFAULT 18,
   is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
@@ -42,12 +46,14 @@ CREATE TABLE IF NOT EXISTS faculty (
 CREATE TABLE IF NOT EXISTS subjects (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   code TEXT UNIQUE NOT NULL,
-  name TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('theory', 'lab')),
-  weekly_periods INTEGER NOT NULL,
+  name TEXT NULL,
+  short_name TEXT NULL,
+  type TEXT NOT NULL CHECK (type IN ('theory', 'lab', 'activity')),
+  weekly_periods INTEGER NOT NULL DEFAULT 0,
   lab_block_length INTEGER NOT NULL DEFAULT 1,
   department_id INTEGER NOT NULL REFERENCES departments(id) ON DELETE RESTRICT,
-  semester INTEGER NOT NULL
+  semester TEXT NULL,
+  semester_candidates TEXT NULL
 );
 
 -- 5. Faculty Subjects (Who is qualified to teach what)
@@ -63,7 +69,9 @@ CREATE TABLE IF NOT EXISTS sections (
   name TEXT NOT NULL UNIQUE,
   semester INTEGER NOT NULL,
   department_id INTEGER NOT NULL REFERENCES departments(id) ON DELETE RESTRICT,
-  strength INTEGER NOT NULL DEFAULT 40
+  strength INTEGER NULL,
+  batches TEXT NULL,
+  classroom TEXT NULL
 );
 
 -- 7. Section Subjects (Which faculty teaches which subject to which section)
@@ -78,8 +86,11 @@ CREATE TABLE IF NOT EXISTS section_subjects (
 CREATE TABLE IF NOT EXISTS rooms (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT UNIQUE NOT NULL,
+  code TEXT NULL,
   type TEXT NOT NULL CHECK (type IN ('classroom', 'lab')),
   capacity INTEGER NOT NULL DEFAULT 50,
+  floor INTEGER NULL,
+  floor_name TEXT NULL,
   is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
 );
 
@@ -117,7 +128,9 @@ CREATE TABLE IF NOT EXISTS timetable_versions (
   status TEXT NOT NULL CHECK (status IN ('draft', 'active', 'archived')),
   created_by INTEGER NULL REFERENCES users(id) ON DELETE SET NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  notes TEXT NULL
+  notes TEXT NULL,
+  source TEXT NULL,
+  baseline_fingerprint TEXT NULL
 );
 
 -- Partial UNIQUE index: Only one version may be active at any given time
@@ -249,16 +262,28 @@ CREATE INDEX IF NOT EXISTS idx_student_notice_reads_user ON student_notice_reads
 CREATE TABLE IF NOT EXISTS faculty_sessions (
   id TEXT PRIMARY KEY,
   faculty_id TEXT NOT NULL,
+  faculty_name TEXT,
   day TEXT NOT NULL,
   start TEXT,
   end TEXT,
   period_start INTEGER,
   period_end INTEGER,
+  hours INTEGER,
   subject_code TEXT,
   type TEXT,
   batch TEXT,
   section TEXT,
-  semester TEXT
+  semester TEXT,
+  section_status TEXT,
+  candidate_sections TEXT,
+  room_name TEXT DEFAULT 'TBD',
+  room_id TEXT NULL,
+  room_type TEXT NULL,
+  floor INTEGER NULL,
+  floor_name TEXT NULL,
+  room_note TEXT NULL,
+  section_resolved TEXT NULL,
+  section_source TEXT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_faculty_sessions_faculty ON faculty_sessions(faculty_id);
 CREATE INDEX IF NOT EXISTS idx_faculty_sessions_day ON faculty_sessions(day);

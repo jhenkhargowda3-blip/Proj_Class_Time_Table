@@ -26,6 +26,7 @@ let lastSharedValidation = null;
 let undoStack = [];
 let redoStack = [];
 let activeStepHighlight = null;
+let originalBaselineSnapshot = null;
 
 // CSP Timetable Generation Progress Tracker State
 let isGenerationRunning = false;
@@ -2222,6 +2223,19 @@ async function executeUndo() {
     await syncRestoredEntriesToDb(restored);
   }
 
+  if (originalBaselineSnapshot && restored) {
+    const restoredSnapshot = JSON.stringify(restored.map(e => ({
+      id: e.id,
+      day_id: e.day_id,
+      slot_id: e.slot_id,
+      room_id: e.room_id,
+      faculty_id: e.faculty_id
+    })));
+    if (restoredSnapshot === originalBaselineSnapshot) {
+      draftWorkingEntries = null;
+    }
+  }
+
   runSharedValidation();
   renderStudioGrid();
   showToast('Undone manual move (Ctrl+Z)', 'info');
@@ -2266,10 +2280,45 @@ async function syncRestoredEntriesToDb(entriesList) {
 
 // Unified Timetable Validation Function for CTAS
 // Calculates conflicts for faculty, rooms, and sections consistently across Header Counter, Toolbar Button, Grid, and Resolver
-export function calculateTimetableConflicts(targetEntries = null, targetMasterData = null) {
+export function calculateTimetableConflicts(targetEntries = null, targetMasterData = null, options = {}) {
   const mData = targetMasterData || masterData;
   const entriesToValidate = targetEntries || draftWorkingEntries || currentVersionData?.entries || [];
-  const rawValidation = validateTimetableConflict(entriesToValidate, mData || {});
+
+  const versionObj = currentVersionData?.version || currentVersionData || {};
+  const isImportedVerified = versionObj.source === 'imported_verified';
+
+  let baselineFingerprint = options.baselineFingerprint;
+  if (!baselineFingerprint && versionObj.baseline_fingerprint) {
+    try {
+      baselineFingerprint = typeof versionObj.baseline_fingerprint === 'string'
+        ? JSON.parse(versionObj.baseline_fingerprint)
+        : versionObj.baseline_fingerprint;
+    } catch (e) {}
+  }
+
+  // Check if current entries match the pristine loaded baseline snapshot
+  let isModified = false;
+  if (originalBaselineSnapshot && entriesToValidate.length > 0) {
+    const currentSnapshot = JSON.stringify(entriesToValidate.map(e => ({
+      id: e.id,
+      day_id: e.day_id,
+      slot_id: e.slot_id,
+      room_id: e.room_id,
+      faculty_id: e.faculty_id
+    })));
+    isModified = (currentSnapshot !== originalBaselineSnapshot);
+  } else if (draftWorkingEntries) {
+    isModified = true;
+  }
+
+  const validationOpts = {
+    isGeneratingOrEditing: isModified || Boolean(options.isGeneratingOrEditing),
+    isImportedBaseline: isImportedVerified && !isModified,
+    baselineFingerprint: baselineFingerprint || [],
+    ...options
+  };
+
+  const rawValidation = validateTimetableConflict(entriesToValidate, mData || {}, validationOpts);
 
   // Categorize conflicts consistently across Faculty, Rooms, and Sections
   const facultyConflicts = (rawValidation.conflicts || []).filter(v =>
@@ -2670,6 +2719,20 @@ async function loadStudioVersion(versionId) {
   try {
     resetResolvedPreviewState();
     currentVersionData = await apiRequest(`/api/timetable/versions/${versionId}`);
+
+    // Store pristine baseline snapshot for imported_verified detection
+    if (currentVersionData?.entries && (currentVersionData?.version?.source === 'imported_verified' || !currentVersionData?.version?.source)) {
+      originalBaselineSnapshot = JSON.stringify(currentVersionData.entries.map(e => ({
+        id: e.id,
+        day_id: e.day_id,
+        slot_id: e.slot_id,
+        room_id: e.room_id,
+        faculty_id: e.faculty_id
+      })));
+    } else {
+      originalBaselineSnapshot = null;
+    }
+
     const val = runSharedValidation(currentVersionData.entries);
 
     // Sync draft conflict banner

@@ -60,14 +60,29 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
   const sectionSubjectCountMap = new Map(); // key: `sectionId_subjectId` -> entries[]
   const labBlocksMap = new Map();           // key: `sectionId_subjectId_dayId` -> entries[]
 
+  const baselineKeySet = new Set();
+  if (options.baselineFingerprint) {
+    if (options.baselineFingerprint instanceof Set) {
+      for (const k of options.baselineFingerprint) baselineKeySet.add(k);
+    } else if (Array.isArray(options.baselineFingerprint)) {
+      for (const k of options.baselineFingerprint) baselineKeySet.add(k);
+    }
+  }
+
   let conflictSequence = 1;
 
   function registerViolation(v) {
     v.severity = v.severity || 'error';
     v.id = `cnf_${conflictSequence++}`;
+    v.key = `${v.type || v.code}_${v.dayId || v.day || ''}_${v.slotId || v.period || ''}_${v.sectionId || ''}_${v.facultyId || ''}_${v.roomId || ''}`;
+
+    if (baselineKeySet.has(v.key) || options.isImportedBaseline) {
+      v.isBaseline = true;
+    }
+
     violations.push(v);
 
-    if (v.severity === 'error') {
+    if (v.severity === 'error' && !v.isBaseline) {
       if (Array.isArray(v.involvedEntryIds)) {
         for (const eid of v.involvedEntryIds) {
           if (!conflictsByEntryId[eid]) conflictsByEntryId[eid] = [];
@@ -503,14 +518,25 @@ export function evaluateTimetableConflicts(entries = [], masterData = {}, option
     }
   }
 
-  const errorsOnly = violations.filter(v => v.severity === 'error');
+  const errorsOnly = violations.filter(v => v.severity === 'error' && !v.isBaseline);
+  const warningsOnly = violations.filter(v => v.severity === 'warning');
+
+  if (options.logViolations || options.diagnostic) {
+    const counts = {};
+    for (const v of violations) {
+      counts[v.type] = (counts[v.type] || 0) + 1;
+    }
+    console.table ? console.table(counts) : console.log('[Timetable Validator Violations]', counts);
+  }
+
   return {
     isValid: errorsOnly.length === 0,
     errorCount: errorsOnly.length,
-    warningCount: violations.filter(v => v.severity === 'warning').length,
+    warningCount: warningsOnly.length,
     conflicts: violations,
     conflictsByEntryId,
-    conflictsByCellKey
+    conflictsByCellKey,
+    baselineFingerprint: violations.map(v => v.key)
   };
 }
 

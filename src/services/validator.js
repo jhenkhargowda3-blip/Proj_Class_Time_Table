@@ -93,18 +93,22 @@ export function validateTimetable(versionIdOrEntries, context = {}) {
     }
 
     // 3. Section double-booking (Hard Error)
-    // Parallel lab batches and parallel electives / activities in different rooms are valid.
-    if (e.section_id) {
+    // Parallel lab batches, parallel electives, and activities in different rooms are valid.
+    const isPooledOrNoSemester = (!e.semester && !e.section_semester) || (e.subject_code && (e.subject_code.startsWith('OE') || e.subject_code === 'OE'));
+    if (e.section_id && !isPooledOrNoSemester) {
       const secKey = `${e.section_id}_${timeKey}`;
       if (sectionSlotMap.has(secKey)) {
         const prior = sectionSlotMap.get(secKey);
         const isSharedActivity = (e.subject_code === 'ACTIVITY' && prior.subject_code === 'ACTIVITY');
-        const isBothLabs = (e.subject_type === 'lab' && prior.subject_type === 'lab');
-        const isParallelElective = (e.room_id !== prior.room_id && (e.room_note || prior.room_note || (e.batch && prior.batch && e.batch !== prior.batch) || (e.subject_code !== prior.subject_code)));
+        const isBothLabs = ((e.subject_type === 'lab' || Number(e.is_lab_block) === 1) && (prior.subject_type === 'lab' || Number(prior.is_lab_block) === 1));
+        const hasDifferentBatch = Boolean(e.batch && prior.batch && e.batch !== prior.batch);
+        const hasRoomNote = Boolean(e.room_note || prior.room_note);
+        const isParallelElective = (e.room_id !== prior.room_id && (hasRoomNote || hasDifferentBatch || (e.subject_code !== prior.subject_code)));
 
-        if (!isSharedActivity && !isBothLabs && !isParallelElective) {
+        if (!isSharedActivity && !isBothLabs && !isParallelElective && !hasDifferentBatch && !hasRoomNote) {
+          const isKnownOverlap = Boolean(e.room_note || prior.room_note || e.batch || prior.batch || e.subject_code === 'ACTIVITY' || prior.subject_code === 'ACTIVITY');
           violations.push({
-            severity: 'error',
+            severity: isKnownOverlap ? 'warning' : 'error',
             code: 'SECTION_DOUBLE_BOOKED',
             message: `Section '${e.section_name}' has two simultaneous classes ('${e.subject_code}' & '${prior.subject_code}') on ${e.day_name} at ${e.slot_label}.`,
             entities: { sectionId: e.section_id, entryId1: prior.id, entryId2: e.id },
@@ -191,16 +195,27 @@ export function validateTimetable(versionIdOrEntries, context = {}) {
         });
       }
 
-      // 7. Room capacity check (Hard Error)
-      if (e.section_strength && e.room_capacity < e.section_strength) {
-        violations.push({
-          severity: 'error',
-          code: 'ROOM_CAPACITY_INSUFFICIENT',
-          message: `Room '${e.room_name}' capacity (${e.room_capacity}) is smaller than section '${e.section_name}' strength (${e.section_strength}).`,
-          entities: { entryId: e.id, roomId: e.room_id, sectionId: e.section_id },
-          day: e.day_name,
-          slot: e.slot_label
-        });
+      // 7. Room capacity check (Rule 1)
+      // For lab entries compare room with batch size (section strength / batch count), never whole section.
+      // For theory use section strength. If section strength is missing or 0, skip the check.
+      const isLabSubject = (e.subject_type || '').toLowerCase() === 'lab';
+      const rawSecStrength = Number(e.section_strength || 0);
+      if (rawSecStrength > 0 && e.room_capacity) {
+        let requiredCapacity = rawSecStrength;
+        if (isLabSubject) {
+          const batchCount = (e.batches ? e.batches.split(',').filter(Boolean).length : 0) || (e.batch_count || 3);
+          requiredCapacity = Math.ceil(rawSecStrength / batchCount);
+        }
+        if (e.room_capacity < requiredCapacity) {
+          violations.push({
+            severity: 'error',
+            code: 'ROOM_CAPACITY_INSUFFICIENT',
+            message: `Room '${e.room_name}' capacity (${e.room_capacity}) is smaller than section '${e.section_name}' (${isLabSubject ? 'batch size ' + requiredCapacity : rawSecStrength + ' students'}).`,
+            entities: { entryId: e.id, roomId: e.room_id, sectionId: e.section_id },
+            day: e.day_name,
+            slot: e.slot_label
+          });
+        }
       }
     }
 
@@ -208,24 +223,26 @@ export function validateTimetable(versionIdOrEntries, context = {}) {
     const facDayKey = `${e.faculty_id}_${e.day_id}`;
     facultyDayCounts.set(facDayKey, (facultyDayCounts.get(facDayKey) || 0) + 1);
 
-    // Section subject count
+    // Section subject count & entries tracking
     const secSubKey = `${e.section_id}_${e.subject_id}`;
     sectionSubjectCounts.set(secSubKey, (sectionSubjectCounts.get(secSubKey) || 0) + 1);
+    if (!sectionSubjectCounts.has(`entries_${secSubKey}`)) sectionSubjectCounts.set(`entries_${secSubKey}`, []);
+    sectionSubjectCounts.get(`entries_${secSubKey}`).push(e);
 
     // Section day slots for gap analysis
     const secDayKey = `${e.section_id}_${e.day_id}`;
     if (!sectionDaySlots.has(secDayKey)) sectionDaySlots.set(secDayKey, []);
     sectionDaySlots.get(secDayKey).push(e);
 
-    // Group labs per session or per batch
-    if (e.subject_type === 'lab' && (e.lab_block_length > 1 || e.is_lab_block === 1)) {
+    // Group labs per session (Rule 4: group by session_id so each session stays one block)
+    if (e.subject_type === 'lab' && (e.lab_block_length > 1 || e.is_lab_block === 1 || e.session_id)) {
       const lk = e.session_id ? `session_${e.session_id}` : `${e.section_id}_${e.day_id}_${e.subject_id}_${e.batch || 'all'}`;
       if (!labGroups.has(lk)) labGroups.set(lk, []);
       labGroups.get(lk).push(e);
     }
   }
 
-  // 8. Lab block continuity check (Hard Error)
+  // 8. Lab block continuity check (Hard Error - Rule 4)
   for (const [, labEntries] of labGroups) {
     if (labEntries.length > 1) {
       const sorted = [...labEntries].sort((a, b) => a.slot_no - b.slot_no);
@@ -246,40 +263,51 @@ export function validateTimetable(versionIdOrEntries, context = {}) {
     }
   }
 
-  // 9. Faculty daily overload (Warning)
+  // 9. Faculty daily overload (Rule 3: default to 6, treat as warning)
   for (const [facDayKey, count] of facultyDayCounts) {
     const [facultyId, dayId] = facDayKey.split('_').map(Number);
     const fac = db.prepare('SELECT name, max_periods_per_day FROM faculty WHERE id = ?').get(facultyId);
     const day = db.prepare('SELECT day_name FROM working_days WHERE id = ?').get(dayId);
-    if (fac && count > fac.max_periods_per_day) {
+    const limit = (fac && fac.max_periods_per_day) ? fac.max_periods_per_day : 6;
+    if (count > limit) {
       violations.push({
         severity: 'warning',
         code: 'FACULTY_OVERLOAD_DAY',
-        message: `Faculty '${fac.name}' has ${count} periods on ${day.day_name}, exceeding preferred limit of ${fac.max_periods_per_day}.`,
-        entities: { facultyId, dayId, count, max: fac.max_periods_per_day },
-        day: day.day_name,
+        message: `Faculty '${fac ? fac.name : 'Faculty ' + facultyId}' has ${count} periods on ${day ? day.day_name : 'Day ' + dayId}, exceeding preferred limit of ${limit}.`,
+        entities: { facultyId, dayId, count, max: limit },
+        day: day ? day.day_name : null,
         slot: null
       });
     }
   }
 
-  // 10. Subject period count mismatch (Error if full version check)
-  if (versionId && !context.skipPeriodCountCheck) {
+  // 10. Subject period count mismatch (Rule 2: only run when admin generates or edits, count lab periods per batch, never fallback to default 4)
+  if (versionId && !context.skipPeriodCountCheck && context.isGeneratingOrEditing && !context.isImportedBaseline) {
     const requiredAssignments = db.prepare(`
-      SELECT ss.section_id, ss.subject_id, s.code as subject_code, s.weekly_periods, sec.name as section_name
+      SELECT ss.section_id, ss.subject_id, s.code as subject_code, s.weekly_periods, s.type as subject_type, sec.name as section_name
       FROM section_subjects ss
       JOIN subjects s ON ss.subject_id = s.id
       JOIN sections sec ON ss.section_id = sec.id
     `).all();
 
     for (const req of requiredAssignments) {
-      const scheduledCount = sectionSubjectCounts.get(`${req.section_id}_${req.subject_id}`) || 0;
-      if (scheduledCount !== req.weekly_periods) {
+      const scheduledAll = sectionSubjectCounts.get(`entries_${req.section_id}_${req.subject_id}`) || [];
+      let scheduledCount = scheduledAll.length;
+      if (req.subject_type === 'lab') {
+        const batchCounts = new Map();
+        for (const e of scheduledAll) {
+          const b = e.batch || 'all';
+          batchCounts.set(b, (batchCounts.get(b) || 0) + 1);
+        }
+        scheduledCount = batchCounts.size > 0 ? Math.max(...batchCounts.values()) : scheduledAll.length;
+      }
+      const required = req.weekly_periods;
+      if (required !== undefined && required !== null && required > 0 && scheduledCount !== required) {
         violations.push({
           severity: 'error',
           code: 'SUBJECT_PERIODS_MISMATCH',
-          message: `Section '${req.section_name}' requires ${req.weekly_periods} periods of '${req.subject_code}', but ${scheduledCount} are scheduled.`,
-          entities: { sectionId: req.section_id, subjectId: req.subject_id, required: req.weekly_periods, actual: scheduledCount },
+          message: `Section '${req.section_name}' requires ${required} periods of '${req.subject_code}', but ${scheduledCount} are scheduled.`,
+          entities: { sectionId: req.section_id, subjectId: req.subject_id, required, actual: scheduledCount },
           day: null,
           slot: null
         });
@@ -307,14 +335,46 @@ export function validateTimetable(versionIdOrEntries, context = {}) {
     }
   }
 
-  const errorCount = violations.filter(v => v.severity === 'error').length;
+  // Baseline fingerprint handling (Step 3)
+  let baselineKeys = new Set();
+  if (context.baselineFingerprint) {
+    if (context.baselineFingerprint instanceof Set) baselineKeys = context.baselineFingerprint;
+    else if (Array.isArray(context.baselineFingerprint)) baselineKeys = new Set(context.baselineFingerprint);
+  } else if (versionId) {
+    try {
+      const ver = db.prepare('SELECT source, baseline_fingerprint FROM timetable_versions WHERE id = ?').get(versionId);
+      if (ver && ver.source === 'imported_verified' && ver.baseline_fingerprint) {
+        const parsed = JSON.parse(ver.baseline_fingerprint);
+        if (Array.isArray(parsed)) baselineKeys = new Set(parsed);
+      }
+    } catch (e) {}
+  }
+
+  for (const v of violations) {
+    v.key = `${v.code || v.type}_${v.day || ''}_${v.slot || ''}_${v.entities?.sectionId || ''}_${v.entities?.facultyId || ''}_${v.entities?.roomId || ''}`;
+    if (baselineKeys.has(v.key) || context.isImportedBaseline) {
+      v.isBaseline = true;
+    }
+  }
+
+  if (context.logViolations || context.diagnostic) {
+    const counts = {};
+    for (const v of violations) {
+      counts[v.code || v.type] = (counts[v.code || v.type] || 0) + 1;
+    }
+    console.table ? console.table(counts) : console.log('[Validator Diagnostics Table]', counts);
+  }
+
+  const errorsOnly = violations.filter(v => v.severity === 'error' && !v.isBaseline);
+  const errorCount = errorsOnly.length;
   const warningCount = violations.filter(v => v.severity === 'warning').length;
 
   return {
     isValid: errorCount === 0,
     errorCount,
     warningCount,
-    violations
+    violations,
+    baselineFingerprint: violations.map(v => v.key)
   };
 }
 

@@ -35,6 +35,9 @@ function getWeekMonday(refDate = new Date()) {
 let currentDateStr = getLocalDateString(new Date());
 let currentSection = null;
 let currentScheduleData = null;
+let cachedTimeSlots = null; // MODIFIED: Cached authoritative time_slots from DB (includes is_break rows if any)
+let lastWeeklyRenderSignature = null;
+let forceWeeklyFadeIn = true;
 let activeTab = 'my-section'; // 'my-section' | 'department'
 
 // Real-Time Class Changes & Substitute Notice State
@@ -54,21 +57,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initialize SSE for live schedule and substitution updates
   initSSE('/api/events');
   onEvent('timetable.updated', () => {
+    cachedTimeSlots = null; // Refresh slot definitions if timetable updated
+    forceWeeklyFadeIn = true;
     fetchAndRenderNotices(true);
     loadSchedule(currentDateStr);
   });
   onEvent('absence:created', (data) => {
     showToast('Faculty update reported: checking schedule adjustments...', 'info');
+    forceWeeklyFadeIn = true;
     fetchAndRenderNotices(true);
     loadSchedule(currentDateStr);
   });
   onEvent('substitution:claimed', (data) => {
     showToast(`Substitute coverage confirmed: ${data.substituteFacultyName} taking ${data.subjectName}`, 'success');
+    forceWeeklyFadeIn = true;
     fetchAndRenderNotices(true);
     loadSchedule(currentDateStr);
   });
   onEvent('substitution:assigned', (data) => {
     showToast(`Substitute update: ${data.substituteFacultyName} assigned for ${data.subjectName}`, 'info');
+    forceWeeklyFadeIn = true;
     fetchAndRenderNotices(true);
     loadSchedule(currentDateStr);
   });
@@ -1074,9 +1082,29 @@ window.triggerTestStudentNotice = function(customNotice = {}) {
   return testNotice;
 };
 
+// MODIFIED: Fetch real time_slots (including any Tea/Lunch breaks configured in DB) without inventing breaks
+async function ensureTimeSlotsLoaded(forceRefresh = false) {
+  if (Array.isArray(cachedTimeSlots) && cachedTimeSlots.length > 0 && !forceRefresh) {
+    return cachedTimeSlots;
+  }
+  try {
+    const deptData = await apiRequest('/api/student/department-timetable');
+    if (Array.isArray(deptData?.timeSlots) && deptData.timeSlots.length > 0) {
+      cachedTimeSlots = [...deptData.timeSlots].sort((a, b) => a.slot_no - b.slot_no);
+      return cachedTimeSlots;
+    }
+  } catch {
+    // Graceful fallback handled by renderWeeklyBreakdown
+  }
+  return null;
+}
+
 async function loadSchedule(dateStr) {
   try {
-    const data = await apiRequest(`/api/student/schedule?date=${dateStr}`);
+    const [data] = await Promise.all([
+      apiRequest(`/api/student/schedule?date=${dateStr}`),
+      ensureTimeSlotsLoaded()
+    ]);
     currentScheduleData = data;
     currentSection = data.section;
 
@@ -1101,7 +1129,7 @@ async function loadSchedule(dateStr) {
 
     renderTodaySchedule(data);
     renderNextClassTracker(data.todaySchedule || []);
-    renderWeeklyBreakdown(data.fullWeeklySchedule || []);
+    renderWeeklyBreakdown(data.fullWeeklySchedule || [], cachedTimeSlots);
 
   } catch (err) {
     console.error('Failed to load student schedule:', err);
@@ -1286,12 +1314,58 @@ function getDateForWeekdayInCurrentWeek(targetDayName) {
   return getLocalDateString(targetDate);
 }
 
-function renderWeeklyBreakdown(fullSchedule) {
+// MODIFIED: Helpers for transposed weekly timetable rendering
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatShortFacultyName(fullName) {
+  if (!fullName) return 'TBA';
+  const cleaned = String(fullName).trim();
+  const withoutPrefix = cleaned.replace(/^(Mrs\.|Mr\.|Ms\.|Dr\.|Prof\.)\s+/i, '');
+  return withoutPrefix || cleaned;
+}
+
+function formatShortRoomName(roomName) {
+  if (!roomName) return 'TBA';
+  return String(roomName).trim();
+}
+
+function getSlotEntries(fullSchedule, dayIndex, slotNo) {
+  return fullSchedule
+    .filter(e => e.day_index === dayIndex && e.slot_no === slotNo)
+    .sort((a, b) => {
+      const ba = (a.batch || '').localeCompare(b.batch || '');
+      if (ba !== 0) return ba;
+      return (a.subject_code || '').localeCompare(b.subject_code || '');
+    });
+}
+
+function getCellSignature(entries) {
+  if (!entries || !entries.length) return '';
+  return entries
+    .map(e => [
+      e.subject_code || '',
+      e.batch || '',
+      e.faculty_name || '',
+      e.room_name || '',
+      e.subject_type || '',
+      e.is_lab_block ? '1' : '0'
+    ].join('|'))
+    .join(';;');
+}
+
+function renderWeeklyBreakdown(fullSchedule, authoritativeSlots = null) {
   const container = document.getElementById('student-schedule-list');
   if (!container) return;
 
   if (!fullSchedule || !fullSchedule.length) {
-    container.innerHTML = `<div style="padding: 1.5rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle); border-radius: var(--radius-md);">No entries found in active timetable.</div>`;
+    container.innerHTML = `<div class="st-weekly-fade-in" style="padding: 1.5rem; text-align: center; color: var(--text-muted); background: var(--bg-surface-subtle); border-radius: var(--radius-md);">No entries found in active timetable.</div>`;
     return;
   }
 
@@ -1305,69 +1379,184 @@ function renderWeeklyBreakdown(fullSchedule) {
     { index: 6, name: 'Saturday', short: 'Sat' }
   ];
 
-  // Distinct slots from fullSchedule
-  const slotMap = new Map();
-  fullSchedule.forEach(e => {
-    if (!slotMap.has(e.slot_no)) {
-      slotMap.set(e.slot_no, {
-        slotNo: e.slot_no,
-        label: e.slot_label || `Period ${e.slot_no}`,
-        startTime: e.start_time,
-        endTime: e.end_time
-      });
-    }
-  });
-
-  const slots = Array.from(slotMap.values()).sort((a, b) => a.slotNo - b.slotNo);
-
-  let html = `
-    <div style="overflow-x: auto; margin-top: 0.5rem;">
-      <table style="width: 100%; border-collapse: collapse; border: 1px solid var(--border-subtle); font-size: 0.8rem; background: var(--bg-surface);">
-        <thead>
-          <tr style="background: var(--bg-surface-subtle); border-bottom: 2px solid var(--border-subtle);">
-            <th style="padding: 0.6rem 0.5rem; border: 1px solid var(--border-subtle); width: 100px; text-align: center;">Period</th>
-            ${days.map(d => `<th style="padding: 0.6rem 0.5rem; border: 1px solid var(--border-subtle); text-align: center; min-width: 110px;">${d.short}</th>`).join('')}
-          </tr>
-        </thead>
-        <tbody>
-  `;
-
-  for (const slot of slots) {
-    html += `
-      <tr>
-        <td style="padding: 0.5rem 0.4rem; border: 1px solid var(--border-subtle); background: var(--bg-surface-subtle); text-align: center; font-weight: 700;">
-          <div style="color: var(--color-brand-primary);">${slot.label}</div>
-          <div style="font-size: 0.68rem; color: var(--text-muted); font-weight: 400;" class="tabular-nums">${slot.startTime}</div>
-        </td>
-    `;
-
-    for (const d of days) {
-      const cellEntries = fullSchedule.filter(e => e.day_index === d.index && e.slot_no === slot.slotNo);
-
-      if (cellEntries.length === 0) {
-        html += `<td style="padding: 0.4rem; border: 1px solid var(--border-subtle); text-align: center; color: var(--text-muted); font-size: 0.72rem;">—</td>`;
-      } else {
-        html += `<td style="padding: 0.35rem; border: 1px solid var(--border-subtle); vertical-align: top; background: var(--bg-surface);">`;
-        html += cellEntries.map(e => `
-          <div style="padding: 0.35rem 0.45rem; background: var(--color-brand-blush-soft); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); margin-bottom: 0.25rem;">
-            <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.2rem;">
-              <span style="font-weight: 700; color: var(--color-brand-primary); font-size: 0.78rem;">${e.subject_code}</span>
-              ${e.batch ? `<span style="font-size: 0.65rem; font-weight: 700; background: var(--bg-surface); padding: 0.05rem 0.25rem; border-radius: 3px; border: 1px solid var(--border-subtle);">B:${e.batch}</span>` : ''}
-            </div>
-            <div style="font-size: 0.72rem; color: var(--text-primary); font-weight: 600; line-height: 1.2; margin-top: 0.15rem;">${e.subject_name}</div>
-            <div style="font-size: 0.68rem; color: var(--text-secondary); margin-top: 0.1rem;">${e.faculty_name}</div>
-            <div style="font-size: 0.65rem; color: var(--text-muted);">${e.room_name}</div>
-          </div>
-        `).join('');
-        html += `</td>`;
+  // Build ordered slot columns from DB timeSlots (only showing break columns if they exist in data)
+  let slots = [];
+  if (Array.isArray(authoritativeSlots) && authoritativeSlots.length > 0) {
+    slots = authoritativeSlots.map(s => ({
+      slotNo: s.slot_no,
+      label: s.label || `Period ${s.slot_no}`,
+      startTime: s.start_time || '',
+      endTime: s.end_time || '',
+      isBreak: Boolean(s.is_break === 1 || s.is_break === true)
+    })).sort((a, b) => a.slotNo - b.slotNo);
+  } else {
+    const slotMap = new Map();
+    fullSchedule.forEach(e => {
+      if (!slotMap.has(e.slot_no)) {
+        slotMap.set(e.slot_no, {
+          slotNo: e.slot_no,
+          label: e.slot_label || `Period ${e.slot_no}`,
+          startTime: e.start_time || '',
+          endTime: e.end_time || '',
+          isBreak: false
+        });
       }
-    }
-
-    html += `</tr>`;
+    });
+    slots = Array.from(slotMap.values()).sort((a, b) => a.slotNo - b.slotNo);
   }
 
-  html += `</tbody></table></div>`;
-  container.innerHTML = html;
+  // Today weekday index (1=Mon..6=Sat, 0=Sun) & current HH:MM for live highlights
+  const now = new Date();
+  const todayDayIndex = now.getDay();
+  const nowHHMM = now.toTimeString().slice(0, 5);
+  const activeSlot = slots.find(s => !s.isBreak && s.startTime && s.endTime && s.startTime <= nowHHMM && nowHHMM < s.endTime);
+
+  // Colgroup ensures Day and Break columns stay compact while teaching periods share remaining width equally
+  const colgroupHtml = [
+    '<col style="width: 54px;">',
+    ...slots.map(s => (s.isBreak ? '<col style="width: 36px;">' : '<col>'))
+  ].join('');
+
+  const headerCellsHtml = slots.map(s => {
+    if (s.isBreak) {
+      const shortBreak = (s.label || 'Break').toUpperCase().includes('LUNCH') ? 'LUNCH' : 'TEA';
+      return `
+        <th scope="col" class="st-break-th" title="${escapeHtml(s.label)} (${escapeHtml(s.startTime)}–${escapeHtml(s.endTime)})">
+          <div class="st-break-th-label">${shortBreak}</div>
+          <div class="st-break-th-time tabular-nums">${escapeHtml(s.startTime)}</div>
+        </th>
+      `;
+    }
+    const isCurrentPeriod = activeSlot && activeSlot.slotNo === s.slotNo;
+    return `
+      <th scope="col" class="st-period-th ${isCurrentPeriod ? 'st-current-period-head' : ''}">
+        <div class="st-period-name">${escapeHtml(s.label)}</div>
+        <div class="st-period-time tabular-nums">${escapeHtml(s.startTime)}–${escapeHtml(s.endTime)}</div>
+        ${isCurrentPeriod ? '<span class="st-live-tag">● Live</span>' : ''}
+      </th>
+    `;
+  }).join('');
+
+  let bodyRowsHtml = '';
+  days.forEach((d, dayRowIdx) => {
+    const isTodayRow = d.index === todayDayIndex;
+    bodyRowsHtml += `<tr class="${isTodayRow ? 'st-today-row' : ''}">`;
+    bodyRowsHtml += `
+      <th scope="row" class="st-day-cell" title="${escapeHtml(d.name)}">
+        <span>${escapeHtml(d.short)}</span>
+        ${isTodayRow ? '<span class="st-today-badge">Today</span>' : ''}
+      </th>
+    `;
+
+    let colIdx = 0;
+    while (colIdx < slots.length) {
+      const slot = slots[colIdx];
+
+      if (slot.isBreak) {
+        // Render vertical muted break column once across all 6 weekday rows
+        if (dayRowIdx === 0) {
+          const breakLabel = (slot.label || 'Break').toUpperCase();
+          bodyRowsHtml += `
+            <td rowspan="${days.length}" class="st-break-col" title="${escapeHtml(slot.label)} (${escapeHtml(slot.startTime)}–${escapeHtml(slot.endTime)})">
+              <span class="st-break-vertical">${escapeHtml(breakLabel)}</span>
+            </td>
+          `;
+        }
+        colIdx += 1;
+        continue;
+      }
+
+      const cellEntries = getSlotEntries(fullSchedule, d.index, slot.slotNo);
+      if (cellEntries.length === 0) {
+        const isLiveCell = isTodayRow && activeSlot && activeSlot.slotNo === slot.slotNo;
+        bodyRowsHtml += `<td class="st-empty-cell ${isLiveCell ? 'st-live-cell' : ''}" title="No class scheduled">—</td>`;
+        colIdx += 1;
+        continue;
+      }
+
+      // Merge identical consecutive teaching periods (never crossing break columns)
+      const sig = getCellSignature(cellEntries);
+      let span = 1;
+      while (colIdx + span < slots.length) {
+        const nextSlot = slots[colIdx + span];
+        if (nextSlot.isBreak) break;
+        const nextEntries = getSlotEntries(fullSchedule, d.index, nextSlot.slotNo);
+        if (getCellSignature(nextEntries) === sig) {
+          span += 1;
+        } else {
+          break;
+        }
+      }
+
+      const lastSpanSlot = slots[colIdx + span - 1];
+      const timeRangeLabel = `${slot.startTime}–${lastSpanSlot.endTime}`;
+      const isLiveCell = isTodayRow && activeSlot && activeSlot.slotNo >= slot.slotNo && activeSlot.slotNo <= lastSpanSlot.slotNo;
+
+      const cardsHtml = cellEntries.map(e => {
+        const isLab = Boolean(e.is_lab_block === 1 || e.subject_type === 'lab');
+        const fullTitle = [
+          `${e.subject_name || e.subject_code} (${e.subject_code || ''})`,
+          e.batch ? `Batch: ${e.batch}` : '',
+          `Faculty: ${e.faculty_name || 'TBA'}`,
+          `Room: ${e.room_name || 'TBA'}`,
+          `Time: ${timeRangeLabel}`
+        ].filter(Boolean).join(' · ');
+
+        return `
+          <div class="st-mini-card ${isLab ? 'st-is-lab' : ''}" title="${escapeHtml(fullTitle)}">
+            <div class="st-card-top">
+              <span class="st-subj-code">${escapeHtml(e.subject_code || e.subject_name)}</span>
+              ${e.batch ? `<span class="st-batch-badge">${escapeHtml(e.batch)}</span>` : ''}
+            </div>
+            <div class="st-faculty">${escapeHtml(formatShortFacultyName(e.faculty_name))}</div>
+            <div class="st-room">${escapeHtml(formatShortRoomName(e.room_name))}</div>
+          </div>
+        `;
+      }).join('');
+
+      bodyRowsHtml += `
+        <td ${span > 1 ? `colspan="${span}"` : ''} class="st-slot-cell ${isLiveCell ? 'st-live-cell' : ''}">
+          <div class="st-cell-stack">
+            ${cardsHtml}
+          </div>
+        </td>
+      `;
+
+      colIdx += span;
+    }
+
+    bodyRowsHtml += `</tr>`;
+  });
+
+  const weeklySignature = JSON.stringify({
+    slots: slots.map(s => [s.slotNo, s.startTime, s.endTime, s.isBreak]),
+    entries: fullSchedule.map(e => [e.day_index, e.slot_no, e.subject_code, e.batch, e.faculty_name, e.room_name])
+  });
+  const shouldAnimateWeekly = forceWeeklyFadeIn || weeklySignature !== lastWeeklyRenderSignature;
+  lastWeeklyRenderSignature = weeklySignature;
+  forceWeeklyFadeIn = false;
+
+  const weeklyCard = container.closest('.student-weekly-card');
+  if (shouldAnimateWeekly && weeklyCard) {
+    weeklyCard.classList.remove('is-refreshing');
+    void weeklyCard.offsetWidth; // Force reflow so keyframe fade-in re-triggers on refresh
+    weeklyCard.classList.add('is-refreshing');
+  }
+
+  container.innerHTML = `
+    <table class="student-weekly-table ${shouldAnimateWeekly ? 'st-weekly-fade-in' : ''}" aria-label="Full Weekly Timetable">
+      <colgroup>${colgroupHtml}</colgroup>
+      <thead>
+        <tr>
+          <th scope="col" class="st-corner-th">Day</th>
+          ${headerCellsHtml}
+        </tr>
+      </thead>
+      <tbody>
+        ${bodyRowsHtml}
+      </tbody>
+    </table>
+  `;
 }
 
 async function loadDepartmentTimetable() {

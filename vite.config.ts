@@ -5,13 +5,21 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // Express serves /public directly; prevent Vite from copying public/index.html over dist/index.html
+    publicDir: false as const,
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname || '.', '.'),
       },
     },
+    build: {
+      outDir: 'dist',
+      emptyOutDir: true,
+    },
     server: {
+      port: 3000,
+      host: '0.0.0.0',
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',

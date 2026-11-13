@@ -206,3 +206,489 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================================
+   MODIFIED: Student Portal Layout & Transposed Weekly Timetable (Scoped)
+   ============================================================================ */
+
+:root {
+  --student-crimson-text: var(--color-brand-primary);
+  --student-today-tint: rgba(107, 0, 16, 0.055);
+  --student-live-tint: rgba(107, 0, 16, 0.08);
+}
+
+[data-theme="dark"] {
+  --student-crimson-text: #FF6B79;
+  --student-today-tint: rgba(148, 12, 30, 0.14);
+  --student-live-tint: rgba(255, 90, 105, 0.12);
+}
+
+.student-main {
+  max-width: 1460px;
+  margin: 1.4rem auto 2.25rem;
+  padding: 0 1.25rem;
+  width: 100%;
+}
+
+.student-section-banner {
+  margin-bottom: 1.25rem;
+}
+
+.student-portal-grid {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+/* Left Sticky Today's Schedule Pane */
+.student-today-pane {
+  position: sticky;
+  top: 82px;
+  height: calc(100vh - 102px);
+  display: flex;
+  flex-direction: column;
+  padding: 1.1rem;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.student-today-header {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.student-date-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.student-quick-chips {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.student-status-legend {
+  display: flex;
+  gap: 0.65rem;
+  font-size: 0.74rem;
+  padding: 0.5rem 0.65rem;
+  background: var(--bg-surface-subtle);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.student-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  color: var(--text-secondary);
+}
+
+.student-legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.student-today-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding-right: 5px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 12, 30, 0.6) transparent;
+}
+
+.student-today-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.student-today-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.student-today-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 12, 30, 0.55);
+  border-radius: 999px;
+}
+
+.student-today-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-brand-accent);
+}
+
+/* Right Column: Next Class Banner + Medium-Sized Weekly Timetable */
+.student-timetable-col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  max-width: 1060px;
+  min-width: 0;
+}
+
+.student-tracker-banner {
+  padding: 1.1rem 1.35rem;
+}
+
+.student-weekly-card {
+  padding: 1.25rem;
+  overflow: visible;
+}
+
+.student-weekly-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.student-weekly-subtitle {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.student-weekly-table-wrap {
+  width: 100%;
+  overflow: visible;
+}
+
+@keyframes weeklyTimetableFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.st-weekly-fade-in {
+  animation: weeklyTimetableFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .st-weekly-fade-in {
+    animation: fadeIn 0.15s ease-out both;
+    transform: none !important;
+  }
+}
+
+/* Transposed Weekly Timetable Table (NO scrollbars, table-layout: fixed) */
+.student-weekly-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  font-size: clamp(10.5px, 0.8vw, 12.5px);
+}
+
+.student-weekly-table th,
+.student-weekly-table td {
+  border: 1px solid var(--border-subtle);
+  overflow-wrap: break-word;
+}
+
+.student-weekly-table thead th {
+  background: var(--bg-surface-subtle);
+  padding: 0.5rem 0.25rem;
+  text-align: center;
+  vertical-align: middle;
+  border-bottom: 2px solid var(--border-strong);
+}
+
+.st-corner-th {
+  font-size: clamp(10.5px, 0.78vw, 12px);
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.st-period-th {
+  position: relative;
+}
+
+.st-period-name {
+  font-weight: 700;
+  font-size: clamp(10.5px, 0.8vw, 12px);
+  color: var(--student-crimson-text);
+  line-height: 1.2;
+}
+
+.st-period-time {
+  font-family: var(--font-mono);
+  font-size: clamp(9px, 0.68vw, 10.5px);
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-top: 2px;
+  line-height: 1.15;
+}
+
+.st-period-th.st-current-period-head {
+  background: var(--student-live-tint);
+  box-shadow: inset 0 3px 0 var(--color-brand-accent);
+}
+
+.st-live-tag {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--color-brand-accent);
+  text-transform: uppercase;
+}
+
+.st-break-th {
+  background: var(--bg-surface-subtle);
+  padding: 0.35rem 0.08rem;
+}
+
+.st-break-th-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.st-break-th-time {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--text-muted);
+  opacity: 0.85;
+  margin-top: 2px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.st-day-cell {
+  background: var(--bg-surface-subtle);
+  text-align: center;
+  vertical-align: middle;
+  padding: 0.45rem 0.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: clamp(11px, 0.85vw, 13px);
+}
+
+.st-today-badge {
+  display: block;
+  margin-top: 2px;
+  font-size: 8.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--student-crimson-text);
+}
+
+tr.st-today-row {
+  background: var(--student-today-tint);
+}
+
+tr.st-today-row .st-day-cell {
+  border-left: 3px solid var(--color-brand-accent);
+  background: var(--student-live-tint);
+  color: var(--student-crimson-text);
+}
+
+/* Break Vertical Columns */
+td.st-break-col {
+  background: var(--bg-surface-subtle);
+  text-align: center;
+  vertical-align: middle;
+  padding: 0.5rem 0.1rem;
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+.st-break-vertical {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  display: inline-block;
+  font-size: clamp(9.5px, 0.72vw, 11px);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Timetable Class & Empty Cells */
+td.st-empty-cell {
+  text-align: center;
+  vertical-align: middle;
+  padding: 0.5rem 0.25rem;
+  color: var(--text-muted);
+  opacity: 0.45;
+  font-size: 12px;
+}
+
+td.st-slot-cell {
+  vertical-align: top;
+  padding: 4px;
+}
+
+td.st-slot-cell.st-live-cell {
+  background: var(--student-live-tint);
+  box-shadow: inset 0 0 0 1.5px var(--color-brand-accent);
+}
+
+.st-cell-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.st-mini-card {
+  background: var(--color-brand-blush-soft);
+  border: 1px solid var(--border-subtle);
+  border-left: 2.5px solid var(--color-brand-primary);
+  border-radius: 6px;
+  padding: 4px 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5px;
+  min-width: 0;
+}
+
+.st-mini-card.st-is-lab {
+  border-left-color: var(--color-brand-accent);
+}
+
+.st-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+  min-width: 0;
+}
+
+.st-subj-code {
+  font-weight: 700;
+  font-size: clamp(10.5px, 0.82vw, 12.5px);
+  color: var(--student-crimson-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.st-batch-badge {
+  flex-shrink: 0;
+  font-size: clamp(9px, 0.68vw, 10.5px);
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  line-height: 1.15;
+}
+
+.st-faculty {
+  font-size: clamp(10px, 0.74vw, 11.5px);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+}
+
+.st-room {
+  font-size: clamp(9.5px, 0.68vw, 11px);
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+@media (max-width: 1180px) {
+  .student-portal-grid {
+    grid-template-columns: 310px minmax(0, 1fr);
+    gap: 16px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .student-portal-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .student-today-pane {
+    position: static;
+    height: auto;
+    overflow: visible;
+  }
+
+  .student-today-scroll {
+    overflow-y: visible;
+    padding-right: 0;
+  }
+
+  .student-timetable-col {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  .student-main {
+    padding: 0 0.75rem;
+  }
+
+  .student-weekly-card {
+    padding: 0.75rem;
+  }
+
+  .student-weekly-table {
+    font-size: clamp(9px, 2vw, 11px);
+  }
+
+  .student-weekly-table thead th {
+    padding: 0.35rem 0.15rem;
+  }
+
+  td.st-slot-cell {
+    padding: 2px;
+  }
+
+  .st-mini-card {
+    padding: 3px;
+  }
+
+  .st-subj-code {
+    font-size: clamp(9px, 2.1vw, 11px);
+  }
+
+  .st-faculty,
+  .st-room,
+  .st-batch-badge {
+    font-size: clamp(8.5px, 1.8vw, 10px);
+  }
+}
+
